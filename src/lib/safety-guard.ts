@@ -19,27 +19,27 @@ interface Interaction {
 
 const DRUG_INTERACTIONS: Interaction[] = [
   // ── Anticoagulants
-  { drug_a: "warfarin",     drug_b: "aspirin",        severity: "critical", title: "Warfarin + Aspirin — Major Bleed Risk",     mechanism: "Additive antiplatelet effect; increases GI and intracranial bleed risk significantly.", alternatives: ["Paracetamol for analgesia"] },
-  { drug_a: "warfarin",     drug_b: "ibuprofen",       severity: "critical", title: "Warfarin + Ibuprofen — Bleeding",            mechanism: "NSAIDs inhibit platelet aggregation and displace warfarin from protein binding.",           alternatives: ["Paracetamol"] },
-  { drug_a: "warfarin",     drug_b: "diclofenac",      severity: "high",     title: "Warfarin + Diclofenac — Elevated INR",       mechanism: "Diclofenac inhibits CYP2C9, reducing warfarin metabolism, raising INR.",                    alternatives: ["Paracetamol", "Physiotherapy"] },
-  { drug_a: "warfarin",     drug_b: "ciprofloxacin",   severity: "high",     title: "Warfarin + Ciprofloxacin — INR Increase",    mechanism: "Quinolones inhibit CYP1A2; monitor INR closely or choose alternative antibiotic." },
+  { drug_a: "warfarin", drug_b: "aspirin", severity: "critical", title: "Warfarin + Aspirin — Major Bleed Risk", mechanism: "Additive antiplatelet effect; increases GI and intracranial bleed risk significantly.", alternatives: ["Paracetamol for analgesia"] },
+  { drug_a: "warfarin", drug_b: "ibuprofen", severity: "critical", title: "Warfarin + Ibuprofen — Bleeding", mechanism: "NSAIDs inhibit platelet aggregation and displace warfarin from protein binding.", alternatives: ["Paracetamol"] },
+  { drug_a: "warfarin", drug_b: "diclofenac", severity: "high", title: "Warfarin + Diclofenac — Elevated INR", mechanism: "Diclofenac inhibits CYP2C9, reducing warfarin metabolism, raising INR.", alternatives: ["Paracetamol", "Physiotherapy"] },
+  { drug_a: "warfarin", drug_b: "ciprofloxacin", severity: "high", title: "Warfarin + Ciprofloxacin — INR Increase", mechanism: "Quinolones inhibit CYP1A2; monitor INR closely or choose alternative antibiotic." },
   // ── Serotonin syndrome
-  { drug_a: "sertraline",   drug_b: "tramadol",        severity: "critical", title: "SSRI + Tramadol — Serotonin Syndrome",       mechanism: "Both increase serotonin; risk of hyperthermia, seizures, and death.",                       alternatives: ["Paracetamol", "non-opioid analgesia"] },
-  { drug_a: "fluoxetine",   drug_b: "tramadol",        severity: "critical", title: "SSRI + Tramadol — Serotonin Syndrome",       mechanism: "Fluoxetine's long half-life makes interaction particularly dangerous.",                     alternatives: ["Paracetamol"] },
-  { drug_a: "escitalopram", drug_b: "tramadol",        severity: "critical", title: "SSRI + Tramadol — Serotonin Syndrome",       mechanism: "Avoid combination; risk of serotonin syndrome." },
+  { drug_a: "sertraline", drug_b: "tramadol", severity: "critical", title: "SSRI + Tramadol — Serotonin Syndrome", mechanism: "Both increase serotonin; risk of hyperthermia, seizures, and death.", alternatives: ["Paracetamol", "non-opioid analgesia"] },
+  { drug_a: "fluoxetine", drug_b: "tramadol", severity: "critical", title: "SSRI + Tramadol — Serotonin Syndrome", mechanism: "Fluoxetine's long half-life makes interaction particularly dangerous.", alternatives: ["Paracetamol"] },
+  { drug_a: "escitalopram", drug_b: "tramadol", severity: "critical", title: "SSRI + Tramadol — Serotonin Syndrome", mechanism: "Avoid combination; risk of serotonin syndrome." },
   // ── QT prolongation
-  { drug_a: "azithromycin", drug_b: "chloroquine",     severity: "critical", title: "Azithromycin + Chloroquine — QT Prolongation", mechanism: "Additive QTc prolongation; risk of torsades de pointes.",                                  alternatives: ["Doxycycline for atypicals", "Artemether-lumefantrine"] },
-  { drug_a: "metronidazole",drug_b: "alcohol",          severity: "high",     title: "Metronidazole + Alcohol — Disulfiram Reaction", mechanism: "Inhibits acetaldehyde dehydrogenase; causes flushing, vomiting, tachycardia." },
+  { drug_a: "azithromycin", drug_b: "chloroquine", severity: "critical", title: "Azithromycin + Chloroquine — QT Prolongation", mechanism: "Additive QTc prolongation; risk of torsades de pointes.", alternatives: ["Doxycycline for atypicals", "Artemether-lumefantrine"] },
+  { drug_a: "metronidazole", drug_b: "alcohol", severity: "high", title: "Metronidazole + Alcohol — Disulfiram Reaction", mechanism: "Inhibits acetaldehyde dehydrogenase; causes flushing, vomiting, tachycardia." },
   // ── Metformin
-  { drug_a: "metformin",    drug_b: "iv_contrast",     severity: "critical", title: "Metformin + IV Contrast — Lactic Acidosis",  mechanism: "Contrast-induced nephropathy reduces metformin clearance; risk of fatal lactic acidosis.",  alternatives: ["Hold metformin 48h before/after contrast"] },
+  { drug_a: "metformin", drug_b: "iv_contrast", severity: "critical", title: "Metformin + IV Contrast — Lactic Acidosis", mechanism: "Contrast-induced nephropathy reduces metformin clearance; risk of fatal lactic acidosis.", alternatives: ["Hold metformin 48h before/after contrast"] },
   // ── ACE inhibitors + potassium
-  { drug_a: "enalapril",    drug_b: "spironolactone",  severity: "high",     title: "ACEi + Spironolactone — Hyperkalaemia",      mechanism: "Both raise serum potassium; risk of fatal arrhythmia, monitor K+ weekly.",                alternatives: ["Furosemide if diuresis needed"] },
-  { drug_a: "ramipril",     drug_b: "spironolactone",  severity: "high",     title: "ACEi + Spironolactone — Hyperkalaemia",      mechanism: "Dual blockade of RAAS increases hyperkalaemia risk substantially." },
+  { drug_a: "enalapril", drug_b: "spironolactone", severity: "high", title: "ACEi + Spironolactone — Hyperkalaemia", mechanism: "Both raise serum potassium; risk of fatal arrhythmia, monitor K+ weekly.", alternatives: ["Furosemide if diuresis needed"] },
+  { drug_a: "ramipril", drug_b: "spironolactone", severity: "high", title: "ACEi + Spironolactone — Hyperkalaemia", mechanism: "Dual blockade of RAAS increases hyperkalaemia risk substantially." },
   // ── Statins
-  { drug_a: "atorvastatin", drug_b: "clarithromycin",  severity: "high",     title: "Statin + Clarithromycin — Myopathy Risk",    mechanism: "Clarithromycin inhibits CYP3A4, increasing statin plasma levels → rhabdomyolysis.",       alternatives: ["Azithromycin (safer alternative)", "Reduce statin dose temporarily"] },
-  { drug_a: "simvastatin",  drug_b: "amlodipine",      severity: "medium",   title: "Simvastatin + Amlodipine — Myopathy",        mechanism: "Amlodipine inhibits CYP3A4; simvastatin dose must not exceed 20 mg/day.",                  alternatives: ["Switch to rosuvastatin (renal excretion)"] },
+  { drug_a: "atorvastatin", drug_b: "clarithromycin", severity: "high", title: "Statin + Clarithromycin — Myopathy Risk", mechanism: "Clarithromycin inhibits CYP3A4, increasing statin plasma levels → rhabdomyolysis.", alternatives: ["Azithromycin (safer alternative)", "Reduce statin dose temporarily"] },
+  { drug_a: "simvastatin", drug_b: "amlodipine", severity: "medium", title: "Simvastatin + Amlodipine — Myopathy", mechanism: "Amlodipine inhibits CYP3A4; simvastatin dose must not exceed 20 mg/day.", alternatives: ["Switch to rosuvastatin (renal excretion)"] },
   // ── Diabetes
-  { drug_a: "glibenclamide",drug_b: "ciprofloxacin",   severity: "high",     title: "Sulphonylurea + Ciprofloxacin — Hypoglycaemia", mechanism: "Fluoroquinolones potentiate insulin release; risk of severe hypoglycaemia.",              alternatives: ["Amoxicillin-clavulanate if appropriate"] },
+  { drug_a: "glibenclamide", drug_b: "ciprofloxacin", severity: "high", title: "Sulphonylurea + Ciprofloxacin — Hypoglycaemia", mechanism: "Fluoroquinolones potentiate insulin release; risk of severe hypoglycaemia.", alternatives: ["Amoxicillin-clavulanate if appropriate"] },
 ];
 
 // ─── Allergy → contraindicated drug mapping ───────────────────────────────────

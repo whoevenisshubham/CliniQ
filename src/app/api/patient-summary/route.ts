@@ -86,7 +86,7 @@ ${JSON.stringify(emrDigest, null, 2)}
 Generate the patient-friendly summary JSON now.`;
 
     const response = await groq.chat.completions.create({
-      model: "llama3-70b-8192",
+      model: "llama-3.3-70b-versatile",
       temperature: 0.4,
       response_format: { type: "json_object" },
       messages: [

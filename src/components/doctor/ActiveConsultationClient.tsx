@@ -369,7 +369,9 @@ function SafetyAlertSidebar({
               "p-3 rounded-lg border",
               alert.severity === "critical"
                 ? "bg-red-500/10 border-red-500/30"
-                : "bg-orange-500/10 border-orange-500/30"
+                : "bg-orange-500/10 border-orange-500/30",
+              // newly detected "live" alerts flash slightly longer
+              alert.id.startsWith("live-alert") && "animate-pulse border-red-500 ring-1 ring-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]"
             )}
           >
             <div className="flex items-start gap-2">
@@ -513,6 +515,8 @@ export function ActiveConsultationClient({
 
   const { safety_alerts, differentials, emr_entry, audit_entries, acknowledgeAlert, setIsExtracting, addAuditEntry } = useConsultationStore();
   const extractionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const liveSafetyTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastSafetyLengthRef = useRef(0);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved">("idle");
 
@@ -585,16 +589,78 @@ export function ActiveConsultationClient({
     }
   }, [consultationId]);
 
+  // Use a ref for transcript so we don't constantly reset the setInterval in useEffect
+  const transcriptRef = useRef(transcript);
+  useEffect(() => {
+    transcriptRef.current = transcript;
+  }, [transcript]);
+
+  // Phase 6 Live Safety Guard: Stream transcript chunks to LLM
+  const runLiveSafetyCheck = useCallback(async () => {
+    const currentTranscript = transcriptRef.current;
+    if (!currentTranscript) return;
+
+    // Safety check acts on the delta to avoid re-evaluating the whole transcript
+    const currentLength = currentTranscript.length;
+    if (currentLength - lastSafetyLengthRef.current < 20) return; // not enough new talk
+
+    const chunk = currentTranscript.slice(lastSafetyLengthRef.current);
+    lastSafetyLengthRef.current = currentLength;
+
+    try {
+      const res = await fetch("/api/safety/live", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transcriptChunk: chunk,
+          // In a real app, this comes from the patient's record
+          patientAllergies: ["Penicillin", "ACE Inhibitors", "Peanuts", "Aspirin"],
+          chronicConditions: ["Asthma", "Hypertension"]
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const newAlerts: SafetyAlert[] = (data.alerts ?? []).map((a: { drug: string; reason: string; severity: string }) => ({
+          id: `live-alert-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          consultation_id: consultationId,
+          alert_type: "contraindication",
+          severity: a.severity as "critical" | "high" | "medium" | "low",
+          title: `Potential Conflict: ${a.drug}`,
+          description: a.reason,
+          drug_a: a.drug,
+          acknowledged: false,
+          created_at: new Date().toISOString(),
+        })).filter((a: SafetyAlert) => !shownAlertIds.current.has(a.id));
+
+        if (newAlerts.length > 0) {
+          newAlerts.forEach((a) => shownAlertIds.current.add(a.id));
+          newAlerts.forEach((a) => useConsultationStore.getState().addSafetyAlert(a));
+
+          // Show the urgent ones in modal/sidebar immediately
+          const urgentAlerts = newAlerts.filter(a => a.severity === "critical" || a.severity === "high");
+          if (urgentAlerts.length > 0) {
+            setModalAlerts(urgentAlerts);
+            setShowModal(true);
+          }
+        }
+      }
+    } catch {
+      // Non-blocking
+    }
+  }, [patientName, consultationId]);
+
   // Auto-extract every 15s when recording
   const runExtraction = useCallback(async () => {
-    if (!transcript || transcript.length < 50) return;
+    const currentTranscript = transcriptRef.current;
+    if (!currentTranscript || currentTranscript.length < 50) return;
 
     setIsExtracting(true);
     try {
       const res = await fetch("/api/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transcript, consultationId }),
+        body: JSON.stringify({ transcript: currentTranscript, consultationId }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -634,18 +700,27 @@ export function ActiveConsultationClient({
     } finally {
       setIsExtracting(false);
     }
-  }, [transcript, consultationId, setIsExtracting, runSafetyCheck]);
+  }, [consultationId, setIsExtracting, runSafetyCheck]);
 
+  // We only run this effect when isRecording changes!
   useEffect(() => {
     if (isRecording) {
-      extractionTimerRef.current = setInterval(runExtraction, 15000);
+      extractionTimerRef.current = setInterval(runExtraction, 5000);
+      liveSafetyTimerRef.current = setInterval(runLiveSafetyCheck, 8000); // Check for drug conflicts every 8s
     } else {
       if (extractionTimerRef.current) clearInterval(extractionTimerRef.current);
+      if (liveSafetyTimerRef.current) clearInterval(liveSafetyTimerRef.current);
+
+      // Trigger one final extraction when recording is stopped (if there's a transcript)
+      if (transcriptRef.current && transcriptRef.current.length > 50) {
+        runExtraction();
+      }
     }
     return () => {
       if (extractionTimerRef.current) clearInterval(extractionTimerRef.current);
+      if (liveSafetyTimerRef.current) clearInterval(liveSafetyTimerRef.current);
     };
-  }, [isRecording, runExtraction]);
+  }, [isRecording, runExtraction, runLiveSafetyCheck]);
 
   const handleSave = async () => {
     setIsSaving(true);

@@ -32,12 +32,12 @@ function buildWhatsAppMessage(summary: PatientSummaryData, patientName: string, 
   const bullets = summary.bullets.map((b) => `• ${b}`).join("\n");
   const meds = summary.medication_instructions.length > 0
     ? `\n\n*${lang === "hi" ? "Dawaiyaan" : "Your Medicines"}:*\n` +
-      summary.medication_instructions.map((m) => `• ${m}`).join("\n")
+    summary.medication_instructions.map((m) => `• ${m}`).join("\n")
     : "";
   const followUp = `\n\n*${lang === "hi" ? "Agla appointment" : "Next Visit"}:* ${summary.follow_up}`;
   const redFlags = summary.red_flags.length > 0
     ? `\n\n*${lang === "hi" ? "⚠️ Turant doctor ko dikhao agar" : "⚠️ See doctor immediately if"}:*\n` +
-      summary.red_flags.map((r) => `• ${r}`).join("\n")
+    summary.red_flags.map((r) => `• ${r}`).join("\n")
     : "";
   const footer = `\n\n_NexusMD — ${lang === "hi" ? "Aapki sehat, humari zimmedari" : "Your health, our priority"}_`;
 
@@ -190,7 +190,7 @@ export function PatientSummaryPanel({
       <AnimatePresence mode="wait">
         {summary && !isLoading && (
           <motion.div
-            key={`${language}-${summary.headline.slice(0, 20)}`}
+            key={`${language}-${summary.headline?.slice(0, 20) ?? "summary"}`}
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
@@ -199,7 +199,7 @@ export function PatientSummaryPanel({
             {/* Headline */}
             <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-blue-500/8 border border-blue-500/20">
               <Sparkles className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
-              <p className="text-xs font-medium text-blue-200 leading-relaxed">{summary.headline}</p>
+              <p className="text-xs font-medium text-blue-200 leading-relaxed">{summary.headline ?? "Visit Summary"}</p>
             </div>
 
             {/* 3-bullet summary */}
