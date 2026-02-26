@@ -44,4 +44,8 @@ next-env.d.ts
 nul
 con
 prn
+<<<<<<< HEAD
 aux
+=======
+aux
+>>>>>>> a5fa477498d95bd0fb2a14b21c9ecdf9a46aa7fe
