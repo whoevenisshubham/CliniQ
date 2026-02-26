@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Windows reserved device names (prevent Tailwind/Turbopack scanning)
+nul
+con
+prn
+aux

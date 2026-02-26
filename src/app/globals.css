@@ -1,26 +1,135 @@
 @import "tailwindcss";
+@source not "../../nul";
+@source not "**/nul";
+@source not "**/con";
+@source not "**/aux";
+@source not "**/prn";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* NexusMD Clinical Dark Theme */
+  --background: #0a0f1e;
+  --background-secondary: #0d1526;
+  --surface: #111827;
+  --surface-elevated: #1a2540;
+  --border: #1e2d4a;
+  --border-subtle: #162035;
+
+  --foreground: #e2e8f0;
+  --foreground-muted: #94a3b8;
+  --foreground-subtle: #64748b;
+
+  /* Brand */
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-foreground: #ffffff;
+
+  /* Clinical Status */
+  --safe: #16a34a;
+  --safe-bg: #052e16;
+  --warning: #d97706;
+  --warning-bg: #1c0f00;
+  --critical: #dc2626;
+  --critical-bg: #240808;
+  --info: #0ea5e9;
+  --info-bg: #0c1a2e;
+
+  /* Recording */
+  --recording: #ef4444;
+
+  /* Sidebar */
+  --sidebar-width: 256px;
+  --sidebar-bg: #070c18;
+  --sidebar-border: #0f1c32;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+  border-color: var(--border);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--background); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--foreground-subtle); }
+
+/* Recording pulse keyframes */
+@keyframes pulse-record {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.4); }
+}
+
+@keyframes ripple {
+  0% { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+@keyframes typing-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fade-up {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-pulse-record {
+  animation: pulse-record 1.2s ease-in-out infinite;
+}
+
+.animate-ripple {
+  animation: ripple 1.5s ease-out infinite;
+}
+
+.animate-typing-cursor {
+  animation: typing-cursor 1s step-end infinite;
+}
+
+.animate-fade-up {
+  animation: fade-up 0.3s ease-out forwards;
+}
+
+/* Clinical grid background pattern */
+.clinical-grid {
+  background-image:
+    linear-gradient(rgba(37, 99, 235, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Gradient borders */
+.gradient-border {
+  border: 1px solid transparent;
+  background: linear-gradient(var(--surface), var(--surface)) padding-box,
+              linear-gradient(135deg, var(--primary), transparent 60%) border-box;
+}
+
+/* Status indicators */
+.status-dot-safe { background: var(--safe); box-shadow: 0 0 6px var(--safe); }
+.status-dot-warning { background: var(--warning); box-shadow: 0 0 6px var(--warning); }
+.status-dot-critical { background: var(--critical); box-shadow: 0 0 8px var(--critical); }
+
+/* Transcript text */
+.transcript-interim { color: var(--foreground-subtle); font-style: italic; }
+.transcript-final { color: var(--foreground); }
