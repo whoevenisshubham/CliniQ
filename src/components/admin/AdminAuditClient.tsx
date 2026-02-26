@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
     Shield, Search, Filter, Download, CheckCircle2,
@@ -78,9 +78,36 @@ export function AdminAuditClient({ user }: AdminAuditClientProps) {
     const [search, setSearch] = useState("");
     const [eventFilter, setEventFilter] = useState("all");
     const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [auditEntries, setAuditEntries] = useState(MOCK_AUDIT_ENTRIES);
+
+    useEffect(() => {
+        async function fetchData() {
+            try {
+                const res = await fetch('/api/audit?consultationId=all');
+                const data = await res.json();
+                if (data.entries?.length > 0) {
+                    const mapped = data.entries.map((e: Record<string, unknown>, i: number) => ({
+                        id: (e.id ?? `AUD-${String(i + 1).padStart(4, '0')}`) as string,
+                        event_type: (e.event_type ?? 'CONSULTATION_STARTED') as string,
+                        actor_id: (e.actor_id ?? 'sys') as string,
+                        actor_name: (e.actor_id ?? 'System') as string,
+                        actor_role: (e.actor_role ?? 'admin') as string,
+                        consultation_id: (e.consultation_id ?? '') as string,
+                        patient: '',
+                        timestamp: e.timestamp ? new Date(e.timestamp as string).toLocaleString() : 'Unknown',
+                        hash: ((e.hash ?? '') as string).substring(0, 16),
+                        previous_hash: ((e.previous_hash ?? '0000000000000000') as string).substring(0, 16),
+                        payload: (e.payload ?? { details: 'No details' }) as { details: string },
+                    }));
+                    setAuditEntries(mapped);
+                }
+            } catch { /* keep mock data */ }
+        }
+        fetchData();
+    }, []);
 
     const filtered = useMemo(() => {
-        return MOCK_AUDIT_ENTRIES.filter((e) => {
+        return auditEntries.filter((e) => {
             const matchesSearch =
                 e.actor_name.toLowerCase().includes(search.toLowerCase()) ||
                 e.patient.toLowerCase().includes(search.toLowerCase()) ||
@@ -89,7 +116,7 @@ export function AdminAuditClient({ user }: AdminAuditClientProps) {
             const matchesEvent = eventFilter === "all" || e.event_type === eventFilter;
             return matchesSearch && matchesEvent;
         });
-    }, [search, eventFilter]);
+    }, [search, eventFilter, auditEntries]);
 
     return (
         <div className="p-6 space-y-6 max-w-6xl mx-auto">
@@ -120,12 +147,12 @@ export function AdminAuditClient({ user }: AdminAuditClientProps) {
                     <div className="flex-1">
                         <p className="text-xs font-semibold text-green-400">Blockchain-like Audit Chain — Integrity Verified</p>
                         <p className="text-[10px] text-[var(--foreground-muted)] mt-0.5">
-                            All {MOCK_AUDIT_ENTRIES.length} events are cryptographically chained with SHA-256 hashes. No tampering detected.
+                            All {auditEntries.length} events are cryptographically chained with SHA-256 hashes. No tampering detected.
                         </p>
                     </div>
                     <div className="text-right">
                         <p className="text-[10px] text-[var(--foreground-subtle)]">Latest Hash</p>
-                        <p className="text-[10px] font-mono text-green-400">{MOCK_AUDIT_ENTRIES[0]?.hash}...</p>
+                        <p className="text-[10px] font-mono text-green-400">{auditEntries[0]?.hash}...</p>
                     </div>
                 </CardContent>
             </Card>

@@ -48,6 +48,14 @@ export const DEMO_USERS: Array<DemoUser & { password: string }> = [
     role: "research",
     department: "Clinical Research",
   },
+  {
+    id: "demo-receptionist-001",
+    email: "demo.reception@nexusmd.app",
+    password: "demo123456",
+    name: "Kavita (Receptionist)",
+    role: "receptionist",
+    department: "Front Desk",
+  },
 ];
 
 export const SESSION_COOKIE = "nexusmd_session";

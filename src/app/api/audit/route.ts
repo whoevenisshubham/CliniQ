@@ -60,20 +60,45 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const consultationId = searchParams.get("consultationId");
 
-  if (!consultationId) {
-    return NextResponse.json({ error: "consultationId required" }, { status: 400 });
-  }
-
   try {
     const supabase = getSupabaseAdminClient();
+
+    // If consultationId is "all" or not provided, return recent entries
+    if (!consultationId || consultationId === "all") {
+      const { data, error } = await supabase
+        .from("audit_log")
+        .select("*")
+        .order("timestamp", { ascending: false })
+        .limit(100);
+
+      if (error) {
+        // Try audit_logs table name as fallback
+        const { data: d2, error: e2 } = await supabase
+          .from("audit_logs")
+          .select("*")
+          .order("timestamp", { ascending: false })
+          .limit(100);
+        if (e2) return NextResponse.json({ entries: [], warning: e2.message });
+        return NextResponse.json({ entries: d2 ?? [] });
+      }
+      return NextResponse.json({ entries: data ?? [] });
+    }
+
     const { data, error } = await supabase
-      .from("audit_logs")
+      .from("audit_log")
       .select("*")
       .eq("consultation_id", consultationId)
       .order("timestamp", { ascending: true });
 
     if (error) {
-      return NextResponse.json({ entries: [], warning: error.message });
+      // Fallback to audit_logs table name
+      const { data: d2, error: e2 } = await supabase
+        .from("audit_logs")
+        .select("*")
+        .eq("consultation_id", consultationId)
+        .order("timestamp", { ascending: true });
+      if (e2) return NextResponse.json({ entries: [], warning: e2.message });
+      return NextResponse.json({ entries: d2 ?? [] });
     }
 
     return NextResponse.json({ entries: data ?? [] });

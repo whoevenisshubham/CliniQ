@@ -23,6 +23,7 @@ export function getRoleDashboardPath(role: UserRole): string {
     nurse: "/doctor",
     admin: "/admin",
     research: "/research",
+    receptionist: "/receptionist",
   };
   return paths[role] ?? "/";
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Calendar, Clock, Video, MapPin, Stethoscope,
@@ -69,10 +69,52 @@ export function PatientAppointmentsClient({ user }: PatientAppointmentsClientPro
     const [selectedType, setSelectedType] = useState("general");
     const [reason, setReason] = useState("");
     const [bookingSuccess, setBookingSuccess] = useState(false);
+    const [upcoming, setUpcoming] = useState(MOCK_UPCOMING);
+    const [past, setPast] = useState(MOCK_PAST_APPOINTMENTS);
+
+    const fetchAppointments = useCallback(async () => {
+        try {
+            const res = await fetch(`/api/patients/${user.id}/appointments`);
+            const data = await res.json();
+            if (data.upcoming?.length > 0 || data.past?.length > 0) {
+                const mapAppt = (a: Record<string, unknown>) => ({
+                    id: a.id as string,
+                    doctor: ((a.doctor as { name?: string })?.name ?? 'Doctor') as string,
+                    department: ((a.doctor as { department?: string })?.department ?? '') as string,
+                    date: new Date(a.date as string).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }),
+                    time: (a.time_slot ?? '') as string,
+                    type: (a.type ?? 'general') as 'general' | 'followup' | 'emergency' | 'teleconsult',
+                    mode: (a.mode ?? 'in-person') as 'in-person' | 'teleconsult',
+                    status: (a.status ?? 'confirmed') as 'confirmed' | 'completed' | 'cancelled',
+                    reason: (a.reason ?? '') as string,
+                });
+                if (data.upcoming?.length > 0) setUpcoming(data.upcoming.map(mapAppt));
+                if (data.past?.length > 0) setPast(data.past.map(mapAppt));
+            }
+        } catch { /* keep mock data */ }
+    }, [user.id]);
+
+    useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
 
     const selectedDoctorData = AVAILABLE_DOCTORS.find((d) => d.id === selectedDoctor);
 
-    const handleBook = () => {
+    const handleBook = async () => {
+        try {
+            const doc = AVAILABLE_DOCTORS.find((d) => d.id === selectedDoctor);
+            await fetch(`/api/patients/${user.id}/appointments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    doctor_id: doc?.id ?? selectedDoctor,
+                    date: selectedDate,
+                    time_slot: selectedSlot,
+                    type: selectedType,
+                    mode: selectedType === 'teleconsult' ? 'teleconsult' : 'in-person',
+                    reason,
+                }),
+            });
+        } catch { /* fallback to local success */ }
+
         setBookingSuccess(true);
         setTimeout(() => {
             setShowBooking(false);
@@ -82,6 +124,7 @@ export function PatientAppointmentsClient({ user }: PatientAppointmentsClientPro
             setSelectedSlot("");
             setSelectedType("general");
             setReason("");
+            fetchAppointments();
         }, 2000);
     };
 
@@ -153,8 +196,8 @@ export function PatientAppointmentsClient({ user }: PatientAppointmentsClientPro
                                                         key={doc.id}
                                                         onClick={() => { setSelectedDoctor(doc.id); setSelectedSlot(""); }}
                                                         className={`flex items-center gap-2.5 p-3 rounded-lg border text-left transition-all ${selectedDoctor === doc.id
-                                                                ? "border-blue-500/50 bg-blue-500/5"
-                                                                : "border-[var(--border)] hover:border-[var(--border)]/80"
+                                                            ? "border-blue-500/50 bg-blue-500/5"
+                                                            : "border-[var(--border)] hover:border-[var(--border)]/80"
                                                             }`}
                                                     >
                                                         <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
@@ -178,8 +221,8 @@ export function PatientAppointmentsClient({ user }: PatientAppointmentsClientPro
                                                         key={ct.value}
                                                         onClick={() => setSelectedType(ct.value)}
                                                         className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${selectedType === ct.value
-                                                                ? "border-blue-500/50 bg-blue-500/10 text-blue-400"
-                                                                : "border-[var(--border)] text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+                                                            ? "border-blue-500/50 bg-blue-500/10 text-blue-400"
+                                                            : "border-[var(--border)] text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
                                                             }`}
                                                     >
                                                         {ct.label}
@@ -210,8 +253,8 @@ export function PatientAppointmentsClient({ user }: PatientAppointmentsClientPro
                                                             key={slot}
                                                             onClick={() => setSelectedSlot(slot)}
                                                             className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${selectedSlot === slot
-                                                                    ? "border-blue-500/50 bg-blue-500/10 text-blue-400"
-                                                                    : "border-[var(--border)] text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+                                                                ? "border-blue-500/50 bg-blue-500/10 text-blue-400"
+                                                                : "border-[var(--border)] text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
                                                                 }`}
                                                         >
                                                             <Clock className="w-3 h-3 inline mr-1" />
@@ -256,11 +299,11 @@ export function PatientAppointmentsClient({ user }: PatientAppointmentsClientPro
                     <CardTitle className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-blue-400" />
                         Upcoming Appointments
-                        <Badge variant="secondary" className="ml-auto text-[9px]">{MOCK_UPCOMING.length}</Badge>
+                        <Badge variant="secondary" className="ml-auto text-[9px]">{upcoming.length}</Badge>
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                    {MOCK_UPCOMING.map((appt, i) => (
+                    {upcoming.map((appt, i) => (
                         <motion.div
                             key={appt.id}
                             initial={{ opacity: 0, y: 6 }}
@@ -308,7 +351,7 @@ export function PatientAppointmentsClient({ user }: PatientAppointmentsClientPro
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                    {MOCK_PAST_APPOINTMENTS.map((appt, i) => (
+                    {past.map((appt, i) => (
                         <motion.div
                             key={appt.id}
                             initial={{ opacity: 0, y: 4 }}

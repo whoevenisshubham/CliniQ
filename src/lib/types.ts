@@ -1,6 +1,6 @@
 // ─── User & Auth ────────────────────────────────────────────────────────────
 
-export type UserRole = "doctor" | "patient" | "nurse" | "admin" | "research";
+export type UserRole = "doctor" | "patient" | "nurse" | "admin" | "research" | "receptionist";
 
 export interface User {
   id: string;

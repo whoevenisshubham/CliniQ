@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
     BarChart3, TrendingUp, Users, Activity, DollarSign,
@@ -64,6 +64,40 @@ interface AdminAnalyticsClientProps {
 
 export function AdminAnalyticsClient({ user }: AdminAnalyticsClientProps) {
     const [timeRange, setTimeRange] = useState<"7d" | "30d" | "90d" | "1y">("30d");
+    const [topDiagnoses, setTopDiagnoses] = useState(TOP_DIAGNOSES);
+    const [doctorPerf, setDoctorPerf] = useState(DOCTOR_PERFORMANCE);
+    const [kpis, setKpis] = useState({ totalRevenue: '₹6,33,000', totalConsultations: '731', activeNow: '0' });
+
+    useEffect(() => {
+        async function fetchData() {
+            try {
+                const res = await fetch('/api/admin/analytics');
+                const data = await res.json();
+                if (data.stats) {
+                    setKpis({
+                        totalRevenue: `₹${Number(data.stats.total_revenue).toLocaleString('en-IN')}`,
+                        totalConsultations: String(data.stats.total_consultations),
+                        activeNow: String(data.stats.active_consultations),
+                    });
+                }
+                if (data.top_diagnoses?.length > 0) {
+                    setTopDiagnoses(data.top_diagnoses.map((d: { name: string; count: number }) => ({
+                        name: d.name, count: d.count, icd: '',
+                    })));
+                }
+                if (data.doctor_performance?.length > 0) {
+                    setDoctorPerf(data.doctor_performance.map((d: { name: string; department?: string; consultations: number }) => ({
+                        name: d.name,
+                        consultations: d.consultations,
+                        avg_duration: '—',
+                        satisfaction: 4.7,
+                        revenue: 0,
+                    })));
+                }
+            } catch { /* keep mock data */ }
+        }
+        fetchData();
+    }, []);
 
     return (
         <div className="p-6 space-y-6 max-w-6xl mx-auto">
@@ -81,8 +115,8 @@ export function AdminAnalyticsClient({ user }: AdminAnalyticsClientProps) {
                             key={range}
                             onClick={() => setTimeRange(range)}
                             className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${timeRange === range
-                                    ? "bg-blue-600 text-white shadow"
-                                    : "text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+                                ? "bg-blue-600 text-white shadow"
+                                : "text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
                                 }`}
                         >
                             {range}
@@ -94,8 +128,8 @@ export function AdminAnalyticsClient({ user }: AdminAnalyticsClientProps) {
             {/* KPI Cards */}
             <div className="grid grid-cols-4 gap-4">
                 {[
-                    { label: "Total Revenue", value: "₹6,33,000", delta: "+12.3%", up: true, icon: DollarSign, color: "text-green-400", bg: "bg-green-500/10" },
-                    { label: "Total Consultations", value: "731", delta: "+8.7%", up: true, icon: Activity, color: "text-blue-400", bg: "bg-blue-500/10" },
+                    { label: "Total Revenue", value: kpis.totalRevenue, delta: "+12.3%", up: true, icon: DollarSign, color: "text-green-400", bg: "bg-green-500/10" },
+                    { label: "Total Consultations", value: kpis.totalConsultations, delta: "+8.7%", up: true, icon: Activity, color: "text-blue-400", bg: "bg-blue-500/10" },
                     { label: "Avg. Satisfaction", value: "4.75", delta: "+0.2", up: true, icon: Heart, color: "text-pink-400", bg: "bg-pink-500/10" },
                     { label: "Safety Compliance", value: "97.8%", delta: "+1.1%", up: true, icon: Shield, color: "text-purple-400", bg: "bg-purple-500/10" },
                 ].map((kpi, i) => {
@@ -200,7 +234,7 @@ export function AdminAnalyticsClient({ user }: AdminAnalyticsClientProps) {
                     <CardContent>
                         <div className="h-56">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={TOP_DIAGNOSES} layout="vertical">
+                                <BarChart data={topDiagnoses} layout="vertical">
                                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
                                     <XAxis type="number" tick={{ fill: "var(--foreground-subtle)", fontSize: 10 }} />
                                     <YAxis type="category" dataKey="name" tick={{ fill: "var(--foreground-muted)", fontSize: 10 }} width={120} />
@@ -253,7 +287,7 @@ export function AdminAnalyticsClient({ user }: AdminAnalyticsClientProps) {
                         <span>Satisfaction</span>
                         <span>Revenue</span>
                     </div>
-                    {DOCTOR_PERFORMANCE.map((doc, i) => (
+                    {doctorPerf.map((doc, i) => (
                         <motion.div
                             key={doc.name}
                             initial={{ opacity: 0 }}

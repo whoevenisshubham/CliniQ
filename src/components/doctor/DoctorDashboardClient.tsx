@@ -75,8 +75,8 @@ function PatientRow({ appt, index }: { appt: typeof MOCK_APPOINTMENTS[0]; index:
         appt.status === "completed"
           ? "border-[var(--border-subtle)] opacity-60"
           : appt.urgency === "high"
-          ? "border-red-500/25 bg-red-500/5 hover:bg-red-500/10"
-          : "border-[var(--border)] hover:bg-[var(--surface-elevated)]"
+            ? "border-red-500/25 bg-red-500/5 hover:bg-red-500/10"
+            : "border-[var(--border)] hover:bg-[var(--surface-elevated)]"
       )}
     >
       {/* Avatar */}
@@ -116,7 +116,7 @@ function PatientRow({ appt, index }: { appt: typeof MOCK_APPOINTMENTS[0]; index:
 
       {/* Action */}
       {appt.status !== "completed" && (
-        <Link href={`/doctor/consultation/new?patientId=${appt.id}`}>
+        <Link href={`/doctor/consultation?id=new&patientId=${appt.id}&patientName=${encodeURIComponent(appt.name)}`}>
           <Button size="sm" className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
             <Stethoscope className="w-3 h-3" />
             Start
@@ -185,7 +185,7 @@ export function DoctorDashboardClient({ user }: DoctorDashboardClientProps) {
             <FileText className="w-3.5 h-3.5" />
             All Records
           </Button>
-          <Link href="/doctor/consultation/new">
+          <Link href="/doctor/consultation?id=new">
             <Button size="sm" className="gap-1.5">
               <Plus className="w-3.5 h-3.5" />
               New Consultation
@@ -246,12 +246,12 @@ export function DoctorDashboardClient({ user }: DoctorDashboardClientProps) {
                 <div key={i} className={cn(
                   "flex items-start gap-2 p-2 rounded-lg text-xs border",
                   alert.severity === "critical" ? "bg-red-500/10 border-red-500/20" :
-                  alert.severity === "high" ? "bg-orange-500/10 border-orange-500/20" :
-                  "bg-amber-500/10 border-amber-500/20"
+                    alert.severity === "high" ? "bg-orange-500/10 border-orange-500/20" :
+                      "bg-amber-500/10 border-amber-500/20"
                 )}>
                   <AlertTriangle className={cn("w-3 h-3 mt-0.5 shrink-0",
                     alert.severity === "critical" ? "text-red-400" :
-                    alert.severity === "high" ? "text-orange-400" : "text-amber-400"
+                      alert.severity === "high" ? "text-orange-400" : "text-amber-400"
                   )} />
                   <div>
                     <p className="font-medium text-[var(--foreground)]">{alert.drug}</p>

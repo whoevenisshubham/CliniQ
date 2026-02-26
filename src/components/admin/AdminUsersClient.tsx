@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Users, Search, Plus, Edit3, Shield, UserCheck, UserX,
@@ -46,22 +46,59 @@ export function AdminUsersClient({ user }: AdminUsersClientProps) {
     const [roleFilter, setRoleFilter] = useState<string>("all");
     const [showAddUser, setShowAddUser] = useState(false);
     const [newUser, setNewUser] = useState({ name: "", email: "", role: "doctor", department: "" });
+    const [users, setUsers] = useState(MOCK_USERS);
+
+    const fetchUsers = useCallback(async () => {
+        try {
+            const res = await fetch('/api/admin/users');
+            const data = await res.json();
+            if (data.users?.length > 0) {
+                const mapped = data.users.map((u: Record<string, unknown>) => ({
+                    id: u.id as string,
+                    name: (u.name ?? 'User') as string,
+                    email: (u.email ?? '') as string,
+                    role: (u.role ?? 'patient') as 'doctor' | 'nurse' | 'patient' | 'admin' | 'research',
+                    department: (u.department ?? '—') as string,
+                    status: (u.is_active !== false ? 'active' : 'inactive') as 'active' | 'inactive',
+                    last_active: u.updated_at ? new Date(u.updated_at as string).toLocaleDateString() : 'Unknown',
+                    consultations: 0,
+                    joined: new Date(u.created_at as string).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }),
+                }));
+                setUsers(mapped);
+            }
+        } catch { /* keep mock data */ }
+    }, []);
+
+    useEffect(() => { fetchUsers(); }, [fetchUsers]);
+
+    const handleCreateUser = async () => {
+        try {
+            await fetch('/api/admin/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newUser),
+            });
+            setShowAddUser(false);
+            setNewUser({ name: '', email: '', role: 'doctor', department: '' });
+            fetchUsers();
+        } catch { /* show error */ }
+    };
 
     const filtered = useMemo(() => {
-        return MOCK_USERS.filter((u) => {
+        return users.filter((u) => {
             const matchesSearch =
                 u.name.toLowerCase().includes(search.toLowerCase()) ||
                 u.email.toLowerCase().includes(search.toLowerCase());
             const matchesRole = roleFilter === "all" || u.role === roleFilter;
             return matchesSearch && matchesRole;
         });
-    }, [search, roleFilter]);
+    }, [search, roleFilter, users]);
 
     const roleCounts = useMemo(() => {
-        const counts: Record<string, number> = { all: MOCK_USERS.length };
-        MOCK_USERS.forEach((u) => { counts[u.role] = (counts[u.role] || 0) + 1; });
+        const counts: Record<string, number> = { all: users.length };
+        users.forEach((u) => { counts[u.role] = (counts[u.role] || 0) + 1; });
         return counts;
-    }, []);
+    }, [users]);
 
     return (
         <div className="p-6 space-y-6 max-w-6xl mx-auto">
@@ -110,7 +147,7 @@ export function AdminUsersClient({ user }: AdminUsersClientProps) {
                                         </select>
                                     </div>
                                     <div className="flex items-end">
-                                        <Button size="sm" className="w-full gap-1"><Check className="w-3.5 h-3.5" />Create User</Button>
+                                        <Button size="sm" className="w-full gap-1" onClick={handleCreateUser}><Check className="w-3.5 h-3.5" />Create User</Button>
                                     </div>
                                 </div>
                             </CardContent>
@@ -134,8 +171,8 @@ export function AdminUsersClient({ user }: AdminUsersClientProps) {
                             key={tab.key}
                             onClick={() => setRoleFilter(tab.key)}
                             className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${roleFilter === tab.key
-                                    ? "bg-blue-600 text-white shadow"
-                                    : "text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+                                ? "bg-blue-600 text-white shadow"
+                                : "text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
                                 }`}
                         >
                             {tab.label} ({roleCounts[tab.key] || 0})

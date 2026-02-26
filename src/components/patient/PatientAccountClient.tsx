@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
     User, Mail, Phone, Shield, Heart, Globe, Users,
@@ -50,6 +50,45 @@ export function PatientAccountClient({ user }: PatientAccountClientProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [profile, setProfile] = useState(MOCK_PROFILE);
     const [consents, setConsents] = useState(MOCK_CONSENTS);
+    const [family, setFamily] = useState(MOCK_FAMILY);
+
+    useEffect(() => {
+        async function fetchData() {
+            try {
+                const res = await fetch(`/api/patients/${user.id}/profile`);
+                const data = await res.json();
+                if (data.profile) {
+                    const p = data.profile;
+                    setProfile({
+                        name: p.name ?? MOCK_PROFILE.name,
+                        email: user.email ?? MOCK_PROFILE.email,
+                        phone: p.phone ?? MOCK_PROFILE.phone,
+                        dob: p.dob ?? MOCK_PROFILE.dob,
+                        gender: p.gender === 'F' ? 'Female' : p.gender === 'M' ? 'Male' : (p.gender ?? MOCK_PROFILE.gender),
+                        blood_group: p.blood_group ?? MOCK_PROFILE.blood_group,
+                        abha_id: p.abha_id ?? MOCK_PROFILE.abha_id,
+                        address: p.address ?? MOCK_PROFILE.address,
+                        allergies: p.allergies ?? MOCK_PROFILE.allergies,
+                        chronic_conditions: p.chronic_conditions ?? MOCK_PROFILE.chronic_conditions,
+                        emergency_contact: p.emergency_contact ?? MOCK_PROFILE.emergency_contact,
+                        language_pref: (p.language_pref ?? 'en') as 'en' | 'hi' | 'hinglish',
+                    });
+                    if (p.family_history && Array.isArray(p.family_history) && p.family_history.length > 0) {
+                        setFamily(p.family_history);
+                    }
+                }
+                if (data.consents?.length > 0) {
+                    setConsents(data.consents.map((c: Record<string, unknown>) => ({
+                        id: c.id as string,
+                        purpose: c.purpose as string,
+                        description: (c.description ?? '') as string,
+                        enabled: Boolean(c.enabled),
+                    })));
+                }
+            } catch { /* keep mock data */ }
+        }
+        fetchData();
+    }, [user.id, user.email]);
 
     const toggleConsent = (id: string) => {
         setConsents((prev) =>
@@ -223,8 +262,8 @@ export function PatientAccountClient({ user }: PatientAccountClientProps) {
                                         key={lang}
                                         onClick={() => setProfile({ ...profile, language_pref: lang })}
                                         className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${profile.language_pref === lang
-                                                ? "border-blue-500/50 bg-blue-500/10 text-blue-400"
-                                                : "border-[var(--border)] text-[var(--foreground-muted)]"
+                                            ? "border-blue-500/50 bg-blue-500/10 text-blue-400"
+                                            : "border-[var(--border)] text-[var(--foreground-muted)]"
                                             }`}
                                     >
                                         {lang === "en" ? "English" : lang === "hi" ? "हिन्दी" : "Hinglish"}
@@ -241,11 +280,11 @@ export function PatientAccountClient({ user }: PatientAccountClientProps) {
                         <CardTitle className="flex items-center gap-2">
                             <Users className="w-4 h-4 text-purple-400" />
                             Family Health Graph
-                            <Badge variant="secondary" className="ml-auto text-[9px]">{MOCK_FAMILY.length} linked</Badge>
+                            <Badge variant="secondary" className="ml-auto text-[9px]">{family.length} linked</Badge>
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
-                        {MOCK_FAMILY.map((member, i) => (
+                        {family.map((member, i) => (
                             <motion.div
                                 key={member.name}
                                 initial={{ opacity: 0, y: 4 }}

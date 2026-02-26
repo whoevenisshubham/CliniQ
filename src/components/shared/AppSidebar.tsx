@@ -111,6 +111,9 @@ const NAV_CONFIG: Record<UserRole, NavItem[]> = {
     { label: "Case Repository", href: "/research/cases", icon: FileText },
     { label: "Analytics", href: "/research/analytics", icon: BarChart3 },
   ],
+  receptionist: [
+    { label: "Front Desk", href: "/receptionist", icon: ClipboardList, description: "Queue & registration" },
+  ],
 };
 
 // ─── Role labels & colors ─────────────────────────────────────────────────────
@@ -121,6 +124,7 @@ const ROLE_META: Record<UserRole, { label: string; color: string; dot: string }>
   patient: { label: "Patient", color: "text-green-400", dot: "bg-green-400" },
   admin: { label: "Administrator", color: "text-purple-400", dot: "bg-purple-400" },
   research: { label: "Researcher", color: "text-amber-400", dot: "bg-amber-400" },
+  receptionist: { label: "Receptionist", color: "text-pink-400", dot: "bg-pink-400" },
 };
 
 // ─── Props ────────────────────────────────────────────────────────────────────

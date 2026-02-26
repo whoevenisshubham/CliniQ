@@ -111,7 +111,7 @@ export function useMedicalScribe(consultationId?: string): UseMedicalScribeRetur
       // Using hi-Latn model handles Hinglish (Hindi written in Latin script)
       const params = new URLSearchParams({
         model: "nova-2",
-        language: "hi-Latn",  // Hinglish: Hindi in Latin script
+        language: "hi",  // Hindi/Hinglish
         smart_format: "true",
         punctuate: "true",
         interim_results: "true",

@@ -474,7 +474,7 @@ function DifferentialPanel({
             <span className="text-xs font-medium text-[var(--foreground)] truncate">{d.condition}</span>
             <span className={cn("text-xs font-bold",
               d.probability >= 70 ? "text-green-400" :
-              d.probability >= 40 ? "text-yellow-400" : "text-[var(--foreground-subtle)]"
+                d.probability >= 40 ? "text-yellow-400" : "text-[var(--foreground-subtle)]"
             )}>
               {d.probability}%
             </span>
@@ -484,7 +484,7 @@ function DifferentialPanel({
             className="h-1.5"
             indicatorClassName={
               d.probability >= 70 ? "bg-green-500" :
-              d.probability >= 40 ? "bg-yellow-500" : "bg-slate-500"
+                d.probability >= 40 ? "bg-yellow-500" : "bg-slate-500"
             }
           />
           <p className="text-[10px] text-[var(--foreground-subtle)]">{d.reasoning}</p>
@@ -649,14 +649,95 @@ export function ActiveConsultationClient({
 
   const handleSave = async () => {
     setIsSaving(true);
-    await new Promise((r) => setTimeout(r, 1200));
+    try {
+      await fetch(`/api/consultations/${consultationId}/emr`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chief_complaint: emr_entry.chief_complaint ?? "",
+          symptoms: emr_entry.symptoms ?? [],
+          diagnosis: emr_entry.diagnosis ?? [],
+          icd_codes: emr_entry.icd_codes ?? [],
+          medications: emr_entry.medications ?? [],
+          lab_tests_ordered: emr_entry.lab_tests_ordered ?? [],
+          physical_examination: emr_entry.physical_examination ?? "",
+          vitals: emr_entry.vitals ?? {},
+          clinical_summary: emr_entry.clinical_summary ?? "",
+          patient_summary: emr_entry.patient_summary ?? "",
+          missing_fields: emr_entry.missing_fields ?? [],
+          gap_prompts: emr_entry.gap_prompts ?? [],
+        }),
+      });
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 3000);
+    } catch { /* graceful degradation */ }
     setIsSaving(false);
-    setSaveStatus("saved");
-    setTimeout(() => setSaveStatus("idle"), 3000);
   };
 
   const handleFinalize = async () => {
-    // Build audit chain entry for consultation end
+    // 1. Save EMR data
+    try {
+      await fetch(`/api/consultations/${consultationId}/emr`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chief_complaint: emr_entry.chief_complaint ?? "",
+          symptoms: emr_entry.symptoms ?? [],
+          diagnosis: emr_entry.diagnosis ?? [],
+          icd_codes: emr_entry.icd_codes ?? [],
+          medications: emr_entry.medications ?? [],
+          lab_tests_ordered: emr_entry.lab_tests_ordered ?? [],
+          physical_examination: emr_entry.physical_examination ?? "",
+          vitals: emr_entry.vitals ?? {},
+          clinical_summary: emr_entry.clinical_summary ?? "",
+          patient_summary: emr_entry.patient_summary ?? "",
+          missing_fields: emr_entry.missing_fields ?? [],
+          gap_prompts: emr_entry.gap_prompts ?? [],
+        }),
+      });
+    } catch { /* non-blocking */ }
+
+    // 2. Save prescriptions
+    if (emr_entry.medications && emr_entry.medications.length > 0) {
+      try {
+        await fetch(`/api/consultations/${consultationId}/prescriptions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prescriptions: emr_entry.medications,
+            doctor_id: "doctor-demo",
+          }),
+        });
+      } catch { /* non-blocking */ }
+    }
+
+    // 3. Save billing draft
+    const { billing_draft } = useConsultationStore.getState();
+    if (billing_draft && (billing_draft.total ?? 0) > 0) {
+      try {
+        await fetch(`/api/consultations/${consultationId}/billing`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(billing_draft),
+        });
+      } catch { /* non-blocking */ }
+    }
+
+    // 4. Update consultation status to completed
+    try {
+      await fetch("/api/consultations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: consultationId,
+          status: "completed",
+          ended_at: new Date().toISOString(),
+          chief_complaint: emr_entry.chief_complaint ?? "",
+        }),
+      });
+    } catch { /* non-blocking */ }
+
+    // 5. Build audit chain entry for consultation end
     const prevHash = audit_entries.length > 0
       ? audit_entries[audit_entries.length - 1].hash
       : GENESIS_HASH;
@@ -682,13 +763,19 @@ export function ActiveConsultationClient({
 
       addAuditEntry(entry);
 
-      // Persist to Supabase (non-blocking)
       fetch("/api/audit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(entry),
-      }).catch(() => {/* graceful degradation */});
-    } catch {/* audit failure is non-blocking */}
+      }).catch(() => {/* graceful degradation */ });
+    } catch {/* audit failure is non-blocking */ }
+
+    // 6. Update queue status
+    fetch("/api/queue", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ consultation_id: consultationId, status: "completed" }),
+    }).catch(() => { });
 
     stopRecording();
   };

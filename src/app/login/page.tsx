@@ -6,28 +6,30 @@ import { motion } from "framer-motion";
 import { Activity, Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
 
 const DEMO_ROLES = [
-  { label: "Doctor",  email: "demo.doctor@nexusmd.app"  },
+  { label: "Doctor", email: "demo.doctor@nexusmd.app" },
   { label: "Patient", email: "demo.patient@nexusmd.app" },
-  { label: "Admin",   email: "demo.admin@nexusmd.app"   },
+  { label: "Admin", email: "demo.admin@nexusmd.app" },
+  { label: "Reception", email: "demo.reception@nexusmd.app" },
 ] as const;
 
 const ROLE_PATHS: Record<string, string> = {
   doctor: "/doctor", nurse: "/doctor",
   patient: "/patient", admin: "/admin", research: "/research",
+  receptionist: "/receptionist",
 };
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail]       = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPw, setShowPw]     = useState(false);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState<string | null>(null);
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function doLogin(e: string, p: string) {
     setLoading(true);
     setError(null);
-    const res  = await fetch("/api/auth/login", {
+    const res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: e, password: p }),
@@ -113,6 +115,7 @@ export default function LoginPage() {
               demo.doctor@nexusmd.app<br />
               demo.patient@nexusmd.app<br />
               demo.admin@nexusmd.app<br />
+              demo.reception@nexusmd.app<br />
               <span className="text-[var(--foreground-muted)]">password: demo123456</span>
             </p>
           </div>

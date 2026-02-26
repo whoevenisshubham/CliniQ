@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
     FileText, Search, Calendar, ChevronDown, ChevronRight,
     Activity, Pill, TrendingUp, Download, Filter, Heart,
-    Thermometer, Droplets, Scale
+    Thermometer, Droplets, Scale, Loader2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,68 +16,57 @@ import {
     ResponsiveContainer, Area, AreaChart
 } from "recharts";
 
-// ─── Mock data ─────────────────────────────────────────────────────────────────
+// ─── Types ──────────────────────────────────────────────────────────────────
+interface ConsultationReport {
+    id: string;
+    date: string;
+    doctor: string;
+    department: string;
+    type: string;
+    diagnosis: string[];
+    icd_codes: string[];
+    chief_complaint: string;
+    vitals: { bp: string; hr: number; temp: number; spo2: number; weight: number };
+    medications: string[];
+    lab_tests: string[];
+    summary: string;
+    status: "completed" | "active" | "draft";
+}
 
-const MOCK_CONSULTATIONS = [
+// ─── Fallback mock data ─────────────────────────────────────────────────────
+const MOCK_CONSULTATIONS: ConsultationReport[] = [
     {
-        id: "c1",
-        date: "Feb 15, 2026",
-        doctor: "Dr. Arjun Sharma",
-        department: "Internal Medicine",
-        type: "followup",
-        diagnosis: ["Type 2 Diabetes - Follow-up"],
-        icd_codes: ["E11.9"],
+        id: "c1", date: "Feb 15, 2026", doctor: "Dr. Arjun Sharma",
+        department: "Internal Medicine", type: "followup",
+        diagnosis: ["Type 2 Diabetes - Follow-up"], icd_codes: ["E11.9"],
         chief_complaint: "Uncontrolled blood sugar, fatigue",
         vitals: { bp: "138/88", hr: 78, temp: 98.4, spo2: 97, weight: 68 },
         medications: ["Metformin 500mg — Twice daily", "Amlodipine 5mg — Once daily"],
         lab_tests: ["HbA1c — 7.2%", "Fasting glucose — 142 mg/dL", "Lipid panel — Normal"],
-        summary: "Patient's blood sugar levels remain above target. Metformin dosage maintained, lifestyle modifications emphasized. Follow-up scheduled in 4 weeks for repeat HbA1c.",
-        status: "completed" as const,
+        summary: "Patient's blood sugar levels remain above target. Metformin dosage maintained, lifestyle modifications emphasized.",
+        status: "completed",
     },
     {
-        id: "c2",
-        date: "Jan 20, 2026",
-        doctor: "Dr. Arjun Sharma",
-        department: "Internal Medicine",
-        type: "followup",
-        diagnosis: ["Hypertension Management"],
-        icd_codes: ["I10"],
+        id: "c2", date: "Jan 20, 2026", doctor: "Dr. Arjun Sharma",
+        department: "Internal Medicine", type: "followup",
+        diagnosis: ["Hypertension Management"], icd_codes: ["I10"],
         chief_complaint: "BP monitoring, dizziness",
         vitals: { bp: "144/92", hr: 82, temp: 98.2, spo2: 98, weight: 69 },
         medications: ["Amlodipine 5mg — Once daily", "Atorvastatin 10mg — Once at night"],
         lab_tests: ["Serum Creatinine — 0.9 mg/dL", "Electrolytes — Normal"],
-        summary: "Blood pressure elevated. Amlodipine dose maintained, added dietary sodium restriction counseling. Patient advised daily home BP monitoring.",
-        status: "completed" as const,
+        summary: "Blood pressure elevated. Amlodipine dose maintained, added dietary sodium restriction counseling.",
+        status: "completed",
     },
     {
-        id: "c3",
-        date: "Dec 10, 2025",
-        doctor: "Dr. Neha Patel",
-        department: "General Medicine",
-        type: "general",
-        diagnosis: ["Seasonal Flu", "Viral Upper Respiratory Infection"],
-        icd_codes: ["J06.9", "J11.1"],
+        id: "c3", date: "Dec 10, 2025", doctor: "Dr. Neha Patel",
+        department: "General Medicine", type: "general",
+        diagnosis: ["Seasonal Flu", "Viral Upper Respiratory Infection"], icd_codes: ["J06.9", "J11.1"],
         chief_complaint: "Fever, body ache, cough for 3 days",
         vitals: { bp: "130/84", hr: 88, temp: 100.8, spo2: 96, weight: 68.5 },
         medications: ["Paracetamol 500mg — As needed", "Cetirizine 10mg — Once daily"],
         lab_tests: ["CBC — Mild lymphocytosis", "CRP — 12 mg/L (elevated)"],
-        summary: "Viral illness, symptomatic management prescribed. Advised rest and hydration. Cleared in follow-up call after 5 days.",
-        status: "completed" as const,
-    },
-    {
-        id: "c4",
-        date: "Oct 5, 2025",
-        doctor: "Dr. Arjun Sharma",
-        department: "Internal Medicine",
-        type: "followup",
-        diagnosis: ["Type 2 Diabetes - Initial Diagnosis"],
-        icd_codes: ["E11.65"],
-        chief_complaint: "Excessive thirst, frequent urination, fatigue",
-        vitals: { bp: "136/86", hr: 76, temp: 98.6, spo2: 98, weight: 70 },
-        medications: ["Metformin 500mg — Once daily (started)"],
-        lab_tests: ["HbA1c — 8.1%", "Fasting glucose — 186 mg/dL", "OGTT — Abnormal"],
-        summary: "New diagnosis of Type 2 Diabetes. Started on Metformin. Comprehensive lifestyle counseling provided. Referral to nutritionist.",
-        status: "completed" as const,
+        summary: "Viral illness, symptomatic management prescribed. Advised rest and hydration.",
+        status: "completed",
     },
 ];
 
@@ -96,11 +85,59 @@ interface PatientReportsClientProps {
 }
 
 export function PatientReportsClient({ user }: PatientReportsClientProps) {
+    const [consultations, setConsultations] = useState<ConsultationReport[]>(MOCK_CONSULTATIONS);
+    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [activeChart, setActiveChart] = useState<"bp" | "sugar" | "weight">("bp");
 
-    const filtered = MOCK_CONSULTATIONS.filter(
+    // Fetch from real API, fall back to mock data
+    useEffect(() => {
+        async function fetchData() {
+            try {
+                const res = await fetch(`/api/patients/${user.id}/consultations`);
+                const data = await res.json();
+                if (data.consultations?.length > 0) {
+                    // Transform DB format to component format
+                    const mapped: ConsultationReport[] = data.consultations.map((c: Record<string, unknown>) => {
+                        const emr = Array.isArray(c.emr_entries) && c.emr_entries.length > 0 ? c.emr_entries[0] : null;
+                        const doctor = c.doctor as { name?: string; department?: string } | null;
+                        const vitals = (emr?.vitals ?? {}) as Record<string, number>;
+                        const meds = (emr?.medications ?? []) as Array<{ name: string; dosage: string; frequency: string }>;
+                        return {
+                            id: c.id as string,
+                            date: new Date(c.started_at as string).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" }),
+                            doctor: doctor?.name ?? "Doctor",
+                            department: doctor?.department ?? "",
+                            type: (c.consultation_type ?? c.type ?? "general") as string,
+                            diagnosis: (emr?.diagnosis ?? []) as string[],
+                            icd_codes: ((emr?.icd_codes ?? []) as Array<{ code: string }>).map((ic) => ic.code),
+                            chief_complaint: (emr?.chief_complaint ?? c.chief_complaint ?? "") as string,
+                            vitals: {
+                                bp: `${vitals.bp_systolic ?? "-"}/${vitals.bp_diastolic ?? "-"}`,
+                                hr: vitals.heart_rate ?? 0,
+                                temp: vitals.temperature ?? 0,
+                                spo2: vitals.spo2 ?? 0,
+                                weight: vitals.weight ?? 0,
+                            },
+                            medications: meds.map((m) => `${m.name} ${m.dosage} — ${m.frequency}`),
+                            lab_tests: (emr?.lab_tests_ordered ?? []) as string[],
+                            summary: (emr?.physical_examination ?? "") as string,
+                            status: (c.status ?? "completed") as "completed" | "active" | "draft",
+                        };
+                    });
+                    setConsultations(mapped);
+                }
+            } catch {
+                // Keep mock data on error
+            } finally {
+                setLoading(false);
+            }
+        }
+        fetchData();
+    }, [user.id]);
+
+    const filtered = consultations.filter(
         (c) =>
             c.diagnosis.some((d) => d.toLowerCase().includes(searchQuery.toLowerCase())) ||
             c.doctor.toLowerCase().includes(searchQuery.toLowerCase()) ||

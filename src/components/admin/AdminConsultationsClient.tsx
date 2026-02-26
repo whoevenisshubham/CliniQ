@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
     ClipboardList, Search, Filter, Download, Calendar,
@@ -42,9 +42,43 @@ export function AdminConsultationsClient({ user }: AdminConsultationsClientProps
     const [statusFilter, setStatusFilter] = useState<string>("all");
     const [typeFilter, setTypeFilter] = useState<string>("all");
     const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [consultations, setConsultations] = useState(MOCK_CONSULTATIONS);
+
+    useEffect(() => {
+        async function fetchData() {
+            try {
+                const res = await fetch('/api/admin/consultations');
+                const data = await res.json();
+                if (data.consultations?.length > 0) {
+                    const mapped = data.consultations.map((c: Record<string, unknown>, i: number) => {
+                        const patient = c.patient as { name?: string } | null;
+                        const doctor = c.doctor as { name?: string } | null;
+                        const emr = Array.isArray(c.emr_entries) && c.emr_entries.length > 0 ? c.emr_entries[0] : null;
+                        const billing = Array.isArray(c.billing) && c.billing.length > 0 ? c.billing[0] : null;
+                        return {
+                            id: `CON-${String(i + 1).padStart(3, '0')}`,
+                            patient: patient?.name ?? 'Patient',
+                            doctor: doctor?.name ?? 'Doctor',
+                            date: new Date(c.started_at as string).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }),
+                            time: new Date(c.started_at as string).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                            duration: c.duration_sec ? `${Math.round(Number(c.duration_sec) / 60)} min` : '—',
+                            type: (c.consultation_type ?? c.type ?? 'general') as string,
+                            mode: (c.mode ?? 'in-person') as string,
+                            status: (c.status ?? 'active') as string,
+                            diagnosis: (emr?.chief_complaint ?? c.chief_complaint ?? '—') as string,
+                            icd: ((emr?.icd_codes ?? []) as Array<{ code: string }>).map(ic => ic.code),
+                            billing: billing ? Number(billing.total ?? 0) : 0,
+                        };
+                    });
+                    setConsultations(mapped);
+                }
+            } catch { /* keep mock data */ }
+        }
+        fetchData();
+    }, []);
 
     const filtered = useMemo(() => {
-        return MOCK_CONSULTATIONS.filter((c) => {
+        return consultations.filter((c) => {
             const matchesSearch =
                 c.patient.toLowerCase().includes(search.toLowerCase()) ||
                 c.doctor.toLowerCase().includes(search.toLowerCase()) ||
@@ -54,12 +88,15 @@ export function AdminConsultationsClient({ user }: AdminConsultationsClientProps
             const matchesType = typeFilter === "all" || c.type === typeFilter;
             return matchesSearch && matchesStatus && matchesType;
         });
-    }, [search, statusFilter, typeFilter]);
+    }, [search, statusFilter, typeFilter, consultations]);
 
     // Stats
-    const totalToday = MOCK_CONSULTATIONS.filter((c) => c.date === "Feb 15, 2026").length;
-    const activeCount = MOCK_CONSULTATIONS.filter((c) => c.status === "active").length;
-    const totalRevenue = MOCK_CONSULTATIONS.reduce((sum, c) => sum + c.billing, 0);
+    const totalToday = consultations.filter((c) => {
+        const today = new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
+        return c.date === today;
+    }).length;
+    const activeCount = consultations.filter((c) => c.status === "active").length;
+    const totalRevenue = consultations.reduce((sum, c) => sum + c.billing, 0);
 
     const handleExport = () => {
         const csv = [
@@ -94,7 +131,7 @@ export function AdminConsultationsClient({ user }: AdminConsultationsClientProps
             {/* Stats */}
             <div className="grid grid-cols-4 gap-3">
                 {[
-                    { label: "Total Consultations", value: MOCK_CONSULTATIONS.length.toString(), color: "text-blue-400", bg: "bg-blue-500/10" },
+                    { label: "Total Consultations", value: consultations.length.toString(), color: "text-blue-400", bg: "bg-blue-500/10" },
                     { label: "Today", value: totalToday.toString(), color: "text-green-400", bg: "bg-green-500/10" },
                     { label: "Active Now", value: activeCount.toString(), color: "text-amber-400", bg: "bg-amber-500/10" },
                     { label: "Total Revenue", value: `₹${totalRevenue.toLocaleString()}`, color: "text-purple-400", bg: "bg-purple-500/10" },
