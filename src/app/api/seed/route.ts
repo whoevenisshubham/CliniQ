@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// Uses service role key — server only
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
+function getSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("Missing Supabase environment variables.");
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
 const DEMO_USERS = [
   {
     email: "demo.doctor@nexusmd.app",
@@ -54,6 +59,8 @@ const DEMO_USERS = [
 export async function POST() {
   const results: { email: string; status: string; error?: string }[] = [];
 
+  const supabaseAdmin = getSupabaseAdmin();
+
   // Step 1: Ensure the users table exists by checking schema
   const { error: tableCheckError } = await supabaseAdmin
     .from("users")
@@ -73,12 +80,15 @@ export async function POST() {
     );
   }
 
+  // Fetch existing users before the loop
+  const { data: existing } = await supabaseAdmin.auth.admin.listUsers();
+  const existingUsers = existing?.users ?? [];
+
   // Step 2: Create each demo user
   for (const demo of DEMO_USERS) {
     try {
       // Check if user already exists
-      const { data: existing } = await supabaseAdmin.auth.admin.listUsers();
-      const alreadyExists = existing?.users?.find((u) => u.email === demo.email);
+      const alreadyExists = existingUsers.find((u) => u.email === demo.email);
 
       let userId: string;
 
@@ -169,6 +179,8 @@ export async function POST() {
 }
 
 export async function GET() {
+  const supabaseAdmin = getSupabaseAdmin();
+
   // Quick health check — tells client if tables exist and users are seeded
   const { error: tableError } = await supabaseAdmin
     .from("users")

@@ -3,7 +3,10 @@ import { Groq } from "groq-sdk";
 
 export const maxDuration = 10; // set a max duration since groq is fast
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+function getGroq() {
+    if (!process.env.GROQ_API_KEY) throw new Error("Missing GROQ_API_KEY");
+    return new Groq({ apiKey: process.env.GROQ_API_KEY });
+}
 
 // System prompt optimized for speed and precise JSON extraction
 const SYSTEM_PROMPT = `You are a clinical safety AI (Liability Shield).
@@ -23,6 +26,7 @@ JSON format:
 }`;
 
 export async function POST(request: Request) {
+    const groq = getGroq();
     try {
         const { transcriptChunk, patientAllergies, chronicConditions } = await request.json();
 
