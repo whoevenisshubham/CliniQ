@@ -303,7 +303,7 @@ export function DoctorDashboardClient({ user }: DoctorDashboardClientProps) {
       </div>
 
       {/* ─── Family Health Graph ──────────────────────────────────── */}
-      <FamilyHealthGraph />
+      <FamilyHealthGraph patientId={MOCK_APPOINTMENTS[0]?.id} />
     </div>
   );
 }

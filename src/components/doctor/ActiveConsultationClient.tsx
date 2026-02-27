@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Clock, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp,
   HeartPulse, Pill, Stethoscope, FlaskConical, Brain,
-  FileText, Save, Send, Loader2, Info, MapPin, X, Mic, ShieldCheck, Sparkles
+  FileText, Save, Send, Loader2, Info, MapPin, X, Mic, ShieldCheck, Sparkles, Plus
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,7 @@ import { useConsultationStore } from "@/store/consultationStore";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { buildAuditEntry, buildConsultationSummaryPayload, GENESIS_HASH } from "@/lib/audit-chain";
 import { cn } from "@/lib/utils";
+import { generateMedicalReport } from "@/lib/report-generator";
 import type { SafetyAlert, Differential } from "@/lib/types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -137,13 +138,124 @@ function EpiSeasonBadge({
 // ─── EMR Live Panel ───────────────────────────────────────────────────────────
 
 function EMRLivePanel() {
-  const { emr_entry, is_extracting } = useConsultationStore();
+  const { emr_entry, is_extracting, updateEMR } = useConsultationStore();
   const [expanded, setExpanded] = useState({
     vitals: true, symptoms: true, diagnosis: true, medications: true, labs: false,
   });
 
+  // Inline editing state
+  const [editingVital, setEditingVital] = useState<string | null>(null);
+  const [editingSymptom, setEditingSymptom] = useState<number | null>(null);
+  const [editingDiagnosis, setEditingDiagnosis] = useState<number | null>(null);
+  const [editingMed, setEditingMed] = useState<number | null>(null);
+  const [editingLab, setEditingLab] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [addingTo, setAddingTo] = useState<"symptoms" | "diagnosis" | "medications" | "labs" | null>(null);
+  const [addValue, setAddValue] = useState("");
+  const [addMedFields, setAddMedFields] = useState({ name: "", dosage: "", frequency: "", duration: "" });
+  const editRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { editRef.current?.focus(); }, [editingVital, editingSymptom, editingDiagnosis, editingMed, editingLab, addingTo]);
+
   const toggle = (key: keyof typeof expanded) =>
     setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  // ─── Vitals edit helpers ────────────────────────────────────────
+  const vitalKeyMap: Record<string, string> = { "BP": "bp", "HR": "heart_rate", "SpO₂": "spo2", "Temp": "temperature", "Weight": "weight", "Height": "height" };
+
+  const handleVitalSave = (label: string, val: string) => {
+    const v = { ...(emr_entry.vitals ?? {}) };
+    if (label === "BP") {
+      const parts = val.split("/");
+      (v as Record<string, unknown>).bp_systolic = parseInt(parts[0]) || undefined;
+      (v as Record<string, unknown>).bp_diastolic = parseInt(parts[1]) || undefined;
+    } else {
+      const key = vitalKeyMap[label];
+      if (key) (v as Record<string, unknown>)[key] = parseFloat(val) || undefined;
+    }
+    updateEMR({ vitals: v as typeof emr_entry.vitals });
+    setEditingVital(null);
+  };
+
+  // ─── Symptoms helpers ──────────────────────────────────────────
+  const handleSymptomEdit = (idx: number, val: string) => {
+    const syms = [...(emr_entry.symptoms ?? [])];
+    syms[idx] = val;
+    updateEMR({ symptoms: syms });
+    setEditingSymptom(null);
+  };
+  const handleSymptomDelete = (idx: number) => {
+    const syms = [...(emr_entry.symptoms ?? [])];
+    syms.splice(idx, 1);
+    updateEMR({ symptoms: syms });
+  };
+  const handleSymptomAdd = () => {
+    if (!addValue.trim()) return;
+    updateEMR({ symptoms: [...(emr_entry.symptoms ?? []), addValue.trim()] });
+    setAddValue(""); setAddingTo(null);
+  };
+
+  // ─── Diagnosis helpers ─────────────────────────────────────────
+  const handleDiagnosisEdit = (idx: number, val: string) => {
+    const codes = [...(emr_entry.icd_codes ?? [])];
+    codes[idx] = { ...codes[idx], description: val };
+    updateEMR({ icd_codes: codes });
+    setEditingDiagnosis(null);
+  };
+  const handleDiagnosisDelete = (idx: number) => {
+    const codes = [...(emr_entry.icd_codes ?? [])];
+    codes.splice(idx, 1);
+    updateEMR({ icd_codes: codes });
+  };
+  const handleDiagnosisAdd = () => {
+    if (!addValue.trim()) return;
+    updateEMR({ icd_codes: [...(emr_entry.icd_codes ?? []), { code: "—", description: addValue.trim(), confidence: 1.0 }] });
+    setAddValue(""); setAddingTo(null);
+  };
+
+  // ─── Medication helpers ────────────────────────────────────────
+  const handleMedEdit = (idx: number, val: string) => {
+    const meds = [...(emr_entry.medications ?? [])];
+    meds[idx] = { ...meds[idx], name: val };
+    updateEMR({ medications: meds });
+    setEditingMed(null);
+  };
+  const handleMedDelete = (idx: number) => {
+    const meds = [...(emr_entry.medications ?? [])];
+    meds.splice(idx, 1);
+    updateEMR({ medications: meds });
+  };
+  const handleMedAdd = () => {
+    if (!addMedFields.name.trim()) return;
+    updateEMR({
+      medications: [...(emr_entry.medications ?? []), {
+        name: addMedFields.name.trim(),
+        dosage: addMedFields.dosage || "As prescribed",
+        frequency: addMedFields.frequency || "OD",
+        duration: addMedFields.duration || "5 days",
+        route: "Oral",
+      }],
+    });
+    setAddMedFields({ name: "", dosage: "", frequency: "", duration: "" }); setAddingTo(null);
+  };
+
+  // ─── Lab test helpers ──────────────────────────────────────────
+  const handleLabEdit = (idx: number, val: string) => {
+    const labs = [...(emr_entry.lab_tests_ordered ?? [])];
+    labs[idx] = val;
+    updateEMR({ lab_tests_ordered: labs });
+    setEditingLab(null);
+  };
+  const handleLabDelete = (idx: number) => {
+    const labs = [...(emr_entry.lab_tests_ordered ?? [])];
+    labs.splice(idx, 1);
+    updateEMR({ lab_tests_ordered: labs });
+  };
+  const handleLabAdd = () => {
+    if (!addValue.trim()) return;
+    updateEMR({ lab_tests_ordered: [...(emr_entry.lab_tests_ordered ?? []), addValue.trim()] });
+    setAddValue(""); setAddingTo(null);
+  };
 
   return (
     <div className="space-y-2">
@@ -171,11 +283,27 @@ function EMRLivePanel() {
             { label: "Weight", value: emr_entry.vitals?.weight?.toString() ?? "—", unit: "kg" },
             { label: "Height", value: emr_entry.vitals?.height?.toString() ?? "—", unit: "cm" },
           ].map((vital) => (
-            <div key={vital.label} className="text-center p-2 rounded-lg bg-[var(--background)] border border-[var(--border-subtle)]">
+            <div
+              key={vital.label}
+              className="text-center p-2 rounded-lg bg-[var(--background)] border border-[var(--border-subtle)] cursor-pointer hover:border-blue-500/40 transition-colors group"
+              onClick={() => { if (editingVital !== vital.label) { setEditingVital(vital.label); setEditValue(vital.value === "—" ? "" : vital.value); } }}
+            >
               <p className="text-[9px] text-[var(--foreground-subtle)] uppercase tracking-wider">{vital.label}</p>
-              <p className={cn("text-sm font-bold mt-0.5", vital.value !== "—" ? "text-[var(--foreground)]" : "text-[var(--foreground-subtle)]")}>
-                {vital.value}
-              </p>
+              {editingVital === vital.label ? (
+                <input
+                  ref={editRef}
+                  className="w-full text-sm font-bold text-center bg-transparent border-b border-blue-500 outline-none text-[var(--foreground)] mt-0.5"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleVitalSave(vital.label, editValue); if (e.key === "Escape") setEditingVital(null); }}
+                  onBlur={() => handleVitalSave(vital.label, editValue)}
+                  placeholder={vital.label === "BP" ? "120/80" : "0"}
+                />
+              ) : (
+                <p className={cn("text-sm font-bold mt-0.5", vital.value !== "—" ? "text-[var(--foreground)]" : "text-[var(--foreground-subtle)]")}>
+                  {vital.value}
+                </p>
+              )}
               <p className="text-[9px] text-[var(--foreground-subtle)]">{vital.unit}</p>
             </div>
           ))}
@@ -188,6 +316,7 @@ function EMRLivePanel() {
         icon={<Stethoscope className="w-3.5 h-3.5 text-blue-400" />}
         expanded={expanded.symptoms}
         onToggle={() => toggle("symptoms")}
+        onAdd={() => { setAddingTo("symptoms"); setAddValue(""); }}
       >
         <div className="flex flex-wrap gap-1.5 min-h-8">
           {emr_entry.symptoms && emr_entry.symptoms.length > 0 ? (
@@ -197,12 +326,45 @@ function EMRLivePanel() {
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.05 }}
+                className="relative group"
               >
-                <Badge variant="secondary" className="text-xs">{s}</Badge>
+                {editingSymptom === i ? (
+                  <input
+                    ref={editRef}
+                    className="text-xs px-2 py-0.5 rounded-full bg-[var(--surface)] border border-blue-500 outline-none text-[var(--foreground)] w-32"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleSymptomEdit(i, editValue); if (e.key === "Escape") setEditingSymptom(null); }}
+                    onBlur={() => handleSymptomEdit(i, editValue)}
+                  />
+                ) : (
+                  <>
+                    <Badge variant="secondary" className="text-xs cursor-pointer hover:bg-blue-500/20 transition-colors pr-5" onClick={() => { setEditingSymptom(i); setEditValue(s); }}>
+                      {s}
+                    </Badge>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleSymptomDelete(i); }}
+                      className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-2 h-2" />
+                    </button>
+                  </>
+                )}
               </motion.span>
             ))
           ) : (
             <p className="text-xs text-[var(--foreground-subtle)] italic">Listening for symptoms...</p>
+          )}
+          {addingTo === "symptoms" && (
+            <input
+              ref={editRef}
+              className="text-xs px-2 py-0.5 rounded-full bg-[var(--surface)] border border-green-500 outline-none text-[var(--foreground)] w-36"
+              value={addValue}
+              onChange={(e) => setAddValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSymptomAdd(); if (e.key === "Escape") setAddingTo(null); }}
+              onBlur={() => { if (addValue.trim()) handleSymptomAdd(); else setAddingTo(null); }}
+              placeholder="Add symptom..."
+            />
           )}
         </div>
       </EMRSection>
@@ -213,6 +375,7 @@ function EMRLivePanel() {
         icon={<Brain className="w-3.5 h-3.5 text-purple-400" />}
         expanded={expanded.diagnosis}
         onToggle={() => toggle("diagnosis")}
+        onAdd={() => { setAddingTo("diagnosis"); setAddValue(""); }}
       >
         <div className="space-y-1.5 min-h-6">
           {emr_entry.icd_codes && emr_entry.icd_codes.length > 0 ? (
@@ -222,17 +385,50 @@ function EMRLivePanel() {
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.05 }}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 group"
               >
                 <Badge variant="default" className="font-mono text-[10px] shrink-0">{code.code}</Badge>
-                <span className="text-xs text-[var(--foreground-muted)] truncate">{code.description}</span>
+                {editingDiagnosis === i ? (
+                  <input
+                    ref={editRef}
+                    className="flex-1 text-xs bg-transparent border-b border-blue-500 outline-none text-[var(--foreground)]"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleDiagnosisEdit(i, editValue); if (e.key === "Escape") setEditingDiagnosis(null); }}
+                    onBlur={() => handleDiagnosisEdit(i, editValue)}
+                  />
+                ) : (
+                  <span className="text-xs text-[var(--foreground-muted)] truncate cursor-pointer hover:text-[var(--foreground)] transition-colors" onClick={() => { setEditingDiagnosis(i); setEditValue(code.description); }}>
+                    {code.description}
+                  </span>
+                )}
                 <span className="text-[10px] text-[var(--foreground-subtle)] shrink-0">
                   {Math.round(code.confidence * 100)}%
                 </span>
+                <button
+                  onClick={() => handleDiagnosisDelete(i)}
+                  className="w-3.5 h-3.5 rounded-full bg-red-500/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                >
+                  <X className="w-2 h-2" />
+                </button>
               </motion.div>
             ))
           ) : (
             <p className="text-xs text-[var(--foreground-subtle)] italic">Awaiting diagnosis extraction...</p>
+          )}
+          {addingTo === "diagnosis" && (
+            <div className="flex items-center gap-2">
+              <Badge variant="default" className="font-mono text-[10px] shrink-0">—</Badge>
+              <input
+                ref={editRef}
+                className="flex-1 text-xs bg-transparent border-b border-green-500 outline-none text-[var(--foreground)]"
+                value={addValue}
+                onChange={(e) => setAddValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleDiagnosisAdd(); if (e.key === "Escape") setAddingTo(null); }}
+                onBlur={() => { if (addValue.trim()) handleDiagnosisAdd(); else setAddingTo(null); }}
+                placeholder="Add diagnosis..."
+              />
+            </div>
           )}
         </div>
       </EMRSection>
@@ -243,6 +439,7 @@ function EMRLivePanel() {
         icon={<Pill className="w-3.5 h-3.5 text-green-400" />}
         expanded={expanded.medications}
         onToggle={() => toggle("medications")}
+        onAdd={() => { setAddingTo("medications"); setAddMedFields({ name: "", dosage: "", frequency: "", duration: "" }); }}
       >
         <div className="space-y-2 min-h-6">
           {emr_entry.medications && emr_entry.medications.length > 0 ? (
@@ -252,21 +449,52 @@ function EMRLivePanel() {
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
-                className="flex items-start gap-2 p-2 rounded-lg bg-[var(--background)] border border-[var(--border-subtle)]"
+                className="flex items-start gap-2 p-2 rounded-lg bg-[var(--background)] border border-[var(--border-subtle)] group relative"
               >
                 <div className="w-6 h-6 flex items-center justify-center rounded-md bg-green-500/10 shrink-0">
                   <Pill className="w-3 h-3 text-green-400" />
                 </div>
-                <div>
-                  <p className="text-xs font-medium text-[var(--foreground)]">{med.name}</p>
+                <div className="flex-1 min-w-0">
+                  {editingMed === i ? (
+                    <input
+                      ref={editRef}
+                      className="w-full text-xs font-medium bg-transparent border-b border-blue-500 outline-none text-[var(--foreground)]"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleMedEdit(i, editValue); if (e.key === "Escape") setEditingMed(null); }}
+                      onBlur={() => handleMedEdit(i, editValue)}
+                    />
+                  ) : (
+                    <p className="text-xs font-medium text-[var(--foreground)] cursor-pointer hover:text-blue-400 transition-colors" onClick={() => { setEditingMed(i); setEditValue(med.name); }}>{med.name}</p>
+                  )}
                   <p className="text-[10px] text-[var(--foreground-muted)]">
                     {med.dosage} · {med.frequency} · {med.duration}
                   </p>
                 </div>
+                <button
+                  onClick={() => handleMedDelete(i)}
+                  className="absolute top-1 right-1 w-4 h-4 rounded-full bg-red-500/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="w-2.5 h-2.5" />
+                </button>
               </motion.div>
             ))
           ) : (
             <p className="text-xs text-[var(--foreground-subtle)] italic">Listening for medications...</p>
+          )}
+          {addingTo === "medications" && (
+            <div className="p-2 rounded-lg bg-[var(--background)] border border-green-500/40 space-y-1.5">
+              <input className="w-full text-xs bg-transparent border-b border-green-500/50 outline-none text-[var(--foreground)] pb-1" value={addMedFields.name} onChange={(e) => setAddMedFields(p => ({ ...p, name: e.target.value }))} placeholder="Medication name..." autoFocus />
+              <div className="grid grid-cols-3 gap-1.5">
+                <input className="text-[10px] bg-transparent border-b border-[var(--border)] outline-none text-[var(--foreground-muted)] pb-0.5" value={addMedFields.dosage} onChange={(e) => setAddMedFields(p => ({ ...p, dosage: e.target.value }))} placeholder="Dose" />
+                <input className="text-[10px] bg-transparent border-b border-[var(--border)] outline-none text-[var(--foreground-muted)] pb-0.5" value={addMedFields.frequency} onChange={(e) => setAddMedFields(p => ({ ...p, frequency: e.target.value }))} placeholder="Frequency" />
+                <input className="text-[10px] bg-transparent border-b border-[var(--border)] outline-none text-[var(--foreground-muted)] pb-0.5" value={addMedFields.duration} onChange={(e) => setAddMedFields(p => ({ ...p, duration: e.target.value }))} placeholder="Duration" />
+              </div>
+              <div className="flex justify-end gap-1.5 pt-1">
+                <button onClick={() => setAddingTo(null)} className="text-[10px] px-2 py-0.5 text-[var(--foreground-subtle)] hover:text-[var(--foreground)]">Cancel</button>
+                <button onClick={handleMedAdd} className="text-[10px] px-2 py-0.5 rounded bg-green-500/20 text-green-400 hover:bg-green-500/30">Add</button>
+              </div>
+            </div>
           )}
         </div>
       </EMRSection>
@@ -277,14 +505,47 @@ function EMRLivePanel() {
         icon={<FlaskConical className="w-3.5 h-3.5 text-cyan-400" />}
         expanded={expanded.labs}
         onToggle={() => toggle("labs")}
+        onAdd={() => { setAddingTo("labs"); setAddValue(""); }}
       >
         <div className="flex flex-wrap gap-1.5">
           {emr_entry.lab_tests_ordered && emr_entry.lab_tests_ordered.length > 0 ? (
             emr_entry.lab_tests_ordered.map((test, i) => (
-              <Badge key={i} variant="outline" className="text-[10px]">{test}</Badge>
+              <span key={i} className="relative group">
+                {editingLab === i ? (
+                  <input
+                    ref={editRef}
+                    className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--surface)] border border-blue-500 outline-none text-[var(--foreground)] w-28"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleLabEdit(i, editValue); if (e.key === "Escape") setEditingLab(null); }}
+                    onBlur={() => handleLabEdit(i, editValue)}
+                  />
+                ) : (
+                  <>
+                    <Badge variant="outline" className="text-[10px] cursor-pointer hover:border-blue-500/50 transition-colors pr-5" onClick={() => { setEditingLab(i); setEditValue(test); }}>{test}</Badge>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleLabDelete(i); }}
+                      className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-2 h-2" />
+                    </button>
+                  </>
+                )}
+              </span>
             ))
           ) : (
             <p className="text-xs text-[var(--foreground-subtle)] italic">No tests ordered yet</p>
+          )}
+          {addingTo === "labs" && (
+            <input
+              ref={editRef}
+              className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--surface)] border border-green-500 outline-none text-[var(--foreground)] w-28"
+              value={addValue}
+              onChange={(e) => setAddValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleLabAdd(); if (e.key === "Escape") setAddingTo(null); }}
+              onBlur={() => { if (addValue.trim()) handleLabAdd(); else setAddingTo(null); }}
+              placeholder="Add test..."
+            />
           )}
         </div>
       </EMRSection>
@@ -295,28 +556,40 @@ function EMRLivePanel() {
 // ─── EMR Section wrapper ──────────────────────────────────────────────────────
 
 function EMRSection({
-  title, icon, expanded, onToggle, children,
+  title, icon, expanded, onToggle, onAdd, children,
 }: {
   title: string;
   icon: React.ReactNode;
   expanded: boolean;
   onToggle: () => void;
+  onAdd?: () => void;
   children: React.ReactNode;
 }) {
   return (
     <Card className="border-[var(--border)] overflow-hidden">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--surface-elevated)] transition-colors"
-      >
-        {icon}
-        <span className="text-xs font-semibold text-[var(--foreground)] flex-1 text-left">{title}</span>
-        {expanded ? (
-          <ChevronUp className="w-3.5 h-3.5 text-[var(--foreground-subtle)]" />
-        ) : (
-          <ChevronDown className="w-3.5 h-3.5 text-[var(--foreground-subtle)]" />
+      <div className="flex items-center">
+        <button
+          onClick={onToggle}
+          className="flex-1 flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--surface-elevated)] transition-colors"
+        >
+          {icon}
+          <span className="text-xs font-semibold text-[var(--foreground)] flex-1 text-left">{title}</span>
+          {expanded ? (
+            <ChevronUp className="w-3.5 h-3.5 text-[var(--foreground-subtle)]" />
+          ) : (
+            <ChevronDown className="w-3.5 h-3.5 text-[var(--foreground-subtle)]" />
+          )}
+        </button>
+        {onAdd && (
+          <button
+            onClick={onAdd}
+            className="px-2.5 py-2.5 hover:bg-green-500/10 transition-colors border-l border-[var(--border)]"
+            title="Add new item"
+          >
+            <Plus className="w-3.5 h-3.5 text-green-400" />
+          </button>
         )}
-      </button>
+      </div>
       <AnimatePresence>
         {expanded && (
           <motion.div
@@ -520,6 +793,7 @@ export function ActiveConsultationClient({
   const lastSafetyLengthRef = useRef(0);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved">("idle");
+  const [isFinalized, setIsFinalized] = useState(false);
 
   // Module 5: Offline / Rural mode sync
   const { isOnline, isSyncing, stats: offlineStats, syncNow, lastSyncAt } = useOfflineSync({
@@ -836,6 +1110,7 @@ export function ActiveConsultationClient({
     }).catch(() => { });
 
     stopRecording();
+    setIsFinalized(true);
   };
 
 
@@ -915,10 +1190,46 @@ export function ActiveConsultationClient({
             {saveStatus === "saved" ? "Saved!" : "Save Draft"}
           </Button>
 
-          <Button size="sm" variant="success" className="gap-1.5" onClick={handleFinalize}>
-            <Send className="w-3.5 h-3.5" />
-            End & Finalize
-          </Button>
+          {!isFinalized ? (
+            <Button size="sm" variant="success" className="gap-1.5" onClick={handleFinalize}>
+              <Send className="w-3.5 h-3.5" />
+              End & Finalize
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Badge variant="success" className="text-[10px] py-1 px-2.5">
+                <CheckCircle2 className="w-3 h-3 mr-1" /> Finalized
+              </Badge>
+              <Button
+                size="sm"
+                className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => {
+                  const { billing_draft, safety_alerts: alerts } = useConsultationStore.getState();
+                  generateMedicalReport({
+                    patientName,
+                    consultationId,
+                    doctorName: "Dr. Arjun Sharma",
+                    durationMs,
+                    chiefComplaint: emr_entry.chief_complaint,
+                    symptoms: emr_entry.symptoms,
+                    vitals: emr_entry.vitals as Record<string, string | number> | undefined,
+                    physicalExamination: emr_entry.physical_examination,
+                    diagnosis: emr_entry.diagnosis,
+                    icdCodes: emr_entry.icd_codes,
+                    medications: emr_entry.medications,
+                    labTestsOrdered: emr_entry.lab_tests_ordered,
+                    clinicalSummary: emr_entry.clinical_summary,
+                    patientSummary: emr_entry.patient_summary,
+                    safetyAlerts: alerts.map(a => ({ title: a.title, severity: a.severity, acknowledged: a.acknowledged })),
+                    billing: billing_draft as { items: { description: string; fee: number }[]; subtotal: number; gst: number; total: number } | undefined,
+                  });
+                }}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Generate Report
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,15 +1,59 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
     Pill, TrendingDown, Store, Search, ChevronRight,
-    Clock, AlertCircle, IndianRupee, BadgeCheck, Package
+    Clock, AlertCircle, IndianRupee, BadgeCheck, Package,
+    Camera, Upload, Loader2, CheckCircle2, X, Image as ImageIcon, Sparkles, FileText
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+interface ScannedMedication {
+    name: string;
+    dose: string;
+    frequency: string;
+    duration: string;
+    route: string;
+    notes?: string | null;
+}
+
+interface ScanResult {
+    doctor_name?: string | null;
+    clinic_name?: string | null;
+    date?: string | null;
+    patient_name?: string | null;
+    medications: ScannedMedication[];
+    diagnosis?: string[];
+    notes?: string | null;
+    confidence?: "high" | "medium" | "low";
+    extracted_at?: string;
+    source?: string;
+    image_preview?: string;
+}
+
+// ─── localStorage helpers ───────────────────────────────────────────────────
+
+const SCANNED_RX_KEY = "cliniq_scanned_prescriptions";
+
+function loadScannedPrescriptions(): ScanResult[] {
+    if (typeof window === "undefined") return [];
+    try {
+        const raw = localStorage.getItem(SCANNED_RX_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+}
+
+function saveScannedPrescriptions(data: ScanResult[]): void {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(SCANNED_RX_KEY, JSON.stringify(data));
+}
 
 // ─── Mock data ─────────────────────────────────────────────────────────────────
 
@@ -101,16 +145,354 @@ const MOCK_PAST_PRESCRIPTIONS = [
     },
 ];
 
+// ─── Prescription Scanner Component ─────────────────────────────────────────
+
+function PrescriptionScanner({
+    onScanComplete,
+}: {
+    onScanComplete: (result: ScanResult) => void;
+}) {
+    const [isDragging, setIsDragging] = useState(false);
+    const [isScanning, setIsScanning] = useState(false);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const processFile = useCallback(async (file: File) => {
+        setError(null);
+        setIsScanning(true);
+
+        // Read file as data URL (used for both preview and API)
+        const dataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(file);
+        });
+
+        // Show preview
+        setPreviewUrl(dataUrl);
+
+        // Extract base64 payload for API
+        const base64 = dataUrl.split(",")[1];
+
+        try {
+            const res = await fetch("/api/prescription-scan", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image_base64: base64 }),
+            });
+
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.error ?? "Scan failed");
+            }
+
+            const result: ScanResult = await res.json();
+
+            if (!result.medications || result.medications.length === 0) {
+                setError("No medications detected. Try a clearer image.");
+                setIsScanning(false);
+                return;
+            }
+
+            // Attach the image preview to the scan result for storage
+            result.image_preview = dataUrl;
+            onScanComplete(result);
+            setPreviewUrl(null);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Scan failed. Please try again.");
+        } finally {
+            setIsScanning(false);
+        }
+    }, [onScanComplete]);
+
+    const handleDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith("image/")) processFile(file);
+    }, [processFile]);
+
+    const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) processFile(file);
+    }, [processFile]);
+
+    return (
+        <Card className="border-blue-500/30 bg-gradient-to-br from-blue-500/5 to-purple-500/5">
+            <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                    <div className="w-7 h-7 rounded-lg bg-blue-500/15 flex items-center justify-center">
+                        <Camera className="w-4 h-4 text-blue-400" />
+                    </div>
+                    Scan External Prescription
+                    <Badge variant="secondary" className="ml-auto text-[9px] gap-1">
+                        <Sparkles className="w-2.5 h-2.5" /> AI-Powered
+                    </Badge>
+                </CardTitle>
+                <p className="text-[10px] text-[var(--foreground-subtle)]">
+                    Upload a photo of any prescription — our AI will extract medication details automatically
+                </p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+                {/* Upload zone */}
+                <div
+                    className={cn(
+                        "relative border-2 border-dashed rounded-xl p-6 transition-all text-center",
+                        isDragging
+                            ? "border-blue-500 bg-blue-500/10"
+                            : "border-[var(--border)] hover:border-blue-500/50 hover:bg-[var(--surface-elevated)]",
+                        isScanning && "pointer-events-none opacity-60"
+                    )}
+                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                >
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={handleFileSelect}
+                    />
+
+                    {isScanning ? (
+                        <div className="flex flex-col items-center gap-3 py-2">
+                            <div className="relative">
+                                {previewUrl && (
+                                    <img
+                                        src={previewUrl}
+                                        alt="Scanning"
+                                        className="w-20 h-20 object-cover rounded-lg border border-blue-500/30"
+                                    />
+                                )}
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg">
+                                    <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
+                                </div>
+                            </div>
+                            <div>
+                                <p className="text-xs font-medium text-blue-400">Scanning prescription...</p>
+                                <p className="text-[10px] text-[var(--foreground-subtle)]">AI is extracting medication details</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center gap-2 cursor-pointer">
+                            <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                                <Upload className="w-5 h-5 text-blue-400" />
+                            </div>
+                            <div>
+                                <p className="text-xs font-medium text-[var(--foreground)]">
+                                    Drop image or <span className="text-blue-400">click to upload</span>
+                                </p>
+                                <p className="text-[10px] text-[var(--foreground-subtle)]">
+                                    Take a photo or upload from gallery · JPG, PNG
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Error message */}
+                {error && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
+                        <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                        <p className="text-xs text-red-400">{error}</p>
+                        <button onClick={() => setError(null)} className="ml-auto">
+                            <X className="w-3 h-3 text-red-400" />
+                        </button>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
+// ─── Scanned Results Display ────────────────────────────────────────────────
+
+function ScannedPrescriptionCard({
+    scan,
+    index,
+    onDelete,
+}: {
+    scan: ScanResult;
+    index: number;
+    onDelete: () => void;
+}) {
+    const [expanded, setExpanded] = useState(index === 0);
+    const [showImage, setShowImage] = useState(false);
+
+    const confidenceColor = {
+        high: "text-green-400 bg-green-500/10 border-green-500/30",
+        medium: "text-amber-400 bg-amber-500/10 border-amber-500/30",
+        low: "text-red-400 bg-red-500/10 border-red-500/30",
+    }[scan.confidence ?? "medium"];
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.05 }}
+        >
+            <Card className="border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-transparent">
+                <CardContent className="p-4 space-y-3">
+                    {/* Header */}
+                    <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                            {scan.image_preview ? (
+                                <button
+                                    onClick={() => setShowImage(!showImage)}
+                                    className="w-10 h-10 rounded-lg overflow-hidden border border-purple-500/30 hover:border-purple-400 transition-colors shrink-0 relative group"
+                                    title="Click to expand"
+                                >
+                                    <img src={scan.image_preview} alt="Prescription" className="w-full h-full object-cover" />
+                                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                        <ImageIcon className="w-3.5 h-3.5 text-white" />
+                                    </div>
+                                </button>
+                            ) : (
+                                <div className="w-10 h-10 rounded-lg bg-purple-500/15 flex items-center justify-center shrink-0">
+                                    <Camera className="w-4 h-4 text-purple-400" />
+                                </div>
+                            )}
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <p className="text-xs font-semibold text-[var(--foreground)]">
+                                        {scan.doctor_name ?? "External Prescription"}
+                                    </p>
+                                    <Badge variant="secondary" className="text-[8px] gap-0.5">
+                                        <Camera className="w-2 h-2" /> Scanned
+                                    </Badge>
+                                </div>
+                                <p className="text-[10px] text-[var(--foreground-subtle)]">
+                                    {scan.clinic_name ?? "Outside clinic"} · {scan.date ?? scan.extracted_at?.split("T")[0] ?? "Recently"}
+                                    {" · "}{scan.medications.length} medication{scan.medications.length !== 1 ? "s" : ""}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <Badge className={cn("text-[8px] border", confidenceColor)}>
+                                {scan.confidence ?? "medium"} confidence
+                            </Badge>
+                            <button
+                                onClick={onDelete}
+                                className="p-1 rounded-md hover:bg-red-500/10 text-[var(--foreground-subtle)] hover:text-red-400 transition-colors"
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Full-size image preview */}
+                    <AnimatePresence>
+                        {showImage && scan.image_preview && (
+                            <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className="overflow-hidden"
+                            >
+                                <div className="rounded-lg overflow-hidden border border-purple-500/20 bg-black/20">
+                                    <img
+                                        src={scan.image_preview}
+                                        alt="Prescription"
+                                        className="w-full max-h-96 object-contain"
+                                    />
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* Diagnosis */}
+                    {scan.diagnosis && scan.diagnosis.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                            {scan.diagnosis.map((d, i) => (
+                                <Badge key={i} variant="outline" className="text-[9px] text-purple-400 border-purple-500/30">
+                                    {d}
+                                </Badge>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Expand / collapse */}
+                    <button
+                        onClick={() => setExpanded(!expanded)}
+                        className="w-full text-left text-[10px] text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
+                    >
+                        <ChevronRight className={cn("w-3 h-3 transition-transform", expanded && "rotate-90")} />
+                        {expanded ? "Hide" : "Show"} {scan.medications.length} medication{scan.medications.length !== 1 ? "s" : ""}
+                    </button>
+
+                    {/* Medications list */}
+                    <AnimatePresence>
+                        {expanded && (
+                            <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className="space-y-2 overflow-hidden"
+                            >
+                                {scan.medications.map((med, i) => (
+                                    <div
+                                        key={i}
+                                        className="flex items-start gap-2 p-2.5 rounded-lg bg-[var(--background)] border border-[var(--border-subtle)]"
+                                    >
+                                        <div className="w-6 h-6 rounded-md bg-purple-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                                            <Pill className="w-3 h-3 text-purple-400" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-semibold text-[var(--foreground)]">{med.name}</p>
+                                            <p className="text-[10px] text-[var(--foreground-muted)]">
+                                                {med.dose} · {med.frequency} · {med.duration}
+                                            </p>
+                                            {med.notes && (
+                                                <p className="text-[9px] text-[var(--foreground-subtle)] mt-0.5 italic">
+                                                    {med.notes}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <Badge variant="outline" className="text-[8px] shrink-0">{med.route}</Badge>
+                                    </div>
+                                ))}
+
+                                {/* Notes */}
+                                {scan.notes && (
+                                    <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-500/5 border border-amber-500/15">
+                                        <FileText className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+                                        <p className="text-[10px] text-[var(--foreground-muted)]">{scan.notes}</p>
+                                    </div>
+                                )}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </CardContent>
+            </Card>
+        </motion.div>
+    );
+}
+
+// ─── Main Component ─────────────────────────────────────────────────────────
+
 interface PatientPrescriptionsClientProps {
     user: { id: string; name: string; email: string; role: string };
 }
 
 export function PatientPrescriptionsClient({ user }: PatientPrescriptionsClientProps) {
-    const [activeTab, setActiveTab] = useState<"active" | "past">("active");
+    const [activeTab, setActiveTab] = useState<"active" | "scanned" | "past">("active");
     const [searchQuery, setSearchQuery] = useState("");
     const [activePrescriptions, setActivePrescriptions] = useState(MOCK_ACTIVE_PRESCRIPTIONS);
     const [pastPrescriptions, setPastPrescriptions] = useState(MOCK_PAST_PRESCRIPTIONS);
+    const [scannedPrescriptions, setScannedPrescriptions] = useState<ScanResult[]>([]);
 
+    // Load scanned prescriptions from localStorage
+    useEffect(() => {
+        setScannedPrescriptions(loadScannedPrescriptions());
+    }, []);
+
+    // Fetch from API (fallback to mock)
     useEffect(() => {
         async function fetchData() {
             try {
@@ -161,6 +543,24 @@ export function PatientPrescriptionsClient({ user }: PatientPrescriptionsClientP
         fetchData();
     }, [user.id]);
 
+    // Scan completion handler
+    const handleScanComplete = useCallback((result: ScanResult) => {
+        setScannedPrescriptions((prev) => {
+            const updated = [result, ...prev];
+            saveScannedPrescriptions(updated);
+            return updated;
+        });
+        setActiveTab("scanned");
+    }, []);
+
+    const handleDeleteScan = useCallback((index: number) => {
+        setScannedPrescriptions((prev) => {
+            const updated = prev.filter((_, i) => i !== index);
+            saveScannedPrescriptions(updated);
+            return updated;
+        });
+    }, []);
+
     const totalBrandCost = activePrescriptions.reduce((sum, rx) => sum + rx.brand_price, 0);
     const totalGenericCost = activePrescriptions.reduce((sum, rx) => sum + rx.generic_price, 0);
     const totalJACost = activePrescriptions.reduce((sum, rx) => sum + rx.jan_aushadhi_price, 0);
@@ -185,9 +585,12 @@ export function PatientPrescriptionsClient({ user }: PatientPrescriptionsClientP
             <div>
                 <h1 className="text-xl font-bold text-[var(--foreground)]">Prescriptions & Drug Costs</h1>
                 <p className="text-sm text-[var(--foreground-muted)] mt-0.5">
-                    Track medications, compare prices, and find affordable alternatives
+                    Track medications, compare prices, and scan external prescriptions
                 </p>
             </div>
+
+            {/* Prescription Scanner */}
+            <PrescriptionScanner onScanComplete={handleScanComplete} />
 
             {/* Savings banner */}
             <Card className="border-green-500/30 bg-gradient-to-br from-green-500/10 to-transparent">
@@ -223,7 +626,7 @@ export function PatientPrescriptionsClient({ user }: PatientPrescriptionsClientP
             {/* Tabs + Search */}
             <div className="flex items-center gap-3">
                 <div className="flex bg-[var(--surface)] rounded-lg p-0.5 border border-[var(--border)]">
-                    {(["active", "past"] as const).map((tab) => (
+                    {(["active", "scanned", "past"] as const).map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -232,7 +635,11 @@ export function PatientPrescriptionsClient({ user }: PatientPrescriptionsClientP
                                 : "text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
                                 }`}
                         >
-                            {tab === "active" ? `Active (${activePrescriptions.length})` : `Past (${pastPrescriptions.length})`}
+                            {tab === "active"
+                                ? `Active (${activePrescriptions.length})`
+                                : tab === "scanned"
+                                    ? `📸 Scanned (${scannedPrescriptions.length})`
+                                    : `Past (${pastPrescriptions.length})`}
                         </button>
                     ))}
                 </div>
@@ -344,6 +751,32 @@ export function PatientPrescriptionsClient({ user }: PatientPrescriptionsClientP
                             </Card>
                         </motion.div>
                     ))}
+                </div>
+            )}
+
+            {/* Scanned prescriptions tab */}
+            {activeTab === "scanned" && (
+                <div className="space-y-3">
+                    {scannedPrescriptions.length > 0 ? (
+                        scannedPrescriptions.map((scan, i) => (
+                            <ScannedPrescriptionCard
+                                key={i}
+                                scan={scan}
+                                index={i}
+                                onDelete={() => handleDeleteScan(i)}
+                            />
+                        ))
+                    ) : (
+                        <Card className="border-dashed">
+                            <CardContent className="p-8 text-center">
+                                <ImageIcon className="w-8 h-8 text-[var(--foreground-subtle)] mx-auto mb-3" />
+                                <p className="text-sm text-[var(--foreground-muted)]">No scanned prescriptions yet</p>
+                                <p className="text-xs text-[var(--foreground-subtle)] mt-1">
+                                    Upload a photo of your prescription to get started
+                                </p>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
             )}
 
