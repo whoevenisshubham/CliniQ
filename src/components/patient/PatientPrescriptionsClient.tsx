@@ -95,6 +95,7 @@ const MOCK_ACTIVE_PRESCRIPTIONS = [
         instructions: "Take at the same time each day.",
     },
     {
+
         id: "rx3",
         name: "Atorvastatin 10mg",
         generic_name: "Atorvastatin Calcium",
