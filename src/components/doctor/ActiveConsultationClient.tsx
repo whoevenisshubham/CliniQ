@@ -14,6 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import { LiveTranscriptPanel } from "./LiveTranscriptPanel";
 import { SafetyAlertModal } from "./SafetyAlertModal";
 import { DrugCostPanel } from "./DrugCostPanel";
+// SafetyAlertModal removed — sidebar alerts are sufficient
 import { LiveBillingPanel } from "./LiveBillingPanel";
 import { AuditTrailPanel } from "./AuditTrailPanel";
 import { ConsentRecorder } from "./ConsentRecorder";
@@ -530,9 +531,7 @@ export function ActiveConsultationClient({
     autoSync: true,
   });
 
-  // Module 2: Safety modal state
-  const [showModal, setShowModal] = useState(false);
-  const [modalAlerts, setModalAlerts] = useState<SafetyAlert[]>([]);
+
 
   // Module 2: Gap analysis toasts
   const [gapToasts, setGapToasts] = useState<Array<{ id: string; message: string }>>([]);
@@ -573,17 +572,8 @@ export function ActiveConsultationClient({
 
       newAlerts.forEach((a) => shownAlertIds.current.add(a.id));
 
-      // Add to store
+      // Add to store (sidebar will display them)
       newAlerts.forEach((a) => useConsultationStore.getState().addSafetyAlert(a));
-
-      // Open modal for critical/high alerts
-      const urgentAlerts = newAlerts.filter(
-        (a) => a.severity === "critical" || a.severity === "high"
-      );
-      if (urgentAlerts.length > 0) {
-        setModalAlerts(urgentAlerts);
-        setShowModal(true);
-      }
     } catch {
       // Safety check failure is non-blocking
     }
@@ -636,13 +626,6 @@ export function ActiveConsultationClient({
         if (newAlerts.length > 0) {
           newAlerts.forEach((a) => shownAlertIds.current.add(a.id));
           newAlerts.forEach((a) => useConsultationStore.getState().addSafetyAlert(a));
-
-          // Show the urgent ones in modal/sidebar immediately
-          const urgentAlerts = newAlerts.filter(a => a.severity === "critical" || a.severity === "high");
-          if (urgentAlerts.length > 0) {
-            setModalAlerts(urgentAlerts);
-            setShowModal(true);
-          }
         }
       }
     } catch {
@@ -705,7 +688,7 @@ export function ActiveConsultationClient({
   // We only run this effect when isRecording changes!
   useEffect(() => {
     if (isRecording) {
-      extractionTimerRef.current = setInterval(runExtraction, 5000);
+      extractionTimerRef.current = setInterval(runExtraction, 20000);
       liveSafetyTimerRef.current = setInterval(runLiveSafetyCheck, 8000); // Check for drug conflicts every 8s
     } else {
       if (extractionTimerRef.current) clearInterval(extractionTimerRef.current);
@@ -855,10 +838,7 @@ export function ActiveConsultationClient({
     stopRecording();
   };
 
-  const handleModalAcknowledge = (id: string, reason: string) => {
-    acknowledgeAlert(id, reason);
-    setModalAlerts((prev) => prev.filter((a) => a.id !== id));
-  };
+
 
   const unacknowledgedCritical = safety_alerts.filter(
     (a) => !a.acknowledged && (a.severity === "critical" || a.severity === "high")
@@ -866,14 +846,7 @@ export function ActiveConsultationClient({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Safety Alert Modal (critical/high) */}
-      {showModal && modalAlerts.length > 0 && (
-        <SafetyAlertModal
-          alerts={modalAlerts}
-          onAcknowledge={handleModalAcknowledge}
-          onDismissAll={() => setShowModal(false)}
-        />
-      )}
+
 
       {/* Gap Analysis Toast Stack */}
       <GapToastStack
@@ -919,19 +892,10 @@ export function ActiveConsultationClient({
           />
 
           {unacknowledgedCritical > 0 && (
-            <button
-              onClick={() => {
-                const urgent = safety_alerts.filter(
-                  (a) => !a.acknowledged && (a.severity === "critical" || a.severity === "high")
-                );
-                setModalAlerts(urgent);
-                setShowModal(true);
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/15 border border-red-500/30 hover:bg-red-500/25 transition-colors"
-            >
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/15 border border-red-500/30">
               <AlertTriangle className="w-3.5 h-3.5 text-red-400 animate-pulse" />
               <span className="text-xs text-red-400 font-medium">{unacknowledgedCritical} Critical Alert{unacknowledgedCritical > 1 ? "s" : ""}</span>
-            </button>
+            </div>
           )}
 
           <Button

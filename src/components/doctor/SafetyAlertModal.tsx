@@ -87,17 +87,17 @@ export function SafetyAlertModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
-        onClick={(e) => { if (e.target === e.currentTarget && !isCritical) onDismissAll(); }}
+        className="fixed inset-0 z-50 flex items-start justify-end bg-black/60 backdrop-blur-sm p-4 pt-6"
+        onClick={(e) => { if (e.target === e.currentTarget) onDismissAll(); }}
       >
         {/* Modal */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.92, y: 16 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.92, y: 16 }}
+          initial={{ opacity: 0, x: 60, y: -10 }}
+          animate={{ opacity: 1, x: 0, y: 0 }}
+          exit={{ opacity: 0, x: 60, y: -10 }}
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
           className={cn(
-            "relative w-full max-w-md mx-4 rounded-2xl border overflow-hidden",
+            "relative w-full max-w-md rounded-2xl border overflow-hidden",
             cfg.border,
             cfg.bg,
             cfg.glow
@@ -122,14 +122,12 @@ export function SafetyAlertModal({
                   {current.title}
                 </h2>
               </div>
-              {!isCritical && (
-                <button
-                  onClick={onDismissAll}
-                  className="text-white/60 hover:text-white transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
+              <button
+                onClick={onDismissAll}
+                className="text-white/60 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
           </div>
 
