@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import Groq from "groq-sdk";
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+function getGroq() {
+  if (!process.env.GROQ_API_KEY) throw new Error("Missing GROQ_API_KEY");
+  return new Groq({ apiKey: process.env.GROQ_API_KEY });
+}
 
 const SYSTEM_PROMPT = `You are NexusMD Patient Assistant — a helpful, empathetic AI that answers patient questions about their health, medications, diagnoses, and treatment plans. 
 
@@ -15,6 +18,7 @@ RULES:
 7. If asked about drug interactions or side effects, provide verified information but emphasize consulting the prescribing doctor.`;
 
 export async function POST(req: NextRequest) {
+  const groq = getGroq();
   try {
     const { messages, patientContext } = await req.json();
 

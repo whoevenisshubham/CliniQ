@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import Groq from "groq-sdk";
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+function getGroq() {
+  if (!process.env.GROQ_API_KEY) throw new Error("Missing GROQ_API_KEY");
+  return new Groq({ apiKey: process.env.GROQ_API_KEY });
+}
 
 // ─── System Prompt ────────────────────────────────────────────────────────────
 
@@ -50,6 +53,7 @@ Output schema (same as English):
 // ─── Route handler ────────────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
+  const groq = getGroq();
   try {
     const { emr, patientName, language = "en" } = await request.json();
 
