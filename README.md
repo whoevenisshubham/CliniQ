@@ -18,6 +18,8 @@ Built for Indian Healthcare | ABDM Compliant | ICD-10 Coded | FHIR-Compatible
 
 </div>
 
+## 🎥 Demo Video for Doctor Patient Conversation  
+![Voice-to-EMR Demo](https://private-user-images.githubusercontent.com/199332304/555696911-17ce1825-d1f7-4ae9-8618-06173dae5cdb.mp4?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzIxNTQwMzcsIm5iZiI6MTc3MjE1MzczNywicGF0aCI6Ii8xOTkzMzIzMDQvNTU1Njk2OTExLTE3Y2UxODI1LWQxZjctNGFlOS04NjE4LTA2MTczZGFlNWNkYi5tcDQ_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjYwMjI3JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI2MDIyN1QwMDU1MzdaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT0zMzM3YzYxYzc4ZmY2NmY3NjYxZGU5ZjZkNDRiMmIxMmZmOGEyYTIwYmRiZjI1MGRiYjRmOTRiMTYwMjhhN2MxJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.uVsTv2wlQd-BP3jkhYxg28OJ6EU3VKQd0hTrNHUxJxo)
 ---
 
 > **"Doctors spend up to 55% of their workday on documentation — more time than they spend with patients."**
