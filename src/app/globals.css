@@ -1081,3 +1081,37 @@ p {
 .record-main {
   margin: 0 auto;
 }
+.clinical-topline,.clinical-toolbar,.clinical-inline,.clinical-savebar,.clinical-start {display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.clinical-topline {justify-content:space-between;margin-bottom:16px}
+.clinical-toolbar {font-size:13px;padding:16px 0;border-block:1px solid var(--border);margin:24px 0}
+.clinical-toolbar span {flex:1;color:var(--foreground-muted)}
+.clinical-toolbar a,.consultation-context a {color:var(--primary);text-decoration:underline;text-underline-offset:4px}
+.consultation-columns {display:grid;grid-template-columns:minmax(180px,0.7fr) minmax(0,2fr);gap:36px}
+.consultation-context {border-right:1px solid var(--border);padding-right:24px;font-size:14px}
+.consultation-context h2 {font-size:24px;margin:12px 0 28px}
+.consultation-context h3 {font-size:13px;text-transform:uppercase;letter-spacing:.05em;margin:30px 0 12px}
+.consultation-context p,.consultation-context details {margin:12px 0;color:var(--foreground-muted);overflow-wrap:anywhere}
+.consultation-context small,.clinical-visit small {display:block;font-size:12px;color:var(--foreground-muted);margin-top:5px}
+.clinical-section-heading {display:flex;gap:16px;align-items:flex-start;margin:16px 0 24px}
+.clinical-section-heading h2 {font-size:28px;margin:0 0 6px}.clinical-section-heading p,.clinical-muted {color:var(--foreground-muted);font-size:14px;line-height:1.6}
+.section-number {font:14px var(--font-geist-mono),monospace;color:var(--primary);padding-top:6px}
+.clinical-field {display:block;font-size:14px;font-weight:550;margin:20px 0}
+.clinical-field textarea,.clinical-start select,.clinical-inline select,.clinical-medication input:not([type=checkbox]),.clinical-measurement input,.clinical-measurement select {display:block;width:100%;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--foreground);font:inherit;margin-top:7px;min-height:44px}
+.clinical-field textarea {resize:vertical;min-height:90px;line-height:1.6;max-width:100%}
+.clinical-field textarea:focus,.clinical-medication input:focus {outline:2px solid var(--primary);outline-offset:3px}
+.clinical-inline label {flex:1;min-width:130px;font-size:13px}.clinical-inline {margin:16px 0 30px}
+.clinical-transcript {list-style:none;padding:0;margin:0;border-left:2px solid var(--primary)}
+.clinical-transcript li {padding:8px 0 8px 18px;margin:16px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.clinical-transcript span {font-size:12px;color:var(--foreground-muted);text-transform:uppercase;letter-spacing:.05em}.clinical-transcript p {margin-top:7px;line-height:1.7}
+.clinical-medication {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:20px;border:1px solid var(--border);margin:20px 0;border-radius:10px}
+.clinical-medication legend {font-size:14px;padding:0 8px}.clinical-medication label {font-size:13px;text-transform:capitalize}.clinical-medication label span {display:flex;gap:8px;align-items:center;margin-top:8px;text-transform:none;font-size:12px}
+.clinical-measurement {display:grid;grid-template-columns:1.3fr 1fr 1fr auto;gap:10px;align-items:end;margin:16px 0}.clinical-measurement label {font-size:12px;min-width:0}
+.clinical-savebar {border-top:1px solid var(--border);padding:20px 0;margin-top:24px;justify-content:flex-end}
+.clinical-error {padding:18px;background:var(--surface-elevated);border:1px solid #ba5c4d;border-radius:8px;margin:20px 0;overflow-wrap:anywhere}
+.clinical-review-dialog {max-width:620px;max-height:85dvh;overflow-y:auto;background:var(--background);padding:28px;border:1px solid var(--border);border-radius:16px;color:var(--foreground)}
+.clinical-review-dialog h2 {font-size:28px}.clinical-review-dialog>p {margin:18px 0;line-height:1.6}.clinical-confirm {display:flex;align-items:flex-start;gap:12px;line-height:1.6;font-size:14px}.clinical-confirm input {margin-top:5px}
+.clinical-start {padding:24px 0;align-items:end}.clinical-start label {flex:1;max-width:500px;min-width:180px;font-size:14px}
+.clinical-visit {display:flex;justify-content:space-between;gap:20px;border-top:1px solid var(--border);padding:24px 0;font-size:15px;overflow-wrap:anywhere}
+.approved-record {border-top:1px solid var(--border);padding:28px 0;overflow-wrap:anywhere}.approved-record h2 {font-size:24px;margin:12px 0}.approved-record p,.approved-record li {font-size:14px;line-height:1.7}.approved-record .text-link {margin-top:20px;display:inline-block}
+@media(max-width:1000px){.consultation-columns {grid-template-columns:1fr}.consultation-context {border-right:0;border-bottom:1px solid var(--border);padding:0 0 24px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 24px}.consultation-context>.eyebrow,.consultation-context>h2 {grid-column:1/-1}}
+@media(max-width:600px){.clinical-medication,.clinical-measurement {grid-template-columns:1fr 1fr}.clinical-measurement .quiet-button {grid-column:1/-1}.clinical-visit {flex-direction:column;gap:10px}.consultation-context {display:block}.clinical-inline button,.clinical-savebar button {width:100%;justify-content:center}.clinical-review-dialog {padding:20px}.clinical-toolbar {align-items:flex-start}.clinical-toolbar span {flex-basis:100%}}

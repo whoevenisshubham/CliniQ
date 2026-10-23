@@ -65,10 +65,12 @@ export function RecordLayout({
   children,
   provider = false,
   fixture = false,
+  section = "documents",
 }: {
   children: React.ReactNode;
   provider?: boolean;
   fixture?: boolean;
+  section?: "documents" | "consultations";
 }) {
   return (
     <div className="record-app">
@@ -88,7 +90,7 @@ export function RecordLayout({
             {provider ? "Clinical workspace" : "Your workspace"}
           </p>
           <Link
-            aria-current="page"
+            aria-current={section === "documents" ? "page" : undefined}
             href={
               fixture
                 ? `/design/documents?view=${provider ? "provider" : "patient"}`
@@ -98,6 +100,9 @@ export function RecordLayout({
             }
           >
             <FileText size={18} /> {provider ? "Shared records" : "My records"}
+          </Link>
+          <Link aria-current={section === "consultations" ? "page" : undefined} href={fixture?"/design/consultation":"/consultations"}>
+            <FileText size={18}/> {provider?"Consultations":"Approved visits"}
           </Link>
           <div className="nav-note">
             <LockKeyhole size={20} />

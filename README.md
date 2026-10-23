@@ -12,6 +12,10 @@ PDF/text parsing is local and bounded: 20 pages, 100,000 extracted characters, 1
 
 The original speech-to-EMR hooks, adapters, prompts and clinical review components remain in the repository. Most legacy clinical write endpoints are still contained. Provider/model choices were preserved; the exact historically successful runtime is not asserted. See the [reuse map](docs/core-pipeline-reuse.md).
 
+## Manual consultation foundation
+
+The `/consultations` workspace adds authorized encounter creation, durable typed transcripts and clinician findings, revision-checked review, atomic approval and linked corrections. Patients read only approved records and prescriptions, including returning sessions. See [consultation contracts and limitations](docs/consultations.md). `/design/consultation` is a labelled rendered fixture with persistence disabled. Speech/provider execution remains unavailable; full M3 acceptance is in progress.
+
 ## Setup and verification
 
 Use Node 22.20 or later within the supported Node 22 line and Docker for isolated integration tests.
@@ -28,7 +32,7 @@ npm run test:integration
 npm run jobs:local
 ```
 
-The prepare command requires an empty, verified local test database; it refuses to reset existing data. It tests a seed-free baseline and representative legacy forward migration, then explicitly provisions bounded synthetic accounts. Integration tests provision two additional synthetic patients and retain their private credentials only under ignored `tests/infra/.runtime/`. Never publish runtime credentials or infrastructure startup output. Public `/api/seed` remains unavailable.
+The prepare command requires an empty, verified local test database; it refuses to reset existing data. It tests a seed-free baseline and representative legacy forward migration, then explicitly provisions bounded synthetic accounts. Integration suites explicitly provision additional isolated synthetic identities. Credentials stay private under ignored `tests/infra/.runtime/` or test-process memory. Never publish runtime credentials or infrastructure startup output. Public `/api/seed` remains unavailable.
 
 Copy `.env.example` for an independently verified development environment. Never use production credentials for preview. Intended hosted upgrades require inventory, backup and reconciliation first. See [identity and isolation](docs/identity-isolation.md), [document lifecycle and reproduction](docs/documents.md), and [baseline migration protocol](supabase/baseline/README.md).
 
