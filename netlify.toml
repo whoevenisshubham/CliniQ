@@ -1,0 +1,4 @@
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["scripts/document-parser-worker.mjs", "node_modules/pdfjs-dist/legacy/build/**"]
+  external_node_modules = ["pdfjs-dist"]

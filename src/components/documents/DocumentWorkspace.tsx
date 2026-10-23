@@ -1,0 +1,628 @@
+"use client";
+import { useEffect, useRef, useState, useCallback } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import {
+  DocumentList,
+  RecordLayout,
+  SourceDetail,
+  AddRecordButton,
+  type DocumentRow,
+  type SourceChunk,
+} from "./DocumentSurface";
+
+type Version = {
+  id: string;
+  version_no: number;
+  extraction_status: string;
+  mime: string;
+  source_class: string;
+};
+type Grant = { id: string; provider_id: string; workspace_id: string };
+export type Detail = {
+  document: DocumentRow;
+  versions: Version[];
+  chunks: SourceChunk[];
+  grants: Grant[];
+};
+export type Provider = {
+  provider_id: string;
+  workspace_id: string;
+  name: string;
+  workspace_name: string;
+};
+async function serverApi(path: string, init?: RequestInit) {
+  const response = await fetch(path, {
+    ...init,
+    cache: "no-store",
+    signal: init?.signal ?? AbortSignal.timeout(45000),
+  });
+  let body;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error("The server response could not be read. Try again.");
+  }
+  if (!response.ok)
+    throw new Error(
+      body.error?.message ?? "The request could not be completed.",
+    );
+  return body;
+}
+export function DocumentWorkspace({
+  provider = false,
+  fixture,
+  initialDocumentId = null,
+}: {
+  provider?: boolean;
+  fixture?: { rows: DocumentRow[]; detail: Detail; providers: Provider[] };
+  initialDocumentId?: string | null;
+}) {
+  const api = useCallback(
+    async (path: string, init?: RequestInit) => {
+      if (!fixture) return serverApi(path, init);
+      if (init?.method)
+        throw new Error(
+          "Visual sample only: changes are not saved. Use a provisioned account for the real workflow.",
+        );
+      if (path === "/api/documents") return { documents: fixture.rows };
+      if (path === "/api/documents/providers")
+        return { providers: fixture.providers };
+      return fixture.detail;
+    },
+    [fixture],
+  );
+
+  const [rows, setRows] = useState<DocumentRow[]>([]),
+    [detail, setDetail] = useState<Detail | null>(null),
+    [selected, setSelected] = useState<string | null>(initialDocumentId),
+    [providers, setProviders] = useState<Provider[]>([]),
+    [mode, setMode] = useState<
+      "upload" | "replace" | "manual" | "share" | "delete" | null
+    >(null);
+  const [loading, setLoading] = useState(true),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState(""),
+    [dialogError, setDialogError] = useState(""),
+    [title, setTitle] = useState(""),
+    [file, setFile] = useState<File | null>(null),
+    [text, setText] = useState("");
+  const retry = useRef<{ signature: string; key: string } | null>(null),
+    headingRef = useRef<HTMLDivElement>(null);
+  async function refresh(target = selected) {
+    const list = await api("/api/documents");
+    setRows(list.documents);
+    if (target) {
+      try {
+        const data = await api("/api/documents/" + target);
+        setDetail(data);
+      } catch (e) {
+        setDetail(null);
+        setSelected(null);
+        throw e;
+      }
+    }
+  }
+  useEffect(() => {
+    let active = true;
+    const c = new AbortController();
+    api("/api/documents", { signal: c.signal })
+      .then((data) => {
+        if (active) setRows(data.documents);
+      })
+      .catch((e) => {
+        if (active) setError(e.message);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+      c.abort();
+    };
+  }, [api]);
+  // Bounded polling; after one minute the user can continue later or refresh.
+  useEffect(() => {
+    if (!selected) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const started = Date.now();
+    async function poll() {
+      if (cancelled) return;
+      if (document.hidden) {
+        timer = setTimeout(poll, 5000);
+        return;
+      }
+      try {
+        const d: Detail = await api("/api/documents/" + selected);
+        if (cancelled) return;
+        setDetail(d);
+        const version = d.versions.find(
+          (v) => v.id === d.document.current_version_id,
+        );
+        if (
+          version &&
+          ["queued", "parsing"].includes(version.extraction_status) &&
+          Date.now() - started < 60000
+        )
+          timer = setTimeout(
+            poll,
+            Date.now() - started < 10000
+              ? 2000
+              : Date.now() - started < 30000
+                ? 5000
+                : 10000,
+          );
+      } catch (e) {
+        if (!cancelled) {
+          setDetail(null);
+          setSelected(null);
+          setError((e as Error).message);
+        }
+      }
+    }
+    void poll();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [selected, api]);
+  useEffect(() => {
+    if (!selected || mode !== null) return;
+    const recheck = () => {
+      if (document.hidden) return;
+      setDetail(null);
+      setLoading(true);
+      api("/api/documents/" + selected)
+        .then(setDetail)
+        .catch((e) => {
+          setSelected(null);
+          setError(e.message);
+        })
+        .finally(() => setLoading(false));
+    };
+    window.addEventListener("focus", recheck);
+    document.addEventListener("visibilitychange", recheck);
+    return () => {
+      window.removeEventListener("focus", recheck);
+      document.removeEventListener("visibilitychange", recheck);
+    };
+  }, [selected, mode, api]);
+  async function choose(id: string) {
+    setError("");
+    setDetail(null);
+    setSelected(id);
+    setLoading(true);
+    try {
+      setDetail(await api("/api/documents/" + id));
+    } catch (e) {
+      setSelected(null);
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+      headingRef.current?.focus();
+    }
+  }
+  function open(next: typeof mode) {
+    setMode(next);
+    setTitle(next === "upload" ? "" : (detail?.document.title ?? ""));
+    setFile(null);
+    setText("");
+    setDialogError("");
+    retry.current = null;
+    if (next === "share")
+      void api("/api/documents/providers")
+        .then((d) => setProviders(d.providers))
+        .catch((e) => setDialogError(e.message));
+  }
+  async function upload(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setDialogError("");
+    try {
+      const chosen =
+        mode === "manual"
+          ? new File([text], "manual-transcript.txt", { type: "text/plain" })
+          : file;
+      if (!chosen) throw new Error("Choose a file.");
+      if (mode === "manual" && !text.trim())
+        throw new Error("Enter the transcript as you read it.");
+      const signature = [
+        title,
+        chosen.name,
+        chosen.size,
+        mode === "manual" ? text : chosen.lastModified,
+        mode,
+        selected,
+      ].join("|");
+      if (!retry.current || retry.current.signature !== signature)
+        retry.current = { signature, key: crypto.randomUUID() };
+      const form = new FormData();
+      form.set("title", title);
+      form.set("file", chosen);
+      if (mode !== "upload") {
+        form.set("revision", String(detail!.document.revision));
+        if (mode === "manual")
+          form.set("parentVersionId", detail!.document.current_version_id!);
+      }
+      const result = await api(
+        mode === "upload"
+          ? "/api/documents"
+          : `/api/documents/${selected}/versions`,
+        {
+          method: "POST",
+          headers: { "idempotency-key": retry.current.key },
+          body: form,
+        },
+      );
+      setMode(null);
+      setNotice(
+        "Original bytes and metadata are saved. Text processing is queued; you can return later.",
+      );
+      await refresh(null);
+      await choose(result.document_id);
+    } catch (e) {
+      setDialogError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function change(action: string, p?: Provider | Grant) {
+    setBusy(true);
+    setDialogError("");
+    try {
+      await api("/api/documents/" + selected, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          key: crypto.randomUUID(),
+          revision: detail!.document.revision,
+          action,
+          providerId: p?.provider_id,
+          workspaceId: p?.workspace_id,
+        }),
+      });
+      if (action === "delete") {
+        setSelected(null);
+        setDetail(null);
+        setMode(null);
+        await refresh(null);
+        setNotice("Access is removed. Private byte cleanup is queued.");
+      } else {
+        await refresh();
+        setNotice(
+          action === "share"
+            ? "Explicit sharing saved."
+            : action === "retry"
+              ? "Text processing queued again."
+              : "Future access revoked. Previously downloaded copies cannot be recalled.",
+        );
+      }
+    } catch (e) {
+      setDialogError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const version = detail?.versions.find(
+    (v) => v.id === detail.document.current_version_id,
+  );
+  return (
+    <RecordLayout provider={provider} fixture={!!fixture}>
+      <div tabIndex={-1} ref={headingRef} className="workspace-focus">
+        {error && (
+          <div role="alert" className="error-message">
+            {error}
+            <button
+              className="quiet-button"
+              onClick={() => {
+                setError("");
+                void refresh().catch((e) => setError(e.message));
+              }}
+            >
+              Retry loading
+            </button>
+          </div>
+        )}
+        {notice && (
+          <p className="status-message" role="status">
+            {notice}
+          </p>
+        )}
+        {loading ? (
+          <p role="status">Loading your private records…</p>
+        ) : detail ? (
+          <>
+            <SourceDetail
+              title={detail.document.title}
+              chunks={detail.chunks}
+              status={version?.extraction_status ?? detail.document.status}
+              version={version?.version_no ?? 1}
+              onBack={() => {
+                setSelected(null);
+                setDetail(null);
+              }}
+            >
+              <div className="document-actions">
+                {detail.document.status === "ready" && !fixture && (
+                  <a
+                    className="secondary-button"
+                    href={`/api/documents/${selected}/content`}
+                  >
+                    Download original
+                  </a>
+                )}
+                {!provider && (
+                  <button
+                    className="primary-button"
+                    onClick={() => open("share")}
+                  >
+                    Manage sharing
+                  </button>
+                )}
+              </div>
+            </SourceDetail>
+            <div className="document-actions">
+              <button
+                className="secondary-button"
+                onClick={() => void refresh().catch((e) => setError(e.message))}
+              >
+                Refresh processing state
+              </button>
+              {!provider && (
+                <>
+                  {version?.extraction_status === "failed" && (
+                    <button
+                      className="secondary-button"
+                      disabled={busy}
+                      onClick={() =>
+                        void change("retry").catch((e) => setError(e.message))
+                      }
+                    >
+                      Retry text processing
+                    </button>
+                  )}
+                  <button
+                    className="secondary-button"
+                    onClick={() => open("replace")}
+                  >
+                    Add replacement
+                  </button>
+                  {version && (
+                    <button
+                      className="secondary-button"
+                      onClick={() => open("manual")}
+                    >
+                      Add manual transcript
+                    </button>
+                  )}
+                  <button
+                    className="secondary-button"
+                    onClick={() => open("delete")}
+                  >
+                    Delete record
+                  </button>
+                </>
+              )}
+            </div>
+            {!provider && detail.versions.length > 1 && (
+              <section className="version-history">
+                <h2>Retained source versions</h2>
+                <p>
+                  Earlier sources are private to you. Replacement clears
+                  sharing; share the new source explicitly.
+                </p>
+                {detail.versions.map((v) => (
+                  <p key={v.id}>
+                    <a
+                      href={`/api/documents/${selected}/content?version=${v.id}`}
+                    >
+                      Version {v.version_no} ·{" "}
+                      {v.source_class === "manual"
+                        ? "Patient-entered transcript"
+                        : "Original file"}
+                    </a>
+                    {v.id === detail.document.current_version_id
+                      ? " · current"
+                      : ""}
+                  </p>
+                ))}
+              </section>
+            )}
+          </>
+        ) : (
+          <DocumentList
+            rows={rows}
+            provider={provider}
+            onSelect={(id) => void choose(id)}
+          >
+            {!provider && <AddRecordButton onClick={() => open("upload")} />}
+          </DocumentList>
+        )}
+      </div>
+      <Dialog.Root
+        open={mode !== null}
+        onOpenChange={(open) => {
+          if (!open && !busy) setMode(null);
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="dialog-overlay" />
+          <Dialog.Content
+            className="dialog-panel"
+            onEscapeKeyDown={(e) => {
+              if (busy) e.preventDefault();
+            }}
+            onPointerDownOutside={(e) => {
+              if (busy) e.preventDefault();
+            }}
+          >
+            <Dialog.Title>
+              {mode === "share"
+                ? "Choose who can read this record"
+                : mode === "delete"
+                  ? "Delete this record?"
+                  : mode === "manual"
+                    ? "Add your manual transcript"
+                    : mode === "replace"
+                      ? "Add a replacement version"
+                      : "Add a private record"}
+            </Dialog.Title>
+            <Dialog.Description>
+              {mode === "share"
+                ? "Sharing applies only to this record and the selected clinician and workspace."
+                : mode === "delete"
+                  ? "This removes access immediately and queues permanent cleanup of its bytes and text. This action cannot be undone."
+                  : mode === "manual"
+                    ? "Enter what you can read, without guessing. This becomes a labelled patient-entered text version linked to the retained original. Use a form-feed character to separate pages, if needed."
+                    : mode === "replace"
+                      ? "The original stays in your private version history. Existing sharing is revoked; share the replacement explicitly."
+                      : "PDF, UTF-8 text, PNG or JPEG. Up to 4 MiB each; 10 records and 40 MiB including retained versions. Scans may need manual text."}
+            </Dialog.Description>
+            {dialogError && (
+              <p role="alert" className="error-message">
+                {dialogError}
+              </p>
+            )}
+            {["upload", "replace", "manual"].includes(mode ?? "") ? (
+              <form onSubmit={upload} className="form-stack">
+                <label>
+                  Record title
+                  <input
+                    autoFocus
+                    required
+                    maxLength={160}
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                  />
+                </label>
+                {mode === "manual" ? (
+                  <label>
+                    Patient-entered transcript
+                    <textarea
+                      required
+                      maxLength={100000}
+                      rows={8}
+                      value={text}
+                      onChange={(e) => setText(e.target.value)}
+                    />
+                  </label>
+                ) : (
+                  <label>
+                    File
+                    <input
+                      required
+                      type="file"
+                      accept=".pdf,.txt,.png,.jpg,.jpeg"
+                      onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                    />
+                  </label>
+                )}
+                <div className="document-actions">
+                  <button className="primary-button" disabled={busy}>
+                    {busy
+                      ? "Saving…"
+                      : fixture
+                        ? "Visual sample · no save"
+                        : "Save private record"}
+                  </button>
+                  <button
+                    type="button"
+                    className="quiet-button"
+                    disabled={busy}
+                    onClick={() => setMode(null)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : mode === "share" ? (
+              <>
+                <h3>Currently shared</h3>
+                {detail?.grants.length ? (
+                  detail.grants.map((g) => (
+                    <div className="sharing-row" key={g.id}>
+                      <span>
+                        {providers.find(
+                          (p) =>
+                            p.provider_id === g.provider_id &&
+                            p.workspace_id === g.workspace_id,
+                        )?.name ?? "Previously authorized clinician"}
+                      </span>
+                      <button
+                        className="secondary-button"
+                        disabled={busy}
+                        onClick={() => void change("revoke", g)}
+                      >
+                        Revoke
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <p>Private · no active grants</p>
+                )}
+                <h3>Eligible care team</h3>
+                {providers.length ? (
+                  providers.map((p) => (
+                    <div
+                      className="sharing-row"
+                      key={p.provider_id + p.workspace_id}
+                    >
+                      <span>
+                        {p.name}
+                        <br />
+                        <small>{p.workspace_name}</small>
+                      </span>
+                      <button
+                        disabled={
+                          busy ||
+                          !!detail?.grants.find(
+                            (g) =>
+                              g.provider_id === p.provider_id &&
+                              g.workspace_id === p.workspace_id,
+                          )
+                        }
+                        className="primary-button"
+                        onClick={() => void change("share", p)}
+                      >
+                        Share
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <p>
+                    No eligible clinician is currently linked to your account.
+                  </p>
+                )}
+                <button
+                  className="quiet-button"
+                  disabled={busy}
+                  onClick={() => setMode(null)}
+                >
+                  Done
+                </button>
+              </>
+            ) : (
+              <div className="document-actions">
+                <button
+                  className="primary-button"
+                  disabled={busy}
+                  onClick={() => void change("delete")}
+                >
+                  {busy ? "Deleting…" : "Delete permanently"}
+                </button>
+                <button
+                  className="quiet-button"
+                  disabled={busy}
+                  onClick={() => setMode(null)}
+                >
+                  Keep record
+                </button>
+              </div>
+            )}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </RecordLayout>
+  );
+}

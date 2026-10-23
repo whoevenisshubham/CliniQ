@@ -40,14 +40,17 @@ jobs:
         env:
           DO_NOT_TRACK: "1"
       - run: npm run test:integration:prepare
-      - run: npm run test:integration
+      - run: npm run test:integration -- --reporter=default --reporter=json --outputFile=tests/infra/.runtime/integration-results.json
+      - run: npm run jobs:local
       - run: npm run setup:demo:local
       - name: Retain preservation evidence only (never actor credentials or raw startup logs)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: isolated-preservation
-          path: tests/infra/.runtime/preservation.json
+          path: |
+            tests/infra/.runtime/preservation.json
+            tests/infra/.runtime/integration-results.json
           if-no-files-found: error
       - name: Stop this isolated runner's services
         if: always()

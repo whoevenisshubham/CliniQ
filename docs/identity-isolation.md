@@ -1,3 +1,5 @@
+M2 now implements the document lifecycle on this foundation; see [documents](documents.md). Hosted acceptance remains separate.
+
 # Identity and isolated verification
 
 Normal admission verifies Supabase Auth, resolves an explicit active application

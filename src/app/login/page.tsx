@@ -40,17 +40,17 @@ export default function LoginPage() {
     <div className="min-h-screen flex clinical-grid">
       <div className="hidden lg:flex flex-col justify-between w-[45%] bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] p-12">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center">
-            <Activity className="w-5 h-5 text-white" />
+          <div className="w-10 h-10 rounded-xl bg-[var(--primary)] flex items-center justify-center">
+            <Activity className="w-5 h-5 text-[var(--foreground)]" />
           </div>
-          <span className="text-lg font-bold text-white">Nexus<span className="text-blue-400">MD</span></span>
+          <span className="text-lg font-bold text-[var(--foreground)]">CLINIQ<span className="text-[var(--primary)]">+</span></span>
         </div>
         <div className="space-y-5">
-          <h1 className="text-4xl font-bold text-white leading-tight">
-            Every Word<br /><span className="text-blue-400">Heals.</span>
+          <h1 className="text-4xl font-bold text-[var(--foreground)] leading-tight">
+            Your records.<br /><span className="text-[var(--primary)]">Your context.</span>
           </h1>
           <p className="text-sm text-[var(--foreground-muted)] leading-relaxed max-w-xs">
-            AI-powered ambient clinical documentation. Real-time ICD mapping. Safety guards. Built for Indian healthcare.
+            Private records and source text for your next care conversation. Clinical features are still being built and verified.
           </p>
         </div>
         <p className="text-xs text-[var(--foreground-subtle)]">Educational workspace · Synthetic data only</p>
@@ -62,7 +62,7 @@ export default function LoginPage() {
           <p className="text-sm text-[var(--foreground-muted)] mb-6">Access your clinical workspace</p>
 
           <div className="mb-5 p-3 rounded-lg border border-[var(--border)] bg-[var(--surface)]">
-            <p className="text-xs leading-relaxed text-[var(--foreground-muted)]">Use a provisioned workspace account. Demo access will return after isolated accounts and permissions have been verified.</p>
+            <p className="text-xs leading-relaxed text-[var(--foreground-muted)]">Use a provisioned workspace account. Hosted demo access is not yet configured.</p>
           </div>
 
           <form onSubmit={(ev) => { ev.preventDefault(); doLogin(email, password); }} className="space-y-4">
@@ -71,7 +71,7 @@ export default function LoginPage() {
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--foreground-subtle)]" />
                 <input id="email" autoComplete="username" type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="doctor@hospital.com"
-                  className="w-full pl-10 pr-4 py-2.5 text-sm bg-[var(--surface)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder-[var(--foreground-subtle)] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-colors" />
+                  className="w-full pl-10 pr-4 py-2.5 text-base bg-[var(--surface)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder-[var(--foreground-subtle)] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-colors" />
               </div>
             </div>
             <div>
@@ -79,7 +79,7 @@ export default function LoginPage() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--foreground-subtle)]" />
                 <input id="password" autoComplete="current-password" type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} required placeholder="••••••••"
-                  className="w-full pl-10 pr-10 py-2.5 text-sm bg-[var(--surface)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder-[var(--foreground-subtle)] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-colors" />
+                  className="w-full pl-10 pr-10 py-2.5 text-base bg-[var(--surface)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder-[var(--foreground-subtle)] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-colors" />
                 <button type="button" aria-label={showPw ? "Hide password" : "Show password"} aria-pressed={showPw} onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--foreground-subtle)]">
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -93,7 +93,7 @@ export default function LoginPage() {
               </motion.div>
             )}
             <button type="submit" disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50">
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--foreground)] text-sm font-medium transition-colors disabled:opacity-50">
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><span>Sign In</span><ArrowRight className="w-4 h-4" /></>}
             </button>
           </form>

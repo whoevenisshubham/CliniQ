@@ -34,7 +34,8 @@ function makeClient() {
 }
 async function deniedRead(client:SupabaseClient,table:string,id:string) {
  const {data,error}=await client.from(table).select("*").eq("id",id);
- expect(error===null ? data : []).toEqual([]);
+ if(error) expect(error.code,`Unexpected error for ${table}: ${error.message}`).toBe('42501');
+ else expect(data).toEqual([]);
 }
 beforeAll(async()=>{
  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL",config.API_URL);vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY",config.ANON_KEY);
@@ -130,10 +131,11 @@ it("patient bootstrap is retry/concurrency safe and creates no staff role/member
  const rows=await admin.from("patients").select("id,dob,phone").eq("user_id",principal.id);expect(rows.data).toHaveLength(1);expect(rows.data![0].dob).toBeNull();
  expect((await clients.unlinked.from("workspace_memberships").select("*")).data).toEqual([]);
 });
-it("owner can upload only the exact registered object, while cross-owner and unknown-key uploads fail",async()=>{
+it("direct uploads require validated server admission, including an owner with registered metadata",async()=>{
  expect((await clients.patientB.storage.from("clinical-documents").upload(objectKey,privateBytes,{contentType:'text/plain'})).error).not.toBeNull();
  expect((await clients.patientA.storage.from("clinical-documents").upload('arbitrary.txt',privateBytes,{contentType:'text/plain'})).error).not.toBeNull();
- expect((await clients.patientA.storage.from("clinical-documents").upload(objectKey,privateBytes,{contentType:'text/plain'})).error).toBeNull();
+ expect((await clients.patientA.storage.from("clinical-documents").upload(objectKey,privateBytes,{contentType:'text/plain'})).error).not.toBeNull();
+ expect((await admin.storage.from("clinical-documents").upload(objectKey,privateBytes,{contentType:'text/plain'})).error).toBeNull();
  expect((await admin.from("documents").update({status:'ready'}).eq('id',docId)).error).toBeNull();
 });
 it("direct downloads, signed URLs, listing, overwrite and deletion cannot bypass private content admission",async()=>{
@@ -245,4 +247,7 @@ it("real local PKCE rejects a missing verifier without granting an application s
  await expect(completeCallback(stranger,code,null)).rejects.toMatchObject({status:400});
  await expect(resolvePrincipal(stranger)).rejects.toMatchObject({status:401});
  expect(await completeCallback(client,code,'/patient/reports')).toBe('/patient/reports');
+});
+it('deniedRead does not count an unexpected schema error as a successful denial',async()=>{
+ await expect(deniedRead(clients.patientA,'missing_isolation_test_table',randomUUID())).rejects.toThrow();
 });

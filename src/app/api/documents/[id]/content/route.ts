@@ -7,6 +7,6 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   try {
     const client = await getSupabaseServerClient();
     await resolvePrincipal(client);
-    return await readPrivateContent(client,getSupabaseAdminClient,(await context.params).id);
+    return await readPrivateContent(client,getSupabaseAdminClient,(await context.params).id,new URL(_request.url).searchParams.get("version")??undefined);
   } catch(error) { return errorResponse(error); }
 }
