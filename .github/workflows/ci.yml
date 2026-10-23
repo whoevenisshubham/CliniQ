@@ -51,6 +51,7 @@ jobs:
           path: |
             tests/infra/.runtime/preservation.json
             tests/infra/.runtime/integration-results.json
+            tests/infra/.runtime/ai-evaluation-results.json
           if-no-files-found: error
       - name: Stop this isolated runner's services
         if: always()

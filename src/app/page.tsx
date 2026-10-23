@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ArrowUpRight, FileText, LockKeyhole, ArrowRight } from "lucide-react";
+import { ArrowUpRight, LockKeyhole, ArrowRight } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/ThemeProvider";
+import {WorkflowIllustration} from "@/components/consultation/WorkflowIllustration";
 export default function Home() {
   return (
     <div className="landing">
@@ -34,14 +35,14 @@ export default function Home() {
               <em>every visit.</em>
             </h1>
             <p className="hero-description">
-              Keep the original. Share with intention. Bring the context that
-              helps your next conversation.
+              Keep the original. Bring the conversation into a reviewed visit.
+              Carry the approved record forward.
             </p>
             <div className="hero-actions">
               <Link className="primary-button" href="/login">
                 Open your workspace <ArrowRight size={18} />
               </Link>
-              <Link className="text-link" href="/design/documents">
+              <Link className="text-link" href="/design/consultation">
                 Explore the visual sample <ArrowUpRight size={16} />
               </Link>
             </div>
@@ -49,36 +50,7 @@ export default function Home() {
               In development · educational product · synthetic data only
             </p>
           </div>
-          <div className="hero-paper">
-            <div className="paper-label">
-              <span>THE RECORD, IN CONTEXT</span>
-              <FileText size={20} />
-            </div>
-            <h2>
-              One source.
-              <br />A better starting point.
-            </h2>
-            <p>
-              A visit note, a referral, a report.
-              <br />
-              Keep its origin close to its meaning.
-            </p>
-            <hr />
-            <ol className="paper-steps">
-              <li>
-                <span>01</span>Save the original privately
-              </li>
-              <li>
-                <span>02</span>Read with source references
-              </li>
-              <li>
-                <span>03</span>Choose who can see it
-              </li>
-            </ol>
-            <p className="paper-caption">
-              Product journey illustration · no patient data
-            </p>
-          </div>
+          <WorkflowIllustration/>
         </section>
         <section id="how" className="landing-story">
           <p className="eyebrow">From one visit to the next</p>

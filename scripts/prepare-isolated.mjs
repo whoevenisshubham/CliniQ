@@ -14,8 +14,9 @@ const forward = readFileSync(path.join(root,'supabase/migrations/202610230001_id
 const m2 = readFileSync(path.join(root,'supabase/migrations/202610230002_documents_jobs.sql'),'utf8').replace(/^BEGIN;/m,'').replace(/^COMMIT;/m,'');
 const m3 = readFileSync(path.join(root,'supabase/migrations/202610230003_approved_records.sql'),'utf8').replace(/^BEGIN;/m,'').replace(/^COMMIT;/m,'');
 const proposals=readFileSync(path.join(root,'supabase/migrations/202610230004_clinical_proposals.sql'),'utf8').replace(/^BEGIN;/m,'').replace(/^COMMIT;/m,'');
+const ai=readFileSync(path.join(root,'supabase/migrations/202610230005_ai_jobs.sql'),'utf8').replace(/^BEGIN;/m,'').replace(/^COMMIT;/m,'');
 const legacyPolicies = readFileSync(path.join(root,'tests/fixtures/legacy-policies.sql'),'utf8');
-const fresh = sql(`BEGIN;\n${base}\n${forward}\n${m2}\n${m3}\n${proposals}\nSELECT json_build_object('users',(select count(*) from public.users),'patients',(select count(*) from public.patients),'memberships',(select count(*) from public.workspace_memberships));\nROLLBACK;`);
+const fresh = sql(`BEGIN;\n${base}\n${forward}\n${m2}\n${m3}\n${proposals}\n${ai}\nSELECT json_build_object('users',(select count(*) from public.users),'patients',(select count(*) from public.patients),'memberships',(select count(*) from public.workspace_memberships));\nROLLBACK;`);
 assert.deepEqual(JSON.parse(fresh),{users:0,patients:0,memberships:0});
 const provision = await provisionSyntheticActors();
 const { actors:a } = provision;
@@ -47,7 +48,7 @@ sql(`BEGIN;\n${base}\n${legacyPolicies}\n${fixture}\nCOMMIT;`);
 const columns = JSON.parse(sql(`select json_object_agg(table_name,cols) from (select table_name,string_agg(quote_ident(column_name),',' order by ordinal_position) cols from information_schema.columns where table_schema='public' group by table_name) x`));
 const snapshots = () => Object.fromEntries(Object.entries(columns).map(([table,cols]) => [table,JSON.parse(sql(`select json_build_object('rows',count(*),'hash',md5(coalesce(string_agg(row_to_json(x)::text,'|' order by x.id),''))) from (select ${cols} from public.${table}) x`))]));
 const before=snapshots();
-sql(`BEGIN;\n${forward}\n${m2}\n${m3}\n${proposals}\nCOMMIT;`);
+sql(`BEGIN;\n${forward}\n${m2}\n${m3}\n${proposals}\n${ai}\nCOMMIT;`);
 const after=snapshots();
 assert.deepEqual(after,before,'Forward upgrade changed original IDs or historical values');
 
@@ -67,5 +68,5 @@ for (const s of ['A','B']) {
 sql(`insert into public.care_relationships(patient_id,workspace_id,provider_id,scope,granted_by) values(${q(ids.patientA)},${q(ids.workspaceA)},${q(a.reception.appId)},'intake',${q(a.patientA.appId)})`);
 const target=path.join(root,'tests/infra/.runtime');mkdirSync(target,{recursive:true});
 writeFileSync(path.join(target,'fixture.json'),JSON.stringify({actors:a,ids,runId:provision.runId}));
-writeFileSync(path.join(target,'preservation.json'),JSON.stringify({timestamp:new Date().toISOString(),sourceSha:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),dirty:!!execFileSync('git',['status','--porcelain'],{cwd:root,encoding:'utf8'}).trim(),baselineSha256:createHash('sha256').update(base).digest('hex'),migrationSha256:createHash('sha256').update(readFileSync(path.join(root,'supabase/migrations/202610230001_identity_isolation.sql'))).digest('hex'),clinicalMigrationSha256:createHash('sha256').update(readFileSync(path.join(root,'supabase/migrations/202610230003_approved_records.sql'))).digest('hex'),documentMigrationSha256:createHash('sha256').update(readFileSync(path.join(root,'supabase/migrations/202610230002_documents_jobs.sql'))).digest('hex'),databaseVersion:sql('show server_version'),freshBaseline:{users:0,patients:0,memberships:0},before,after,originalFieldsPreserved:true,explicitMappingOnly:true},null,2));
+writeFileSync(path.join(target,'preservation.json'),JSON.stringify({timestamp:new Date().toISOString(),sourceSha:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),dirty:!!execFileSync('git',['status','--porcelain'],{cwd:root,encoding:'utf8'}).trim(),baselineSha256:createHash('sha256').update(base).digest('hex'),migrationSha256:createHash('sha256').update(readFileSync(path.join(root,'supabase/migrations/202610230001_identity_isolation.sql'))).digest('hex'),aiMigrationSha256:createHash('sha256').update(readFileSync(path.join(root,'supabase/migrations/202610230005_ai_jobs.sql'))).digest('hex'),proposalMigrationSha256:createHash('sha256').update(readFileSync(path.join(root,'supabase/migrations/202610230004_clinical_proposals.sql'))).digest('hex'),clinicalMigrationSha256:createHash('sha256').update(readFileSync(path.join(root,'supabase/migrations/202610230003_approved_records.sql'))).digest('hex'),documentMigrationSha256:createHash('sha256').update(readFileSync(path.join(root,'supabase/migrations/202610230002_documents_jobs.sql'))).digest('hex'),databaseVersion:sql('show server_version'),freshBaseline:{users:0,patients:0,memberships:0},before,after,originalFieldsPreserved:true,explicitMappingOnly:true},null,2));
 console.log(JSON.stringify({freshBaseline:'passed; no seeded identities',legacyUpgrade:'passed',tablesCompared:Object.keys(before).length,historicalRowsPreserved:Object.values(before).reduce((n,x)=>n+x.rows,0),authAccounts:Object.keys(a).length,credentialOutput:false}));

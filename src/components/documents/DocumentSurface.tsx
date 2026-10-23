@@ -70,7 +70,7 @@ export function RecordLayout({
   children: React.ReactNode;
   provider?: boolean;
   fixture?: boolean;
-  section?: "documents" | "consultations";
+  section?: "documents" | "consultations" | "evidence";
 }) {
   return (
     <div className="record-app">
@@ -103,6 +103,9 @@ export function RecordLayout({
           </Link>
           <Link aria-current={section === "consultations" ? "page" : undefined} href={fixture?"/design/consultation":"/consultations"}>
             <FileText size={18}/> {provider?"Consultations":"Approved visits"}
+          </Link>
+          <Link aria-current={section === "evidence" ? "page" : undefined} href={fixture?"/design/evidence":"/evidence"}>
+            <FileText size={18}/> Source review
           </Link>
           <div className="nav-note">
             <LockKeyhole size={20} />

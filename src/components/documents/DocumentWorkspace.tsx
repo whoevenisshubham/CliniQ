@@ -103,6 +103,7 @@ export function DocumentWorkspace({
       }
     }
   }
+  useEffect(()=>{if(!detail)return;const hash=window.location.hash;const chunk=detail.chunks.find(c=>hash==="#source-"+c.id);if(chunk)document.getElementById("source-"+chunk.id)?.focus();},[detail]);
   useEffect(() => {
     let active = true;
     const c = new AbortController();
@@ -116,7 +117,7 @@ export function DocumentWorkspace({
       .finally(() => {
         if (active) setLoading(false);
       });
-    return () => {
+  return () => {
       active = false;
       c.abort();
     };

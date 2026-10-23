@@ -12,7 +12,8 @@
     "test:integration:prepare": "node scripts/prepare-isolated.mjs --apply-local-synthetic",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "setup:demo:local": "node scripts/setup-demo.mjs --local-synthetic",
-    "jobs:local": "node --conditions=react-server --import tsx scripts/run-document-jobs.ts --local-synthetic"
+    "jobs:local": "node --conditions=react-server --import tsx scripts/run-document-jobs.ts --local-synthetic",
+    "eval:offline": "vitest run --config vitest.integration.config.ts tests/integration/ai.test.ts"
   },
   "dependencies": {
     "@deepgram/sdk": "^4.11.3",

@@ -16,6 +16,10 @@ The original speech-to-EMR hooks, adapters, prompts and clinical review componen
 
 The `/consultations` workspace adds authorized encounter creation, durable typed transcripts and clinician findings, revision-checked review, atomic approval and linked corrections. Patients read only approved records and prescriptions, including returning sessions. See [consultation contracts and limitations](docs/consultations.md). `/design/consultation` is a labelled rendered fixture with persistence disabled. Speech/provider execution remains unavailable; full M3 acceptance is in progress.
 
+## Source review and offline orchestration
+
+`/evidence` connects private source text, approved versions, persistent conversations and durable job states. Authorization precedes retrieval ranking; revocation/version/deletion invalidates results. External generation defaults off and is labelled unavailable/evidence-only. Offline provider-double output is never called working live AI. See [AI architecture, budgets and evaluation](docs/ai.md) and [deployment preparation](docs/deployment-readiness.md).
+
 ## Setup and verification
 
 Use Node 22.20 or later within the supported Node 22 line and Docker for isolated integration tests.

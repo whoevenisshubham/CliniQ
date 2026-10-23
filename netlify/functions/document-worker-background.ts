@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { workerClient } from "../../src/lib/server/jobs/client";
-import { runDocumentJob } from "../../src/lib/server/jobs/runner";
+import { runNextJob } from "../../src/lib/server/jobs/unified-runner";
 export async function handler(event: {
   httpMethod: string;
   headers: Record<string, string | undefined>;
@@ -14,6 +14,6 @@ export async function handler(event: {
     !timingSafeEqual(Buffer.from(expected), Buffer.from(supplied))
   )
     return { statusCode: 403, body: "Forbidden" };
-  await runDocumentJob(workerClient());
-  return { statusCode: 200, body: "Completed bounded document work" };
+  await runNextJob(workerClient());
+  return { statusCode: 200, body: "Completed bounded queued work" };
 }
