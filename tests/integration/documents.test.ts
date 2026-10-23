@@ -477,6 +477,7 @@ it("replacement retains owner original, revokes grants and invalidates an old jo
   const m = await data();
   revision = m.document.revision;
   expect(m.versions[0].source_class).toBe("manual");
+  expect(m.document.kind).toBe("manual_transcript");
   expect(m.versions[0].parent_version_id).toBe(newVersion);
 });
 it("cross-owner mutations, direct metadata writes, direct upload and commit/publish RPCs are denied", async () => {

@@ -220,6 +220,7 @@ export function SourceDetail({
   chunks,
   status,
   version,
+  sourceClass = "original",
   onBack,
   children,
 }: {
@@ -227,6 +228,7 @@ export function SourceDetail({
   chunks: SourceChunk[];
   status: string;
   version: number;
+  sourceClass?: string;
   onBack: () => void;
   children?: React.ReactNode;
 }) {
@@ -237,7 +239,12 @@ export function SourceDetail({
       </button>
       <div className="page-lead detail-lead">
         <div>
-          <p className="eyebrow">Original source · Version {version}</p>
+          <p className="eyebrow">
+            {sourceClass === "manual"
+              ? "Patient-entered transcript"
+              : "Original source"}{" "}
+            · Version {version}
+          </p>
           <h1>{title}</h1>
           <p className="lead-description">
             {status.replaceAll("_", " ")} · Private source record

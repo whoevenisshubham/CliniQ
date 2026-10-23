@@ -129,7 +129,7 @@ BEGIN
  PERFORM private.invalidate_document(d.id);
  UPDATE public.document_grants SET revoked_at=now() WHERE document_id=d.id AND revoked_at IS NULL;
  UPDATE public.document_versions SET extraction_status='obsolete' WHERE document_id=d.id AND id<>op.version_id;
- UPDATE public.documents SET title=op.title,current_version_id=op.version_id,status='ready',revision=revision+1 WHERE id=d.id;
+ UPDATE public.documents SET title=op.title,kind=CASE WHEN op.source_class='manual' THEN 'manual_transcript' ELSE 'record' END,current_version_id=op.version_id,status='ready',revision=revision+1 WHERE id=d.id;
  UPDATE public.upload_operations SET state='committed' WHERE id=op.id;
  PERFORM private.enqueue_document(d.id);
  RETURN jsonb_build_object('document_id',d.id,'version_id',op.version_id);

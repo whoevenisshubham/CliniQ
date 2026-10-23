@@ -352,6 +352,7 @@ export function DocumentWorkspace({
               chunks={detail.chunks}
               status={version?.extraction_status ?? detail.document.status}
               version={version?.version_no ?? 1}
+              sourceClass={version?.source_class}
               onBack={() => {
                 setSelected(null);
                 setDetail(null);
@@ -488,7 +489,7 @@ export function DocumentWorkspace({
                 : mode === "delete"
                   ? "This removes access immediately and queues permanent cleanup of its bytes and text. This action cannot be undone."
                   : mode === "manual"
-                    ? "Enter what you can read, without guessing. This becomes a labelled patient-entered text version linked to the retained original. Use a form-feed character to separate pages, if needed."
+                    ? "Enter what you can read, without guessing. This becomes a labelled patient-entered text version linked to the retained original. Add a separate text box for each page you enter. Compare it with the retained original."
                     : mode === "replace"
                       ? "The original stays in your private version history. Existing sharing is revoked; share the replacement explicitly."
                       : "PDF, UTF-8 text, PNG or JPEG. Up to 4 MiB each; 10 records and 40 MiB including retained versions. Scans may need manual text."}
@@ -511,16 +512,38 @@ export function DocumentWorkspace({
                   />
                 </label>
                 {mode === "manual" ? (
-                  <label>
-                    Patient-entered transcript
-                    <textarea
-                      required
-                      maxLength={100000}
-                      rows={8}
-                      value={text}
-                      onChange={(e) => setText(e.target.value)}
-                    />
-                  </label>
+                  <>
+                    {text.split("\f").map((page, index) => (
+                      <label key={index}>
+                        Patient-entered text · page {index + 1}
+                        <textarea
+                          required
+                          maxLength={100000}
+                          rows={6}
+                          value={page}
+                          onChange={(e) => {
+                            const pages = text.split("\f");
+                            pages[index] = e.target.value;
+                            const updated = pages.join("\f");
+                            if (Array.from(updated).length <= 100000)
+                              setText(updated);
+                            else
+                              setDialogError(
+                                "Manual text is limited to 100,000 characters.",
+                              );
+                          }}
+                        />
+                      </label>
+                    ))}
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      disabled={busy || text.split("\f").length >= 20}
+                      onClick={() => setText(text + "\f")}
+                    >
+                      Add next page
+                    </button>
+                  </>
                 ) : (
                   <label>
                     File
