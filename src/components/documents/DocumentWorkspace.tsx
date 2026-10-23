@@ -267,21 +267,35 @@ export function DocumentWorkspace({
       setBusy(false);
     }
   }
+  const mutationRetry = useRef<{ signature: string; key: string } | null>(null);
   async function change(action: string, p?: Provider | Grant) {
     setBusy(true);
     setDialogError("");
     try {
+      const signature = [
+        selected,
+        detail!.document.revision,
+        action,
+        p?.provider_id,
+        p?.workspace_id,
+      ].join("|");
+      if (
+        !mutationRetry.current ||
+        mutationRetry.current.signature !== signature
+      )
+        mutationRetry.current = { signature, key: crypto.randomUUID() };
       await api("/api/documents/" + selected, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          key: crypto.randomUUID(),
+          key: mutationRetry.current.key,
           revision: detail!.document.revision,
           action,
           providerId: p?.provider_id,
           workspaceId: p?.workspace_id,
         }),
       });
+      mutationRetry.current = null;
       if (action === "delete") {
         setSelected(null);
         setDetail(null);

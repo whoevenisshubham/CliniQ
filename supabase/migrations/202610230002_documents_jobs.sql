@@ -62,6 +62,7 @@ BEGIN
  IF FOUND THEN
   IF op.title IS DISTINCT FROM p_title OR op.file_name IS DISTINCT FROM p_name OR op.mime IS DISTINCT FROM p_mime OR op.byte_size IS DISTINCT FROM p_size OR op.sha256 IS DISTINCT FROM p_hash OR (p_document IS NOT NULL AND op.document_id<>p_document) OR op.expected_revision<>p_revision OR op.parent_version_id IS DISTINCT FROM p_parent THEN RAISE EXCEPTION 'IDEMPOTENCY_CONFLICT' USING ERRCODE='23505'; END IF;
   IF op.state IN ('cleaning','cleaned') OR (op.state IN ('reserved','stored') AND op.expires_at<=now()) THEN RAISE EXCEPTION 'UPLOAD_EXPIRED' USING ERRCODE='23514'; END IF;
+  IF op.state='committed' AND NOT EXISTS(SELECT 1 FROM public.documents x JOIN public.document_versions v ON v.document_id=x.id WHERE x.id=op.document_id AND x.deleted_at IS NULL AND v.id=op.version_id) THEN RAISE EXCEPTION 'NOT_FOUND' USING ERRCODE='42501';END IF;
   RETURN op;
  END IF;
  IF (SELECT count(*) FROM public.upload_operations WHERE patient_id=patient AND created_at>now()-interval '24 hours')>=100 THEN RAISE EXCEPTION 'UPLOAD_RATE_LIMIT' USING ERRCODE='23514';END IF;

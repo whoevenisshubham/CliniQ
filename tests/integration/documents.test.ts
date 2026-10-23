@@ -543,6 +543,21 @@ it("deletion immediately blocks bytes and chunks, stale workers cannot resurrect
       .single()
   ).data!;
   expect((await runDocumentJob(admin, purge.id)).status).toBe("succeeded");
+  const originalOperation = (
+    await admin
+      .from("upload_operations")
+      .select("operation_key")
+      .eq("version_id", versionId)
+      .single()
+  ).data!;
+  expect(
+    (
+      await upload(
+        formRequest(payload, { key: originalOperation.operation_key }),
+      )
+    ).status,
+  ).toBe(404);
+
   for (const v of retainedKeys)
     expect(
       (await admin.storage.from("clinical-documents").download(v.object_key))
