@@ -27,3 +27,13 @@ blind benchmark, paid fallback or automatic provider switch is part of this work
 Source provenance: CliniQ history/contributors remain intact. Adapted MediFlow helpers
 retain attribution to Sujit Jaju and contributors at the stated revision. No blanket
 license is invented; applicable third-party notices remain authoritative.
+
+## M3 integration
+
+`src/lib/clinical/audio.ts` substantially adapts MediFlow 45fbfb853338d5236f2c34eb83e771ac4e9307ca `src/hooks/useSTT.ts` PCM clipping, averaging downsample and conversion. `capture.ts` keeps the stream/context/processor lifecycle and abort/cleanup pattern, adding finite capture windows and complete WAV boundaries. It has no transport or model choice. The original CliniQ streaming hook, interim/final handling and medical hints remain preserved for authorized transport integration; neither default adapter is asserted to be the proven winning configuration.
+
+`src/lib/clinical/proposals.ts` and the source-bound proposal transaction retain MediFlow's set_fact/update_fact/retract_fact/mark_uncertain vocabulary, final-segment cursor and evidence IDs. Arbitrary path mutation, implicit medication-index expansion and string coercion were replaced because they permit prototype paths, invented slots and lost manual corrections. Retractions/uncertainty remain review tasks. Late results are retained, never applied over a newer draft.
+
+`ConsultationReview.tsx` preserves the original transcript/findings/review organization and clinical fields while moving orchestration out of `ActiveConsultationClient.tsx`. Its old global editor/inference timers, fixture patient identity and independent finalize writes cannot own the repaired transaction. The retained component remains available for further panel reuse. The new screen uses the M2 theme/layout, scoped source history and faithful approved exports. The MediFlow consultation-context history/recap organization is adapted into the relational service; its MongoDB writes and receptionist-as-doctor admission are not copied.
+
+The original Groq/Llama extraction prompt and provider adapters are unchanged. No speech, inference, OCR or embedding request has been made by M3.

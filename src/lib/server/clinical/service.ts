@@ -3,6 +3,7 @@ import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 import { resolvePrincipal } from "../auth/context";
 import { HttpError } from "../http";
 import { id } from "../documents/service";
+import { validateProposal } from "@/lib/clinical/proposals";
 function check(error: PostgrestError | null) {
     if (!error)
         return;
@@ -24,6 +25,7 @@ function check(error: PostgrestError | null) {
         AMENDMENT_EXISTS: [409, "A correction for this version already exists. Open the existing encounter."],
         ALLERGY_REVIEW_REQUIRED: [422, "A medicine name exactly matches a recorded allergy. Record a reasoned review acknowledgement."],
         UNIT_REVIEW_REQUIRED: [422, "Review conflicting recorded measurement units and record a reason."],
+        STALE_PROPOSAL: [409, "This suggestion predates a clinician edit. It cannot replace the current findings. Review its source and edit manually if appropriate."],
     };
     const c = Object.keys(codes).find(k => error.message === k);
     if (c)
@@ -69,7 +71,7 @@ export async function clinicalDetail(client: SupabaseClient, encounterId: string
     check(visit.error);
     if (!visit.data)
         throw new HttpError(404, "NOT_FOUND", "Consultation unavailable.");
-    const [draft, segments, patient, approved, documents, history, prescriptions] = await Promise.all([
+    const [draft, segments, patient, approved, documents, history, prescriptions, proposals] = await Promise.all([
         client.from("clinical_drafts").select("*").eq("consultation_id", encounterId).maybeSingle(),
         client.from("clinical_segments").select("id,sequence,text,speaker,language,start_ms,end_ms,source_type").eq("consultation_id", encounterId).order("sequence").limit(1000),
         client.from("patients").select("id,name,allergies").eq("id", visit.data.patient_id).maybeSingle(),
@@ -77,8 +79,9 @@ export async function clinicalDetail(client: SupabaseClient, encounterId: string
         client.from("documents").select("id,title,current_version_id,created_at").eq("patient_id", visit.data.patient_id).eq("status", "ready").limit(20),
         client.from("emr_versions").select("id,consultation_id,snapshot,reviewed_at,amended_from_id,consultations!emr_versions_consultation_id_fkey!inner(patient_id)").eq("consultations.patient_id", visit.data.patient_id).order("reviewed_at", { ascending: false }).limit(5),
         client.from("prescriptions").select("id,approved_emr_version_id,medication_name,dosage,frequency,duration,route,instructions,status,prescribed_at").eq("patient_id", visit.data.patient_id).order("prescribed_at", { ascending: false }).limit(50),
+        client.from("clinical_proposals").select("id,base_revision,operations,source_snapshot,result_kind,state,created_at").eq("consultation_id", encounterId).order("created_at", { ascending: false }).limit(100),
     ]);
-    for (const r of [draft, segments, patient, approved, documents, history, prescriptions])
+    for (const r of [draft, segments, patient, approved, documents, history, prescriptions, proposals])
         check(r.error);
     if (!draft.data)
         throw new HttpError(409, "LEGACY_RECONCILIATION_REQUIRED", "This historical encounter requires explicit reconciliation.");
@@ -89,5 +92,30 @@ export async function clinicalDetail(client: SupabaseClient, encounterId: string
         throw new HttpError(404, "NOT_FOUND", "Consultation unavailable.");
     if (current.data.revision !== visit.data.revision)
         throw new HttpError(409, "REVISION_CONFLICT", "This encounter changed. Reload to read current content.");
-    return { visit: visit.data, draft: draft.data, segments: segments.data, patient: patient.data, approved: approved.data, history: history.data, prescriptions: prescriptions.data, documents: documents.data };
+    return { visit: visit.data, draft: draft.data, segments: segments.data, patient: patient.data, approved: approved.data, history: history.data, prescriptions: prescriptions.data, documents: documents.data, proposals: proposals.data };
+}
+export async function offerClinicalProposal(admin: SupabaseClient, actorId: string, encounterId: string, raw: unknown) {
+    id(actorId);
+    id(encounterId);
+    const sources = await admin.from("clinical_segments").select("id,sequence,text").eq("consultation_id", encounterId).order("sequence").limit(1000);
+    check(sources.error);
+    const p = validateProposal(raw, sources.data ?? []);
+    const result = await admin.rpc("clinical_offer", { a: actorId, c: encounterId, p, mode: "offline_fixture" });
+    check(result.error);
+    return result.data as string;
+}
+export async function reviewClinicalProposal(client: SupabaseClient, proposalId: string, key: string, input: unknown) {
+    const p = await resolvePrincipal(client);
+    if (p.role !== "doctor")
+        throw new HttpError(403, "PROVIDER_REQUIRED", "A treating clinician is required.");
+    id(proposalId);
+    id(key);
+    if (!input || typeof input !== "object" || Array.isArray(input))
+        throw new HttpError(400, "INVALID_COMMAND", "A review decision is required.");
+    const b = input as Record<string, unknown>;
+    if (Object.keys(b).sort().join() !== "decision,expectedRevision" || !Number.isInteger(b.expectedRevision) || Number(b.expectedRevision) < 0 || !["accept", "reject"].includes(String(b.decision)))
+        throw new HttpError(400, "INVALID_COMMAND", "A bounded review decision is required.");
+    const result = await client.rpc("clinical_apply_proposal", { k: key, pid: proposalId, expected: b.expectedRevision, decision: b.decision });
+    check(result.error);
+    return result.data;
 }

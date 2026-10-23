@@ -7,6 +7,9 @@ import { localConfiguration, root, sql } from "../../scripts/local-supabase.mjs"
 import { GET as list, POST as mutate } from "@/app/api/clinical/route";
 import { GET as detail } from "@/app/api/clinical/[id]/route";
 import { GET as exportRecord } from "@/app/api/clinical/approved/[id]/route";
+import { POST as proposalReview } from "@/app/api/clinical/proposals/[id]/route";
+import { offerClinicalProposal } from "@/lib/server/clinical/service";
+import { GET as operationLookup } from "@/app/api/clinical/operations/[id]/route";
 import { emptySnapshot, type ClinicalSnapshot } from "@/lib/contracts/clinical";
 const state = vi.hoisted(() => ({ jar: null as null | {
         getAll: () => {
@@ -84,6 +87,14 @@ it("creates a real encounter/draft/audit once through authenticated handler and 
     expect(d.draft.snapshot).toEqual(emptySnapshot());
     expect((await admin.from('audit_log').select('id').eq('consultation_id', encounter)).data).toHaveLength(1);
     expect((await call({ ...command, patientId: fixture.ids.patientB }, createKey)).status).toBe(409);
+    state.jar = jars.doctor;
+    const found = await operationLookup(new Request(origin), { params: Promise.resolve({ id: createKey }) });
+    expect(found.status).toBe(200);
+    expect((await found.json()).data.consultationId).toBe(encounter);
+    state.jar = jars.patientB;
+    const foreign = await operationLookup(new Request(origin), { params: Promise.resolve({ id: createKey }) });
+    expect(foreign.status).toBe(200);
+    expect((await foreign.json()).data).toBeNull();
 });
 it("denies patient, reception, admin, unassigned and cross-workspace creation; rejects forged actor fields", async () => {
     for (const name of ['patient', 'reception', 'admin', 'doctorU', 'doctorB'])
@@ -129,6 +140,62 @@ it("returning clinician session rehydrates committed draft and transcript throug
     expect(d.draft.snapshot.medications[0].dose).toBe('2.5 mg');
     expect(d.segments).toHaveLength(1);
     expect(d.visit.revision).toBe(revision);
+});
+it("concurrent independent stale edits have one winner and a signed-out session cannot save", async () => {
+    const command = save(), other = { ...command, snapshot: { ...snapshot, chief_complaint: 'Concurrent synthetic observation — no fever' } };
+    const r = await Promise.all([call(command), call(other)]);
+    expect(r.map(x => x.status).sort()).toEqual([200, 409]);
+    const d = await current();
+    revision = d.visit.revision;
+    snapshot = structuredClone(d.draft.snapshot);
+    const oldJar = jars.doctor;
+    expect((await clients.doctor.auth.signOut()).error).toBeNull();
+    state.jar = oldJar;
+    const denied = await mutate(new Request(origin, { method: 'POST', headers: { origin, 'content-type': 'application/json', 'idempotency-key': randomUUID() }, body: JSON.stringify(save()) }));
+    expect([401, 403]).toContain(denied.status);
+    const x = make();
+    expect((await x.client.auth.signInWithPassword(actors.doctor)).error).toBeNull();
+    clients.doctor = x.client;
+    jars.doctor = x.jar;
+    expect((await current()).visit.revision).toBe(revision);
+});
+it("durably retains stale proposals without replacing manual dose and accepts only current reviewed source-bound changes", async () => {
+    const d = await current(), source = d.segments[0];
+    const raw = { baseRevision: revision, throughSegmentId: source.id, operations: [{ op: 'set_fact', path: 'clinical_summary', value: source.text, evidence_segment_ids: [source.id] }] };
+    const staleId = await offerClinicalProposal(admin, actors.doctor.appId, encounter, raw);
+    snapshot.medications[0].dose = '1.25 mg';
+    let r = await call(save());
+    expect(r.status).toBe(200);
+    revision = (await r.json()).data.revision;
+    const review = async (id: string, key = randomUUID(), actor = 'doctor') => { state.jar = jars[actor]; return proposalReview(new Request(origin, { method: 'POST', headers: { origin, 'content-type': 'application/json', 'idempotency-key': key }, body: JSON.stringify({ decision: 'accept', expectedRevision: revision }) }), { params: Promise.resolve({ id }) }); };
+    expect((await review(staleId)).status).toBe(409);
+    let now = await current();
+    expect(now.draft.snapshot.medications[0].dose).toBe('1.25 mg');
+    const offeredAfterEdit = await offerClinicalProposal(admin, actors.doctor.appId, encounter, raw);
+    expect((await current()).proposals.find((p: {
+        id: string;
+    }) => p.id === offeredAfterEdit).state).toBe('stale');
+    const currentId = await offerClinicalProposal(admin, actors.doctor.appId, encounter, { ...raw, baseRevision: revision });
+    expect((await review(currentId, randomUUID(), 'patient')).status).toBe(403);
+    expect((await review(currentId, randomUUID(), 'doctorU')).status).toBe(404);
+    const key = randomUUID();
+    r = await review(currentId, key);
+    expect(r.status).toBe(200);
+    const accepted = (await r.json()).data;
+    expect((await review(currentId, key)).status).toBe(200);
+    revision = accepted.revision;
+    now = await current();
+    expect(now.draft.snapshot.clinical_summary).toBe(source.text);
+    expect(now.draft.snapshot.medications[0].dose).toBe('1.25 mg');
+    expect(now.draft.provenance.clinical_summary).toMatchObject({ sourceType: 'generated_proposal', proposalId: currentId, resultKind: 'offline_fixture', evidenceSegmentIds: [source.id] });
+    expect((await clients.patient.from('clinical_proposals').select('*')).data).toEqual([]);
+    expect((await clients.doctor.rpc('clinical_offer', { a: actors.doctor.appId, c: encounter, p: raw, mode: 'offline_fixture' })).error?.code).toBe('42501');
+    await expect(offerClinicalProposal(admin, actors.doctor.appId, encounter, { ...raw, operations: [{ ...raw.operations[0], evidence_segment_ids: [randomUUID()] }] })).rejects.toThrow();
+    snapshot = structuredClone(now.draft.snapshot);
+    snapshot.medications[0].dose = '2.5 mg';
+    r = await call(save());
+    expect(r.status).toBe(200);
+    revision = (await r.json()).data.revision;
 });
 it("patient has no draft, transcript or unapproved prescription visibility", async () => {
     for (const table of ['clinical_drafts', 'clinical_segments', 'emr_versions', 'prescriptions']) {
