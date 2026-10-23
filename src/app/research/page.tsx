@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getServerUser } from "@/lib/auth";
 import { ResearchDashboardClient } from "@/components/research/ResearchDashboardClient";
 
+export const dynamic = "force-dynamic";
+
 export default async function ResearchDashboardPage() {
   const user = await getServerUser();
 

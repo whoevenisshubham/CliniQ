@@ -1,3 +1,13 @@
+# Current development status
+
+The V2 containment branch temporarily closes legacy clinical APIs while trusted
+identity, scoped services and database policies are upgraded. Historical feature
+descriptions below are not V2 acceptance evidence. See
+[security containment](docs/security-containment.md) for implemented behavior,
+configuration, verification commands and remaining gates.
+
+---
+
 <div align="center">
 
 # 🏥 CliniQ

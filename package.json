@@ -6,7 +6,9 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit --incremental false",
+    "test:unit": "vitest run"
   },
   "dependencies": {
     "@deepgram/sdk": "^4.11.3",
@@ -38,6 +40,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.7.0",
+    "server-only": "0.0.1",
     "tailwind-merge": "^3.5.0",
     "zustand": "^5.0.11"
   },
@@ -49,6 +52,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "4.0.18"
   }
 }

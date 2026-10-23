@@ -1,3 +1,4 @@
+import { containLegacyRoute } from "@/lib/server/containment";
 import { NextResponse } from "next/server";
 import Groq from "groq-sdk";
 import { buildEpidemiologyContext } from "@/lib/epidemiology";
@@ -37,7 +38,7 @@ Output schema:
   "gap_prompts": ["string - passive prompt to doctor for missing details"]
 }`;
 
-export async function POST(request: Request) {
+async function legacyPOST(request: Request) {
   const groq = getGroq();
   try {
     const { transcript, consultationId, existingEMR, location } = await request.json();
@@ -125,3 +126,6 @@ INSTRUCTIONS:
     );
   }
 }
+
+// Quarantined pending scoped service and database-policy verification.
+export const POST = containLegacyRoute(legacyPOST);

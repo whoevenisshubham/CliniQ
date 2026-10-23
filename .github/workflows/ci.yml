@@ -1,0 +1,29 @@
+name: Containment checks
+
+on:
+  push:
+    branches: [main, codex/v2-containment]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  containment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test:unit
+      - run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+    # This verifies the containment increment. Supabase/Auth/Storage integration
+    # and browser suites must be added and pass before an integrated release.

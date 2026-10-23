@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocalStorageState } from "@/lib/use-local-storage";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -41,19 +42,7 @@ interface ScanResult {
 // ─── localStorage helpers ───────────────────────────────────────────────────
 
 const SCANNED_RX_KEY = "cliniq_scanned_prescriptions";
-
-function loadScannedPrescriptions(): ScanResult[] {
-    if (typeof window === "undefined") return [];
-    try {
-        const raw = localStorage.getItem(SCANNED_RX_KEY);
-        return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
-}
-
-function saveScannedPrescriptions(data: ScanResult[]): void {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(SCANNED_RX_KEY, JSON.stringify(data));
-}
+const EMPTY_SCANS: ScanResult[] = [];
 
 // ─── Mock data ─────────────────────────────────────────────────────────────────
 
@@ -486,12 +475,7 @@ export function PatientPrescriptionsClient({ user }: PatientPrescriptionsClientP
     const [searchQuery, setSearchQuery] = useState("");
     const [activePrescriptions, setActivePrescriptions] = useState(MOCK_ACTIVE_PRESCRIPTIONS);
     const [pastPrescriptions, setPastPrescriptions] = useState(MOCK_PAST_PRESCRIPTIONS);
-    const [scannedPrescriptions, setScannedPrescriptions] = useState<ScanResult[]>([]);
-
-    // Load scanned prescriptions from localStorage
-    useEffect(() => {
-        setScannedPrescriptions(loadScannedPrescriptions());
-    }, []);
+    const [scannedPrescriptions, setScannedPrescriptions] = useLocalStorageState<ScanResult[]>(SCANNED_RX_KEY, EMPTY_SCANS);
 
     // Fetch from API (fallback to mock)
     useEffect(() => {
@@ -548,19 +532,17 @@ export function PatientPrescriptionsClient({ user }: PatientPrescriptionsClientP
     const handleScanComplete = useCallback((result: ScanResult) => {
         setScannedPrescriptions((prev) => {
             const updated = [result, ...prev];
-            saveScannedPrescriptions(updated);
             return updated;
         });
         setActiveTab("scanned");
-    }, []);
+    }, [setScannedPrescriptions]);
 
     const handleDeleteScan = useCallback((index: number) => {
         setScannedPrescriptions((prev) => {
             const updated = prev.filter((_, i) => i !== index);
-            saveScannedPrescriptions(updated);
             return updated;
         });
-    }, []);
+    }, [setScannedPrescriptions]);
 
     const totalBrandCost = activePrescriptions.reduce((sum, rx) => sum + rx.brand_price, 0);
     const totalGenericCost = activePrescriptions.reduce((sum, rx) => sum + rx.generic_price, 0);

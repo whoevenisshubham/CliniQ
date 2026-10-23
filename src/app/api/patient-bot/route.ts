@@ -1,3 +1,4 @@
+import { containLegacyRoute } from "@/lib/server/containment";
 import { NextRequest, NextResponse } from "next/server";
 import Groq from "groq-sdk";
 
@@ -17,7 +18,7 @@ RULES:
 6. Be concise but thorough. Use bullet points for clarity.
 7. If asked about drug interactions or side effects, provide verified information but emphasize consulting the prescribing doctor.`;
 
-export async function POST(req: NextRequest) {
+async function legacyPOST(req: NextRequest) {
   const groq = getGroq();
   try {
     const { messages, patientContext } = await req.json();
@@ -55,3 +56,6 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+// Quarantined pending scoped service and database-policy verification.
+export const POST = containLegacyRoute(legacyPOST);

@@ -1,8 +1,9 @@
+import { containLegacyRoute } from "@/lib/server/containment";
 import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase-server";
 
 // POST/PUT — Upsert EMR entry for a consultation
-export async function POST(
+async function legacyPOST(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
@@ -65,7 +66,7 @@ export async function POST(
 }
 
 // GET — Fetch EMR entry for a consultation
-export async function GET(
+async function legacyGET(
     _request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
@@ -86,3 +87,7 @@ export async function GET(
         return NextResponse.json({ emr: null });
     }
 }
+
+// Quarantined pending scoped service and database-policy verification.
+export const POST = containLegacyRoute(legacyPOST);
+export const GET = containLegacyRoute(legacyGET);
