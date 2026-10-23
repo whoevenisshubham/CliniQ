@@ -203,7 +203,12 @@ export function DocumentWorkspace({
       headingRef.current?.focus();
     }
   }
+  const dialogOpener = useRef<HTMLElement | null>(null);
   function open(next: typeof mode) {
+    dialogOpener.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     setMode(next);
     setTitle(next === "upload" ? "" : (detail?.document.title ?? ""));
     setFile(null);
@@ -464,6 +469,10 @@ export function DocumentWorkspace({
         <Dialog.Portal>
           <Dialog.Overlay className="dialog-overlay" />
           <Dialog.Content
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              dialogOpener.current?.focus();
+            }}
             className="dialog-panel"
             onEscapeKeyDown={(e) => {
               if (busy) e.preventDefault();
