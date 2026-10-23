@@ -8,8 +8,8 @@ vi.mock("@/lib/supabase-server", () => ({ getSupabaseAdminClient: vi.fn(() => { 
 
 type Endpoint = (request: Request) => Promise<Response> | Response;
 const modules = import.meta.glob<Record<string, Endpoint>>("../../src/app/api/**/route.ts", { eager: true });
-const endpoints = Object.entries(modules).filter(([path]) => !path.includes("/auth/")).flatMap(([path, handlers]) =>
-  Object.entries(handlers).filter(([method]) => ["GET", "POST", "PATCH", "PUT", "DELETE"].includes(method))
+const endpoints = Object.entries(modules).filter(([path]) => !path.includes("/auth/") && !path.includes("/api/me/") && !path.includes("/api/documents/")).flatMap(([path, handlers]) =>
+  Object.entries(handlers).filter(([method]) => ["GET", "POST", "PATCH", "PUT", "DELETE"].includes(method) && !(path.includes("/consultations/[id]/emr/") && method==="GET"))
     .map(([method, handler]) => ({ path, method, handler })));
 
 beforeEach(() => {
@@ -24,7 +24,7 @@ function request(method: string, origin = "http://localhost:3000") {
   } });
 }
 
-it("covers all 35 pre-existing legacy HTTP exports", () => { expect(endpoints.length).toBe(35); });
+it("covers the 34 legacy HTTP exports still closed after the scoped EMR reader repair", () => { expect(endpoints.length).toBe(34); });
 
 it.each(endpoints)("$method $path rejects an unverified forged session without running legacy logic", async ({ path, method, handler }) => {
   vi.mocked(requirePrincipal).mockRejectedValue(new HttpError(401, "AUTH_REQUIRED", "Sign in to continue."));

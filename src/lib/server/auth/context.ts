@@ -11,6 +11,7 @@ export interface Principal {
   name: string;
   role: UserRole;
   avatar_url?: string;
+  memberships?: { workspace_id: string; role: string; status: string }[];
 }
 
 const roles: readonly string[] = ["patient", "doctor", "receptionist", "admin", "nurse", "research"];
@@ -30,8 +31,13 @@ export async function resolvePrincipal(client: SupabaseClient): Promise<Principa
       typeof account.name !== "string" || typeof account.email !== "string") {
     throw new HttpError(403, "ACCOUNT_UNAVAILABLE", "This account is inactive or has not been linked. Contact the workspace owner.");
   }
+  const { data: memberships, error: membershipError } = await client.from("workspace_memberships")
+    .select("workspace_id,role,status").eq("user_id",account.id).eq("status","active");
+  if(membershipError) throw new HttpError(503,"IDENTITY_SETUP_REQUIRED","Workspace configuration needs attention.");
+  const active = (memberships ?? []).filter(m=>m.role===account.role && m.status==="active");
+  if(account.role!=="patient" && !active.length) throw new HttpError(403,"MEMBERSHIP_REQUIRED","An active workspace assignment is required.");
   return { id: account.id, authUserId: user.id, email: account.email,
-    name: account.name, role: account.role, avatar_url: account.avatar_url ?? undefined };
+    name: account.name, role: account.role, avatar_url: account.avatar_url ?? undefined, memberships:active };
 }
 
 export async function requirePrincipal() {

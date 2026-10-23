@@ -1,5 +1,13 @@
 # Security containment status
 
+The identity/isolation increment adds a tested local baseline and forward upgrade,
+active workspace/session admission, PKCE bootstrap, and real Supabase policy tests.
+See [identity and isolation](identity-isolation.md) for the current boundary and
+[core pipeline reuse](core-pipeline-reuse.md) for retained speech/EMR foundations.
+The 34 remaining legacy HTTP exports stay closed. The scoped EMR GET reader,
+`/api/me` and private byte reader are separately repaired paths. Historical
+containment behavior below describes the original closure and its rationale.
+
 The legacy clinical APIs are temporarily closed while identity, database policies
 and scoped services are upgraded. Existing domain implementations are retained
 behind explicit containment wrappers for focused repair. No runtime flag bypasses

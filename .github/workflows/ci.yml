@@ -1,4 +1,4 @@
-name: Containment checks
+name: Identity and isolation checks
 
 on:
   push:
@@ -25,5 +25,32 @@ jobs:
       - run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: "1"
-    # This verifies the containment increment. Supabase/Auth/Storage integration
-    # and browser suites must be added and pass before an integrated release.
+  supabase-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Start isolated Auth/Postgres/Storage/mail services without exposing credentials
+        run: npx --no-install supabase start --workdir tests/infra > "$RUNNER_TEMP/cliniq-supabase-start.log" 2>&1
+        env:
+          DO_NOT_TRACK: "1"
+      - run: npm run test:integration:prepare
+      - run: npm run test:integration
+      - run: npm run setup:demo:local
+      - name: Retain preservation evidence only (never actor credentials or raw startup logs)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: isolated-preservation
+          path: tests/infra/.runtime/preservation.json
+          if-no-files-found: error
+      - name: Stop this isolated runner's services
+        if: always()
+        run: npx --no-install supabase stop --workdir tests/infra
+        env:
+          DO_NOT_TRACK: "1"

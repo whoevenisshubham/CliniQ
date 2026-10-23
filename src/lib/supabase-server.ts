@@ -17,6 +17,7 @@ export async function getSupabaseServerClient() {
   const { url, key } = getSupabaseConfiguration();
   const cookieStore = await cookies();
   return createServerClient(url, key, {
+    cookieOptions:{httpOnly:true,sameSite:"lax",secure:process.env.APP_ORIGIN?.startsWith("https://")??false,path:"/"},
     cookies: {
       getAll() {
         return cookieStore.getAll();

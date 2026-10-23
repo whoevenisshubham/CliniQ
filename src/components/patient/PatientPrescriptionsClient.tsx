@@ -475,7 +475,7 @@ export function PatientPrescriptionsClient({ user }: PatientPrescriptionsClientP
     const [searchQuery, setSearchQuery] = useState("");
     const [activePrescriptions, setActivePrescriptions] = useState(MOCK_ACTIVE_PRESCRIPTIONS);
     const [pastPrescriptions, setPastPrescriptions] = useState(MOCK_PAST_PRESCRIPTIONS);
-    const [scannedPrescriptions, setScannedPrescriptions] = useLocalStorageState<ScanResult[]>(SCANNED_RX_KEY, EMPTY_SCANS);
+    const [scannedPrescriptions, setScannedPrescriptions] = useLocalStorageState<ScanResult[]>(`${SCANNED_RX_KEY}:${user.id}`, EMPTY_SCANS);
 
     // Fetch from API (fallback to mock)
     useEffect(() => {

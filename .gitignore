@@ -51,3 +51,7 @@ aux
 /test-results/
 # Private execution materials must stay outside this repository.
 /CLINIQ_PLUS_V2_EXECUTION_PACK*/
+/tests/infra/.runtime/
+/tests/infra/supabase/.temp/
+/tests/infra/supabase/.branches/
+/supabase/.temp/

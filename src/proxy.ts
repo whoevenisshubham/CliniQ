@@ -13,7 +13,7 @@ export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
   try {
     const { url, key } = getSupabaseConfiguration();
-    const client = createServerClient(url, key, { cookies: {
+    const client = createServerClient(url, key, { cookieOptions:{httpOnly:true,sameSite:"lax",secure:process.env.APP_ORIGIN?.startsWith("https://")??false,path:"/"}, cookies: {
       getAll: () => request.cookies.getAll(),
       setAll(cookies) {
         cookies.forEach(({ name, value }) => request.cookies.set(name, value));

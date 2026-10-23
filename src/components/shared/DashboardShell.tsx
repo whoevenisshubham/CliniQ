@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState,useEffect } from "react";
 import { motion } from "framer-motion";
 import { AppSidebar } from "./AppSidebar";
 import type { UserRole } from "@/lib/types";
+import { useConsultationStore } from "@/store/consultationStore";
+import { configureOfflineActor } from "@/lib/offline-queue";
 
 interface DashboardShellProps {
   user: {
@@ -18,7 +19,7 @@ interface DashboardShellProps {
 }
 
 export function DashboardShell({ user, children }: DashboardShellProps) {
-  const router = useRouter();
+  useEffect(()=>{configureOfflineActor(user.id);return ()=>configureOfflineActor(null);},[user.id]);
   const [signOutError, setSignOutError] = useState<string | null>(null);
 
   const handleSignOut = async () => {
@@ -26,8 +27,9 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
     try {
       const response = await fetch("/api/auth/logout", { method: "POST" });
       if (!response.ok) throw new Error();
-      router.push("/login");
-      router.refresh();
+      configureOfflineActor(null);
+      useConsultationStore.getState().resetAll();
+      window.location.assign("/login");
     } catch { setSignOutError("Sign-out could not be completed. Please try again."); }
   };
 

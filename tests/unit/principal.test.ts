@@ -9,7 +9,8 @@ const account = { id: appId, auth_user_id: authId, email: "patient@example.test"
 
 function client(row: unknown = account, user: unknown = { id: authId, user_metadata: { role: "admin" } }, error: unknown = null) {
   const query = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), maybeSingle: vi.fn().mockResolvedValue({ data: row, error }) };
-  const from = vi.fn().mockReturnValue(query);
+  const memberQuery={select:vi.fn().mockReturnThis(),eq:vi.fn().mockReturnThis(),then:(resolve:(value:unknown)=>unknown)=>Promise.resolve({data:[],error:null}).then(resolve)};
+  const from = vi.fn((table:string)=>table==="workspace_memberships"?memberQuery:query);
   const auth = { getUser: vi.fn().mockResolvedValue({ data: { user }, error: null }) };
   return { value: { auth, from } as unknown as SupabaseClient, auth, from, query };
 }

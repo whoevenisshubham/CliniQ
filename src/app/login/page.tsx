@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Activity, Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
 
@@ -12,7 +11,6 @@ const ROLE_PATHS: Record<string, string> = {
 };
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -32,8 +30,8 @@ export default function LoginPage() {
       if (!res.ok) { setError(data.error?.message ?? "Sign-in failed. Try again."); return; }
       const role = data.data?.user?.role;
       if (typeof role !== "string" || !ROLE_PATHS[role]) { setError("Sign-in could not be confirmed."); return; }
-      router.push(ROLE_PATHS[role]);
-      router.refresh();
+      // A new document clears the previous actor's in-memory editor/capture state.
+      window.location.assign(ROLE_PATHS[role]);
     } catch { setError("Unable to reach sign-in. Check your connection and try again."); }
     finally { setLoading(false); }
   }
