@@ -14,7 +14,17 @@ The original speech-to-EMR hooks, adapters, prompts and clinical review componen
 
 ## Manual consultation foundation
 
-The `/consultations` workspace adds authorized encounter creation, durable typed transcripts and clinician findings, revision-checked review, atomic approval and linked corrections. Patients read only approved records and prescriptions, including returning sessions. See [consultation contracts and limitations](docs/consultations.md). `/design/consultation` is a labelled rendered fixture with persistence disabled. Speech/provider execution remains unavailable; full M3 acceptance is in progress.
+The `/consultations` workspace adds authorized encounter creation, durable typed transcripts and clinician findings, revision-checked review, atomic approval and linked corrections. Patients read only approved records and prescriptions, including returning sessions. See [consultation contracts and limitations](docs/consultations.md). `/design/consultation` is a labelled rendered fixture with persistence disabled. The retained speech path now has authenticated bounded admission, durable offline-double transport and transcript recovery; live transport remains disabled. See [speech boundaries and the unconsumed verification proposal](docs/speech.md). Authenticated browser and hosted acceptance remain open.
+
+## Continuing care
+
+`/care` connects synthetic availability, patient appointments, scoped reception intake and the clinician queue. Its specifically blocked scheduling behavioral suite remains incomplete; endpoints or fixtures do not establish race acceptance. See [continuing-care scope](docs/continuing-care.md).
+
+`/continuity` connects exact approved medicine references, explicitly chosen tracking times, durable in-app tasks, follow-up intentions and self-reported adherence with correction history. A follow-up intention is not a booking. No schedule is inferred from medical directions, and no external message delivery is claimed. See [medicines and task operations](docs/medicines-tasks.md).
+
+`/patient/account` persists owner-controlled profile, purpose preferences and explicit family history, with approved measurements grouped by source/date/unit. It uses no mock patient fallback or unexplained health score. Preferences do not replace document grants. See [account, family and trends](docs/account-trends.md).
+
+Approved encounters link to [illustrative billing](docs/illustrative-billing.md): clinician-selected items, a dated explicitly provisioned synthetic tariff, integer paise and retained review history. No transcript-triggered charges, assumed tax, payment, live stock or automatic substitution is implemented. `/design/continuity`, `/design/account` and `/design/billing` are labelled visual fixtures.
 
 ## Source review and offline orchestration
 
@@ -52,4 +62,4 @@ Background-function availability, packaged assets, deadlines and hosted environm
 
 CliniQ history and original clinical modules are preserved. Suitable MediFlow helpers retain contributor/source attribution; one PostgreSQL authority is used. Geist fonts are bundled locally from Fontsource, with their SIL OFL notices retained in the installed packages and [third-party notices](docs/third-party-notices.md).
 
-The implementation is not a completed EMR or a medical recommendation system. Clinical persistence, approved-review workflows and other V2 milestones remain ahead. Historical feature descriptions in Git history are not acceptance evidence.
+The implementation is not a completed EMR or a medical recommendation system. Local/isolated service checks, visual fixtures, authenticated browser workflows and hosted acceptance have different coverage. Remaining milestone acceptance is explicit in the linked contracts. Historical feature descriptions in Git history are not acceptance evidence.

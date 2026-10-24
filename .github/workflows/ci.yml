@@ -40,6 +40,7 @@ jobs:
         env:
           DO_NOT_TRACK: "1"
       - run: npm run test:integration:prepare
+      - run: node scripts/verify-inventory.mjs --local-synthetic
       - run: npm run test:integration -- --reporter=default --reporter=json --outputFile=tests/infra/.runtime/integration-results.json
       - run: npm run jobs:local
       - run: npm run setup:demo:local
