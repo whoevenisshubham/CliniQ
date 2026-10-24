@@ -1,5 +1,6 @@
 import { parentPort, workerData } from "node:worker_threads";
 import { createHash } from "node:crypto";
+import path from 'node:path';
 function chunksFor(pages) {
   const chunks = [];
   let total = 0;
@@ -43,6 +44,9 @@ async function parse() {
       useWasm: false,
       useSystemFonts: false,
       disableFontFace: true,
+      cMapUrl:path.join(process.cwd(),'node_modules/pdfjs-dist/cmaps').split(path.sep).join('/')+'/',
+      cMapPacked:true,
+      standardFontDataUrl:path.join(process.cwd(),'node_modules/pdfjs-dist/standard_fonts').split(path.sep).join('/')+'/',
       isOffscreenCanvasSupported: false,
       disableAutoFetch: true,
       disableStream: true,

@@ -14,6 +14,16 @@ Main/production release is separate from branch CI and visual preview. Never cop
 
 The historical default text model is preserved. Do not replace it merely to make an account probe succeed. Verify actual model/account/free eligibility and per-request/minute limits before proposing enablement; stop for a concrete incompatibility rather than automatically switching.
 
+## Official documentation check — 24 October 2026
+
+[Deepgram's model/language table](https://developers.deepgram.com/docs/models-languages-overview) lists Hindi `hi` for the retained `nova-2`; its `nova-2-medical` entry lists English. This does not establish Hindi medical accuracy, Hinglish quality or the owner's historical runtime. Keep the existing adapter/model unchanged and disabled pending exact account and audio-allowance verification.
+
+[Groq's supported-model table](https://console.groq.com/docs/models) and [the retained model page](https://console.groq.com/docs/model/llama-3.3-70b-versatile) currently label `llama-3.3-70b-versatile` Enterprise. It is absent from the displayed Free limits table. Its zero-spend availability to the intended organization is therefore **not established**; no live probe or automatic replacement is appropriate. [Groq's limits documentation](https://console.groq.com/docs/rate-limits) directs exact entitlement/limits checks to the organization's account settings. Preserve the code and keep generation disabled if that account cannot use this model at zero spend. Any alternative requires a separately reviewed compatibility/quality decision, not a tournament.
+
+[Netlify documents background functions](https://docs.netlify.com/build/functions/background-functions/) for credit-based plans including Free and Enterprise, with a 15-minute platform maximum, immediate invocation acceptance and possible platform retries. [Its usage guide](https://docs.netlify.com/build/functions/usage-and-billing/) excludes most Legacy plans. The site's actual plan/remaining allowance is unknown; public preview success does not identify it. The SQL fences/operation ledger must remain authoritative under platform retries. [Scheduled functions](https://docs.netlify.com/build/functions/scheduled-functions/) require published-environment acceptance; preview cron is not assumed.
+
+[Supabase's Free plan documentation](https://supabase.com/docs/guides/platform/billing-on-supabase) describes a two-project allowance, and [Free project pausing](https://supabase.com/docs/guides/platform/free-project-pausing) can affect availability. This is documentation, not proof of an available isolated project or the owner's current entitlement. Do not create a paid project, upgrade a plan or copy production credentials to satisfy a test.
+
 ## Identity and environment distinctions
 
 The intended production application callback is `https://cliniqplus.netlify.app/auth/callback`; this is a configured-site target, not evidence of completed OAuth consent. An isolated preview uses its exact preview origin and separately verified Auth redirect configuration. The Supabase provider callback is `https://<verified-project-ref>.supabase.co/auth/v1/callback`. Obtain the intended project identity from the owner/account inventory; do not guess it. Owner account selection/consent/2FA remains an account-only action.

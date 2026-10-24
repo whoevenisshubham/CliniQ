@@ -25,6 +25,12 @@ jobs:
       - run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: "1"
+      - run: node scripts/verify-worker-package.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: worker-package-smoke
+          path: tests/infra/.runtime/worker-package-evidence.json
+          if-no-files-found: error
   supabase-isolation:
     runs-on: ubuntu-latest
     timeout-minutes: 25
