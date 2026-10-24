@@ -35,6 +35,10 @@ export async function provisionDemoWorkspace() {
   check(await admin.from('patients').insert(['A','B'].map(s=>({id:ids['patient'+s],user_id:actors['patient'+s].appId,name:'Synthetic patient '+s}))));
   check(await admin.from('workspace_memberships').insert(['doctorA','doctorU','reception','admin','doctorB'].map(name=>({workspace_id:name==='doctorB'?ids.workspaceB:ids.workspaceA,user_id:actors[name].appId,role:actors[name].role}))));
   check(await admin.from('care_relationships').insert(['A','B'].map(s=>({patient_id:ids['patient'+s],workspace_id:ids['workspace'+s],provider_id:actors['doctor'+s].appId,granted_by:actors['patient'+s].appId,scope:'clinical'}))));
+  check(await admin.from('care_relationships').insert({patient_id:ids.patientA,workspace_id:ids.workspaceA,provider_id:actors.reception.appId,granted_by:actors.patientA.appId,scope:'intake'}));
+  // Explicit provisioning only: never fabricate availability on request/page load.
+  const day=new Date();day.setUTCDate(day.getUTCDate()+2);day.setUTCHours(4,30,0,0);
+  check(await admin.from('availability_slots').insert(['A','B'].flatMap(s=>Array.from({length:3},(_,i)=>({workspace_id:ids['workspace'+s],provider_id:actors['doctor'+s].appId,starts_at:new Date(+day+i*3600000).toISOString(),ends_at:new Date(+day+i*3600000+1800000).toISOString(),time_zone:'Asia/Kolkata',synthetic:true})))));
   return {actors,ids,runId:state.runId};
 }
 

@@ -66,11 +66,13 @@ export function RecordLayout({
   provider = false,
   fixture = false,
   section = "documents",
+  reception = false,
 }: {
   children: React.ReactNode;
   provider?: boolean;
   fixture?: boolean;
-  section?: "documents" | "consultations" | "evidence";
+  section?: "documents" | "consultations" | "evidence" | "care";
+  reception?: boolean;
 }) {
   return (
     <div className="record-app">
@@ -89,7 +91,7 @@ export function RecordLayout({
           <p className="eyebrow">
             {provider ? "Clinical workspace" : "Your workspace"}
           </p>
-          <Link
+          {!reception && <><Link
             aria-current={section === "documents" ? "page" : undefined}
             href={
               fixture
@@ -106,11 +108,12 @@ export function RecordLayout({
           </Link>
           <Link aria-current={section === "evidence" ? "page" : undefined} href={fixture?"/design/evidence":"/evidence"}>
             <FileText size={18}/> Source review
-          </Link>
+          </Link></>}
+          <Link aria-current={section === "care" ? "page" : undefined} href={fixture?"/design/care":"/care"}><FileText size={18}/>{reception?"Reception & queue":provider?"Clinic queue":"Appointments"}</Link>
           <div className="nav-note">
             <LockKeyhole size={20} />
             <p>
-              {provider
+              {reception ? "Intake access does not include clinical notes or patient documents." : provider
                 ? "Only records explicitly shared with you appear here."
                 : "Your records are private. You choose who can read each file."}
             </p>
