@@ -219,7 +219,7 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
             const message = e instanceof Error ? e.message : "Save failed.";
             setError(message);
             const status=(e as{status?:number}).status;
-            setStatus(status===409?"conflicted":status&&status<500?"request rejected":"outcome unconfirmed");
+            setStatus(fixture?"visual fixture · changes not saved":status===409?"conflicted":status&&status<500?"request rejected":"outcome unconfirmed");
             // Known rejected requests did not commit. Ambiguous transport failures keep
             // the exact request/key; only retry/reconcile is allowed until resolved.
             if (status && status < 500 || fixture)
