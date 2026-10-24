@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
 import { RecordLayout } from "../documents/DocumentSurface";
+import {SpeechCapture} from './SpeechCapture';
 import { emptySnapshot, type ClinicalSnapshot, type Medication, type SavedSegment } from "@/lib/contracts/clinical";
 type Approved = {
     id: string;
@@ -108,6 +109,7 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
     const [status, setStatus] = useState(fixture ? "visual fixture" : "loading"), [error, setError] = useState(""), [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false), [review, setReview] = useState(false), [confirmed, setConfirmed] = useState(false), [reasons, setReasons] = useState<Record<string, string>>({});
     const [patientChoice, setPatientChoice] = useState("");
     const [contextOpen, setContextOpen] = useState(false);
+    const [captureBusy,setCaptureBusy]=useState(false);
 
     const pending = useRef<{
         key: string;
@@ -218,7 +220,7 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
             setBusy(false);
         }
     }
-    const locked = busy || status === "session expired" || !!pending.current;
+    const locked = busy || captureBusy || status === "session expired" || !!pending.current;
     const active = detail?.visit.status === "active";
     const notices = [...snapshot.medications.flatMap(m => [...m.unknownFields.map(f => ({ key: `${m.id}:${f}`, text: `${m.name}: ${f} is explicitly unknown.` })), ...(detail?.patient.allergies.some(a => a.trim().toLowerCase() === m.name.trim().toLowerCase()) ? [{ key: `allergy:${m.id}`, text: `${m.name} exactly matches a saved allergy label. Review the source facts.` }] : [])]), ...Array.from(new Set(snapshot.vitals.map(v => v.name))).filter(name => new Set(snapshot.vitals.filter(v => v.name === name).map(v => v.unit)).size > 1).map(name => ({ key: `unit:${name}`, text: `${name} has conflicting recorded units. Review original values.` }))];
     const labelled = (name: keyof Pick<ClinicalSnapshot, "chief_complaint" | "physical_examination" | "clinical_summary">, label: string) => <label className="clinical-field">{label}<textarea rows={3} maxLength={8000} value={snapshot[name] ?? ""} disabled={!active || locked} onChange={e => edit({ ...snapshot, [name]: e.target.value || null })}/></label>;
@@ -260,6 +262,7 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
     <section className="consultation-editor clinical-workbench" aria-label="Clinical findings"><div className="transcript-column">
      <div className="clinical-section-heading"><span className="section-number">01</span><div><h2>Transcript</h2><p>Saved final segments · speaker labels are explicit or unknown</p></div></div>
      <ol className="clinical-transcript">{detail.segments.map(s => <li key={s.id} id={`segment-${s.id}`} tabIndex={-1}><span>{s.speaker} · {s.language} · {s.source_type}</span><p>{s.text}</p></li>)}</ol>{!detail.segments.length && <p className="clinical-muted">No transcript segments saved.</p>}
+     {active&&<SpeechCapture key={detail.visit.id+':'+detail.visit.revision} consultationId={detail.visit.id} revision={detail.visit.revision} sequence={detail.segments.length} disabled={locked||dirty||!!transcript.trim()} fixture={!!fixture} onBusy={setCaptureBusy} onSaved={()=>{setCaptureBusy(false);void loadRef.current(detail.visit.id,true);}}/>}
      {active && <form onSubmit={e => {
                     e.preventDefault();
                     if (dirty) {
