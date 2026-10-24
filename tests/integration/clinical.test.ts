@@ -73,6 +73,19 @@ beforeAll(async () => {
     }
 });
 afterAll(() => vi.unstubAllEnvs());
+it('accepting a medication delta preserves other saved medicines and unchanged per-field clinician provenance',async()=>{
+ const created=await clients.doctor.rpc('clinical_mutate',{k:randomUUID(),command:{action:'create',patientId,workspaceId:workspace}});expect(created.error).toBeNull();const cid=created.data.consultationId;
+ const first={id:randomUUID(),name:'Synthetic Drug A',dose:'1.25 mg',frequency:null,duration:null,route:null,instructions:null,unknownFields:['frequency','duration','route']};
+ const second={...first,id:randomUUID(),name:'Synthetic Drug B',dose:'5 mg'};
+ const saved=await clients.doctor.rpc('clinical_mutate',{k:randomUUID(),command:{action:'save',consultationId:cid,expectedRevision:0,snapshot:{...emptySnapshot(),chief_complaint:'Synthetic medication review',medications:[first,second]}}});expect(saved.error).toBeNull();
+ const sid=randomUUID();const transcript=await clients.doctor.rpc('clinical_mutate',{k:randomUUID(),command:{action:'transcript',consultationId:cid,expectedRevision:1,segment:{id:sid,sequence:0,text:'Synthetic Drug A 2.5 mg',speaker:'clinician',language:'en',startMs:null,endMs:null}}});expect(transcript.error).toBeNull();
+ const pid=await offerClinicalProposal(admin,actors.doctor.appId,cid,{baseRevision:2,throughSegmentId:sid,operations:[{op:'update_fact',path:'medications',value:[{...first,dose:'2.5 mg'}],evidence_segment_ids:[sid]}]});
+ state.jar=jars.doctor;const r=await proposalReview(new Request(origin,{method:'POST',headers:{origin,'content-type':'application/json','idempotency-key':randomUUID()},body:JSON.stringify({decision:'accept',expectedRevision:2})}),{params:Promise.resolve({id:pid})});expect(r.status).toBe(200);
+ const draft=await clients.doctor.from('clinical_drafts').select('snapshot,provenance').eq('consultation_id',cid).single();expect(draft.error).toBeNull();expect(draft.data!.snapshot.medications).toEqual([{...first,dose:'2.5 mg'},second]);
+ expect(draft.data!.provenance.medications.items[first.id].dose.sourceType).toBe('generated_proposal');
+ expect(draft.data!.provenance.medications.items[first.id].name.sourceType).toBe('clinician_observation');
+ expect(draft.data!.provenance.medications.items[second.id].dose.sourceType).toBe('clinician_observation');
+});
 it("creates a real encounter/draft/audit once through authenticated handler and concurrent operation retries", async () => {
     const command = creation();
     const responses = await Promise.all([call(command, createKey), call(command, createKey)]);

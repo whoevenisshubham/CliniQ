@@ -11,6 +11,12 @@ const string = (x: unknown, max: number, min = 0): string => { if (typeof x !== 
 const array = (x: unknown, max: number, min = 0): unknown[] => { if (!Array.isArray(x) || x.length > max || x.length < min)
     throw new Error('OUTPUT_SCHEMA'); return x; };
 const normalize = (s: string) => s.normalize('NFC').replace(/\s+/g, ' ').trim();
+// Conservative excerpt mode: preserve the whole source sentence/line, rather
+// than asserting that an arbitrary matching substring entails a clinical fact.
+const contextText=(s:string)=>normalize(s).replace(/^[“"‘']+|[.!?।”"’']+$/g,'').trim();
+function completeContext(value:string,source:string){return contextText(value)===contextText(source)||source.split(/(?<=[.!?।])\s+|\r?\n+/u).some(unit=>contextText(unit)===contextText(value));}
+const qualifiedContext=/(?:\b(?:no|not|denies|denied|without|family|history|possible|possibly|suspected|resolved|previously|formerly|stopped|discontinued|rule\s+out|r\/o|patient\s+(?:says|reports)|nahi|nahin|band)\b|नहीं|नही|पारिवारिक|इतिहास|संभव|बंद)/iu;
+function numericFidelity(value:string,support:string[]){return numbers(value).every(v=>support.some(s=>numbers(s).some(n=>n.replace(/\s/g,'')===v.replace(/\s/g,''))));}
 function preservesNegation(claim: string, support: string) {
     if (/(?:\b(?:no|not|denies|without|nahi|nahin)\b|नहीं|नही)/i.test(claim))
         return true;
@@ -29,7 +35,7 @@ catch {
 export function validateAnswer(raw: unknown, sources: Evidence[], definitions: {
     id: string;
     text: string;
-}[] = []): GroundedAnswer {
+}[] = [],question?:string): GroundedAnswer {
     const a = object(raw);
     keys(a, ['schemaVersion', 'answerKind', 'answer', 'facts', 'definitions', 'uncertainties', 'citedSourceIds']);
     if (a.schemaVersion !== '1' || !['grounded', 'insufficient_evidence'].includes(String(a.answerKind)))
@@ -61,9 +67,7 @@ export function validateAnswer(raw: unknown, sources: Evidence[], definitions: {
         }
         if (ids.some(id => !sources.some(s => s.evidenceId === id) || !quotes.some(q => object(q).evidenceId === id)))
             throw new Error('INVALID_CITATION');
-        for (const token of numbers(text))
-            if (!support.some(s => normalize(s).includes(normalize(token))))
-                throw new Error('NUMERIC_FIDELITY');
+        if(!numericFidelity(text,support))throw new Error('NUMERIC_FIDELITY');
         // Conservative finite gate: an accepted factual sentence must be a verbatim
         // normalized source span. This preserves negation and temporal wording;
         // it is deliberately stricter than an unverified paraphrase-entailment model.
@@ -71,6 +75,7 @@ export function validateAnswer(raw: unknown, sources: Evidence[], definitions: {
             throw new Error('UNSUPPORTED_FACT');
         if (!preservesNegation(text, support.join(' ')))
             throw new Error('NEGATION_FIDELITY');
+        if(!ids.some(id=>{const source=sources.find(s=>s.evidenceId===id);return !!source&&completeContext(text,source.text);}))throw new Error('CONTEXT_FIDELITY');
         supported.push(text);
     }
     for (const rawDef of defs) {
@@ -92,6 +97,14 @@ export function validateAnswer(raw: unknown, sources: Evidence[], definitions: {
         throw new Error('MISSING_EVIDENCE');
     if (a.answerKind === 'grounded' && normalize(answer) !== normalize(supported.join(' ')))
         throw new Error('UNSUPPORTED_ANSWER');
+    if(a.answerKind==='grounded'&&question){
+        // A finite topical gate, not semantic question-answering acceptance.
+        const generic=new Set('what which is are was were my the this these that does do show shows value result report source shared current most recent recorded written explain explanation summarize summarise plot every test instructions medicine medication of in for a an please use answer'.split(' '));
+        const terms=question.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu)?.filter(t=>t.length>2&&!generic.has(t))??[];
+        const content=normalize(facts.map(f=>object(f).text).join(' ')).toLocaleLowerCase();
+        const explicitTemperature=terms.some(t=>/^temperatures?$/.test(t))&&/°[cf]/i.test(content);
+        if(terms.length&&!explicitTemperature&&!terms.some(t=>content.includes(t.endsWith('s')?t.slice(0,-1):t)))throw new Error('QUESTION_RELEVANCE');
+    }
     if (a.answerKind === 'insufficient_evidence' && (facts.length || defs.length || cited.length || numbers(answer).length || !['Insufficient evidence in the selected sources.', 'The selected sources do not support this question.'].includes(answer)))
         throw new Error('UNSUPPORTED_ANSWER');
     return raw as GroundedAnswer;
@@ -105,6 +118,9 @@ export function validateExtraction(raw: unknown, input: {
     const p = object(raw);
     keys(p, ['operations']);
     const proposal = validateProposal({ baseRevision: input.baseRevision, throughSegmentId: input.throughSegmentId, operations: p.operations }, input.sources.map(s => ({ id: s.segmentId!, sequence: s.sequence!, text: s.text })));
+    const draft = input.draft ?? emptySnapshot();
+    validateClinicalSnapshot(draft);
+    validateClinicalSnapshot(proposalCandidate(draft, input.baseRevision, proposal).snapshot);
     for (const op of proposal.operations) {
         if (op.op === 'mark_uncertain' || op.op === 'retract_fact')
             continue;
@@ -124,11 +140,15 @@ export function validateExtraction(raw: unknown, input: {
             throw new Error('EXTRACTION_FIDELITY');
         if (values.some(v => !preservesNegation(v, evidence)))
             throw new Error('NEGATION_FIDELITY');
+        if(values.some(v=>!numericFidelity(v,[evidence])))throw new Error('NUMERIC_FIDELITY');
         if (op.path === 'diagnosis' && input.sources.filter(s => op.evidence_segment_ids.includes(s.segmentId!)).some(s => s.speaker !== 'clinician'))
             throw new Error('ASSESSMENT_NOT_CLINICIAN_STATED');
+        if(op.path==='diagnosis'){
+            const units=evidence.split(/(?<=[.!?।])\s+|\r?\n+/u).filter(s=>/^(?:assessment|diagnosis|impression|निदान)\s*:/iu.test(s.trim())).map(s=>s.replace(/^(?:assessment|diagnosis|impression|निदान)\s*:\s*/iu,''));
+            if(values.some(v=>!units.some(s=>contextText(v)===contextText(s))))throw new Error('ASSESSMENT_CONTEXT_REQUIRED');
+        }
+        if(op.path==='medications'&&qualifiedContext.test(evidence))throw new Error('MEDICATION_CONTEXT_REVIEW_REQUIRED');
+        if(op.path!=='medications'&&op.path!=='diagnosis'&&qualifiedContext.test(evidence)&&values.some(v=>!completeContext(v,evidence)))throw new Error('CONTEXT_FIDELITY');
     }
-    const draft = input.draft ?? emptySnapshot();
-    validateClinicalSnapshot(draft);
-    validateClinicalSnapshot(proposalCandidate(draft, input.baseRevision, proposal).snapshot);
     return proposal;
 }

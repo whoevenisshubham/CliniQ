@@ -79,7 +79,7 @@ export async function runAIJob(admin: SupabaseClient, jobId?: string, offline?: 
     let result: unknown, state = 'succeeded';
     try {
         const raw = parseOutput(reply.text, reply.finishReason);
-        result = job.kind === 'extract_emr' ? { operations: validateExtraction(raw, input).operations } : validateAnswer(raw, input.sources, corpus.entries);
+        result = job.kind === 'extract_emr' ? { operations: validateExtraction(raw, input).operations } : validateAnswer(raw, input.sources, corpus.entries,input.question);
     }
     catch (e) {
         state = 'rejected';

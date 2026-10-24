@@ -39,3 +39,15 @@ npm run eval:offline
 This command uses real local Auth/PostgreSQL/Storage and the normal services/runner, with explicit synthetic provider doubles. `tests/fixtures/ai/EVAL_CASES.json` contains16 versioned cases. The suite also tests role/workspace boundaries, durable aggregate/daily caps, concurrency, outcome uncertainty, crash recovery, source replacement/deletion and returning sessions. Results are written under ignored `tests/infra/.runtime/ai-evaluation-results.json` and included in CI's safe evidence artifact. A finite offline pass is not a live model score, clinical validation or authenticated-browser acceptance.
 
 Conversations return the latest30 requests; older rows are retained. Admission is bounded to30 requests/day and200 retained jobs/actor, and50 conversations/actor. Reaching a cap refuses new work rather than deleting history or silently resetting usage.
+
+## Supported-source mode and fidelity limits
+
+Accepted factual output is a complete source sentence/line or the complete admitted excerpt, with exact citations. Reviewed reference definitions are displayed separately. This is **supported excerpt mode**, not accepted explanatory paraphrasing or proof of general clinical understanding. A finite topical gate rejects clearly unrelated measurement answers; it does not establish semantic answer quality. Temperature questions also recognize explicit °C/°F source units without silently converting them.
+
+Focused adversarial cases cover negation with intervening words, family versus patient history, uncertain/rule-out/resolved/previously treated conditions, stopped medicines, patient versus clinician statements and Hindi/Hinglish context. Diagnoses require an explicit clinician assessment label and retained assessment context. Qualified medication context is rejected for manual review. These conservative gates can reject otherwise useful extraction; they never justify guessing or weakening source checks.
+
+Numeric token comparison rejects prefixes such as 12.4 extracted from 12.45. Medication proposals are stable-ID deltas: omission does not erase another saved medicine. Changed fields retain proposal provenance while unchanged fields retain prior clinician provenance. Existing stale-revision protection remains authoritative.
+
+Provider401/403 and429 have explicit authentication/rate-limit states, without assuming zero consumption or refunding an unknown usage bound. HTTP408/5xx, unrecognized errors and transport/timeouts remain outcome_unknown. No automatic retry follows either outcome. The offline live-allowance proposal remains unconsumed.
+
+During hardening, schema validation was moved before context validation to retain the existing malformed-schema failure contract. The complete-context gate initially rejected a valid two-sentence medication excerpt and was corrected to allow the complete admitted source. The topical gate initially missed temperature units without the word "temperature"; it now recognizes explicit °C/°F while retaining both source values/units. The versioned16-case fixture and its expectations were not weakened.

@@ -31,9 +31,11 @@ export type SourceChunk = {
 export function RecordHeader({
   provider = false,
   fixture = false,
+  reception = false,
 }: {
   provider?: boolean;
   fixture?: boolean;
+  reception?: boolean;
 }) {
   return (
     <header className="record-header">
@@ -41,7 +43,7 @@ export function RecordHeader({
         CLINIQ<span>+</span>
       </Link>
       <span className="header-context">
-        {provider ? "Clinician workspace" : "Personal health records"}
+        {reception ? "Reception workspace" : provider ? "Clinician workspace" : "Personal health records"}
       </span>
       <div className="header-actions">
         <ThemeToggle />
@@ -79,7 +81,7 @@ export function RecordLayout({
       <a className="skip-link" href="#records-main">
         Skip to records
       </a>
-      <RecordHeader provider={provider} fixture={fixture} />
+      <RecordHeader provider={provider} fixture={fixture} reception={reception} />
       {fixture && (
         <p className="fixture-banner">
           Visual fixture · synthetic layout sample · no persisted data or AI
@@ -89,7 +91,7 @@ export function RecordLayout({
       <div className="record-grid">
         <aside className="record-nav" aria-label="Workspace navigation">
           <p className="eyebrow">
-            {provider ? "Clinical workspace" : "Your workspace"}
+            {reception ? "Clinic operations" : provider ? "Clinical workspace" : "Your workspace"}
           </p>
           {!reception && <><Link
             aria-current={section === "documents" ? "page" : undefined}

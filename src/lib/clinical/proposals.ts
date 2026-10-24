@@ -1,4 +1,4 @@
-import type { ClinicalSnapshot } from "@/lib/contracts/clinical";
+import type { ClinicalSnapshot,Medication } from "@/lib/contracts/clinical";
 // MediFlow 45fbfb85 src/lib/emr/{types,merge}.ts operation vocabulary and
 // extraction cursor retained. Arbitrary path mutation/index expansion replaced
 // by typed top-level operations with exact saved source IDs and revisions.
@@ -57,7 +57,11 @@ export function proposalCandidate(snapshot: ClinicalSnapshot, currentRevision: n
             uncertain.push(op.path);
             continue;
         }
-        Object.assign(next, { [op.path]: structuredClone(op.value) });
+        if(op.path==='medications'&&Array.isArray(op.value)){
+            const incoming=structuredClone(op.value) as Medication[];
+            if(incoming.some(m=>!m||typeof m!=='object')||new Set(incoming.map(m=>m.id)).size!==incoming.length)throw new Error('CLINICAL_SCHEMA');
+            next.medications=[...next.medications.map(m=>incoming.find(n=>n.id===m.id)??m),...incoming.filter(m=>!next.medications.some(old=>old.id===m.id))];
+        }else Object.assign(next, { [op.path]: structuredClone(op.value) });
     }
     return { state: 'review_required' as const, snapshot: next, requiresReview: true, uncertain };
 }
