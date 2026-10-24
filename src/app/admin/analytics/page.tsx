@@ -1,12 +1,3 @@
-import { redirect } from "next/navigation";
-import { getServerUser } from "@/lib/auth";
-import { AdminAnalyticsClient } from "@/components/admin/AdminAnalyticsClient";
-
-export default async function AdminAnalyticsPage() {
-    const user = await getServerUser();
-
-    if (!user) redirect("/login");
-    if (user.role !== "admin") redirect("/login");
-
-    return <AdminAnalyticsClient user={user} />;
-}
+import {DeferredWorkspace} from '@/components/shared/DeferredWorkspace';
+export const dynamic='force-dynamic';
+export default function Page(){return <DeferredWorkspace allowed={['admin']} title="Administrative analytics" reason="Aggregate metrics are unavailable until their sources and access contracts are accepted."/>;}

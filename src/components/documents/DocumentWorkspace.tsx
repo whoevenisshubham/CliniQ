@@ -43,9 +43,7 @@ async function serverApi(path: string, init?: RequestInit) {
     throw new Error("The server response could not be read. Try again.");
   }
   if (!response.ok)
-    throw new Error(
-      body.error?.message ?? "The request could not be completed.",
-    );
+    throw Object.assign(new Error(body.error?.message ?? "The request could not be completed."),{status:response.status});
   return body;
 }
 export function DocumentWorkspace({
@@ -75,6 +73,7 @@ export function DocumentWorkspace({
   const [rows, setRows] = useState<DocumentRow[]>([]),
     [detail, setDetail] = useState<Detail | null>(null),
     [selected, setSelected] = useState<string | null>(initialDocumentId),
+    [selectionEpoch,setSelectionEpoch]=useState(0),
     [providers, setProviders] = useState<Provider[]>([]),
     [mode, setMode] = useState<
       "upload" | "replace" | "manual" | "share" | "delete" | null
@@ -88,17 +87,19 @@ export function DocumentWorkspace({
     [file, setFile] = useState<File | null>(null),
     [text, setText] = useState("");
   const retry = useRef<{ signature: string; key: string } | null>(null),
-    headingRef = useRef<HTMLDivElement>(null);
+    headingRef = useRef<HTMLDivElement>(null),live=useRef(true),selectionRef=useRef<string|null>(initialDocumentId);
+  useEffect(()=>{live.current=true;return()=>{live.current=false;};},[]);
   async function refresh(target = selected) {
     const list = await api("/api/documents");
+    if(!live.current)return;
     setRows(list.documents);
     if (target) {
       try {
         const data = await api("/api/documents/" + target);
-        setDetail(data);
+        if(live.current&&selectionRef.current===target)setDetail(data);
       } catch (e) {
         setDetail(null);
-        setSelected(null);
+        selectionRef.current=null;setSelected(null);
         throw e;
       }
     }
@@ -129,15 +130,17 @@ export function DocumentWorkspace({
     let timer: ReturnType<typeof setTimeout>;
     const started = Date.now();
     async function poll() {
-      if (cancelled) return;
+      if (cancelled||!live.current) return;
       if (document.hidden) {
         timer = setTimeout(poll, 5000);
         return;
       }
       try {
         const d: Detail = await api("/api/documents/" + selected);
-        if (cancelled) return;
+        if (cancelled||!live.current) return;
+        if(selectionRef.current!==selected)return;
         setDetail(d);
+        setLoading(false);
         const version = d.versions.find(
           (v) => v.id === d.document.current_version_id,
         );
@@ -155,9 +158,9 @@ export function DocumentWorkspace({
                 : 10000,
           );
       } catch (e) {
-        if (!cancelled) {
+        if (!cancelled&&live.current&&selectionRef.current===selected) {
           setDetail(null);
-          setSelected(null);
+          selectionRef.current=null;setSelected(null);
           setError((e as Error).message);
         }
       }
@@ -167,42 +170,31 @@ export function DocumentWorkspace({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [selected, api]);
+  }, [selected, api,selectionEpoch]);
   useEffect(() => {
     if (!selected || mode !== null) return;
+    let active=true;
     const recheck = () => {
-      if (document.hidden) return;
-      setDetail(null);
-      setLoading(true);
+      if (document.hidden||!live.current) return;
+      setDetail(null);setLoading(true);
       api("/api/documents/" + selected)
-        .then(setDetail)
-        .catch((e) => {
-          setSelected(null);
-          setError(e.message);
-        })
-        .finally(() => setLoading(false));
+        .then(d=>{if(active&&live.current&&selectionRef.current===selected)setDetail(d);})
+        .catch(e=>{if(active&&live.current&&selectionRef.current===selected){selectionRef.current=null;setSelected(null);setError(e.message);}})
+        .finally(()=>{if(active&&live.current&&selectionRef.current===selected)setLoading(false);});
     };
     window.addEventListener("focus", recheck);
     document.addEventListener("visibilitychange", recheck);
     return () => {
+      active=false;
       window.removeEventListener("focus", recheck);
       document.removeEventListener("visibilitychange", recheck);
     };
   }, [selected, mode, api]);
   async function choose(id: string) {
-    setError("");
-    setDetail(null);
-    setSelected(id);
-    setLoading(true);
-    try {
-      setDetail(await api("/api/documents/" + id));
-    } catch (e) {
-      setSelected(null);
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
-      headingRef.current?.focus();
-    }
+    selectionRef.current=id;setSelectionEpoch(n=>n+1);setError("");setDetail(null);setSelected(id);setLoading(true);
+    // The selected-document effect owns fetching/polling, preventing duplicate
+    // competing requests from painting another document after a fast selection.
+    headingRef.current?.focus();
   }
   const dialogOpener = useRef<HTMLElement | null>(null);
   function open(next: typeof mode) {
@@ -261,6 +253,7 @@ export function DocumentWorkspace({
           body: form,
         },
       );
+      if(!live.current)return;
       setMode(null);
       setNotice(
         "Original bytes and metadata are saved. Text processing is queued; you can return later.",
@@ -268,9 +261,9 @@ export function DocumentWorkspace({
       await refresh(null);
       await choose(result.document_id);
     } catch (e) {
-      setDialogError((e as Error).message);
+      if(live.current)setDialogError((e as Error).message);
     } finally {
-      setBusy(false);
+      if(live.current)setBusy(false);
     }
   }
   const mutationRetry = useRef<{ signature: string; key: string } | null>(null);
@@ -302,8 +295,9 @@ export function DocumentWorkspace({
         }),
       });
       mutationRetry.current = null;
+      if(!live.current)return;
       if (action === "delete") {
-        setSelected(null);
+        selectionRef.current=null;setSelected(null);
         setDetail(null);
         setMode(null);
         await refresh(null);
@@ -319,9 +313,9 @@ export function DocumentWorkspace({
         );
       }
     } catch (e) {
-      setDialogError((e as Error).message);
+      if(live.current)setDialogError((e as Error).message);
     } finally {
-      setBusy(false);
+      if(live.current)setBusy(false);
     }
   }
   const version = detail?.versions.find(
@@ -360,7 +354,7 @@ export function DocumentWorkspace({
               version={version?.version_no ?? 1}
               sourceClass={version?.source_class}
               onBack={() => {
-                setSelected(null);
+                selectionRef.current=null;setSelected(null);
                 setDetail(null);
               }}
             >

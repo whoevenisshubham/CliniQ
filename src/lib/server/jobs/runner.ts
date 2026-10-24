@@ -86,7 +86,7 @@ export async function runDocumentJob(admin: SupabaseClient, jobId?: string) {
       p_fence: job.fence,
     });
     dbError(failed.error);
-    return { jobId: job.id, status: "retry_or_failed" };
+    return { jobId: job.id, status: !failed.data?'stale':job.attempts>=3?'failed':'retry_queued',stage:'local_document_task',inputRevision:job.input_revision,fence:job.fence };
   }
 }
 export async function reconcileDocuments(admin: SupabaseClient, runJob = true) {
@@ -104,7 +104,7 @@ export async function reconcileDocuments(admin: SupabaseClient, runJob = true) {
       p_operation: op.id,
     });
     dbError(done.error);
-    cleaned++;
+    if(done.data)cleaned++;
   }
   return {
     cleaned,

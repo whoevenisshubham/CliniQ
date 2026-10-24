@@ -9,4 +9,4 @@ export default async function Page({ searchParams }: {
         document?: string;
     }>;
 }) { const p = await requirePrincipal().catch(() => null); if (!p || !['doctor', 'patient'].includes(p.role))
-    redirect('/login'); const q = await searchParams; return <EvidenceWorkspace key={p.id + ':' + (q.thread ?? q.consultation ?? 'list')} actorId={p.id} provider={p.role === 'doctor'} initialThread={q.thread ?? null} consultationId={q.consultation ?? null} initialDocumentId={q.document ?? null}/>; }
+    redirect('/login'); const q = await searchParams; return <EvidenceWorkspace key={[p.id,q.thread??'none',q.consultation??'none',q.document??'none'].join(':')} actorId={p.id} provider={p.role === 'doctor'} initialThread={q.thread ?? null} consultationId={q.consultation ?? null} initialDocumentId={q.document ?? null}/>; }

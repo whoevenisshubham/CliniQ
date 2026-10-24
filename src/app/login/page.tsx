@@ -16,7 +16,7 @@ import {
 
 const ROLE_PATHS: Record<string, string> = {
   doctor: "/doctor",
-  nurse: "/doctor",
+  nurse: "/staff",
   patient: "/patient",
   admin: "/admin",
   research: "/research",

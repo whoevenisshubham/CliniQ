@@ -5,8 +5,11 @@ export default async function Page({searchParams}:{searchParams:Promise<{view?:s
  const view=(await searchParams).view;const role=view==='reception'?'receptionist':view==='clinician'?'doctor':'patient';
  return <CareWorkspace role={role} memberships={role==='patient'?[]:[{workspace_id:workspace,role}]} fixture={{
  slots:[{id:'00000000-0000-4000-8000-000000000043',provider_name:'Dr. Synthetic Meera',starts_at:'2026-11-03T04:00:00Z',ends_at:'2026-11-03T04:30:00Z',time_zone:'Asia/Kolkata',synthetic:true}],
- appointments:[{id:'00000000-0000-4000-8000-000000000044',provider_name:'Dr. Synthetic Meera',starts_at:'2026-11-02T04:00:00Z',time_zone:'Asia/Kolkata',reason:'Synthetic follow-up intention confirmed against a sample slot',status:'confirmed',revision:1}],
+ appointments:[{id:'00000000-0000-4000-8000-000000000044',provider_name:'Dr. Synthetic Meera',starts_at:'2026-11-02T04:00:00Z',time_zone:'Asia/Kolkata',reason:'Synthetic appointment reserved against a sample slot',status:'confirmed',revision:1}],
  patients:[{id:'00000000-0000-4000-8000-000000000045',name:'Synthetic आशा — long-name layout sample',phone:null,unclaimed:true}],providers:[{id:provider,name:'Dr. Synthetic Meera'}],
- queue:[{id:'00000000-0000-4000-8000-000000000046',patient_name:'Synthetic आशा — long-name layout sample',doctor_name:'Dr. Synthetic Meera',queue_number:1,status:'waiting',revision:1,consultation_ref:null,vitals_recorded:{temperature:{value:37.2,unit:'°C'},weight:{value:68.25,unit:'kg'}},vital_provenance:{observedAt:'2026-10-24T03:30:00Z',recordedAt:'2026-10-24T03:31:00Z'}}]
+ queue:[{id:'00000000-0000-4000-8000-000000000046',patient_name:'Synthetic आशा — long-name layout sample',doctor_name:'Dr. Synthetic Meera',queue_number:1,status:'waiting',revision:1,consultation_ref:null,vitals_recorded:{temperature:{value:37.2,unit:'°C'},weight:{value:68.25,unit:'kg'}},vital_provenance:{observedAt:'2026-10-24T03:30:00Z',recordedAt:'2026-10-24T03:31:00Z'}},
+ {id:'00000000-0000-4000-8000-000000000047',patient_name:'Synthetic Ibrahim · returning visit',doctor_name:'Dr. Synthetic Meera',queue_number:2,status:'in-consultation',revision:2,consultation_ref:'00000000-0000-4000-8000-000000000031'},
+ {id:'00000000-0000-4000-8000-000000000048',patient_name:'Synthetic Kavya · काव्या',doctor_name:'Dr. Synthetic Meera',queue_number:3,status:'completed',revision:3,consultation_ref:'00000000-0000-4000-8000-000000000031'},
+ {id:'00000000-0000-4000-8000-000000000049',patient_name:'Synthetic R. Sen',doctor_name:'Dr. Synthetic Meera',queue_number:4,status:'no-show',revision:1,consultation_ref:null}]
  }}/>;
 }

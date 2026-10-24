@@ -8,9 +8,11 @@ const c = localConfiguration();
 const admin = createClient(c.API_URL, c.SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
-reconcileDocuments(admin,false).then(async result=>({...result,job:await runNextJob(admin)}))
-  .then((result) => console.log(JSON.stringify(result)))
-  .catch(() => {
-    console.error("DOCUMENT_RUN_FAILED");
-    process.exitCode = 1;
-  });
+async function main(){
+  let cleanup:unknown;let cleanupFailed=false;
+  try{cleanup=await reconcileDocuments(admin,false);}catch{cleanup={status:'cleanup_unavailable'};cleanupFailed=true;}
+  const job=await runNextJob(admin);
+  console.log(JSON.stringify({cleanup,job}));
+  if(cleanupFailed||job.degraded)process.exitCode=1;
+}
+main().catch(()=>{console.error('DOCUMENT_RUN_FAILED');process.exitCode=1;});

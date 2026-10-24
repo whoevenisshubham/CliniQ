@@ -1,12 +1,3 @@
-import { redirect } from "next/navigation";
-import { getServerUser } from "@/lib/auth";
-import { AdminAuditClient } from "@/components/admin/AdminAuditClient";
-
-export default async function AdminAuditPage() {
-    const user = await getServerUser();
-
-    if (!user) redirect("/login");
-    if (user.role !== "admin") redirect("/login");
-
-    return <AdminAuditClient user={user} />;
-}
+import {DeferredWorkspace} from '@/components/shared/DeferredWorkspace';
+export const dynamic='force-dynamic';
+export default function Page(){return <DeferredWorkspace allowed={['admin']} title="Audit review" reason="Privileged audit review requires a scoped reader and accepted access boundaries."/>;}

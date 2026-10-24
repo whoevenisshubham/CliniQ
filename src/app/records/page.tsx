@@ -5,11 +5,14 @@ import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 export default async function Page({searchParams}:{searchParams:Promise<{document?:string}>}) {
   let role: string;
+  let actorId:string;
   try {
-    role = (await resolvePrincipal(await getSupabaseServerClient())).role;
+    const principal=await resolvePrincipal(await getSupabaseServerClient());
+    role=principal.role;actorId=principal.id;
   } catch {
     redirect("/login");
   }
   if (!["doctor", "patient"].includes(role)) redirect("/login");
-  return <DocumentWorkspace provider={role === "doctor"} initialDocumentId={(await searchParams).document??null} />;
+  const documentId=(await searchParams).document??null;
+  return <DocumentWorkspace key={actorId+':'+(documentId??'library')} provider={role === "doctor"} initialDocumentId={documentId} />;
 }

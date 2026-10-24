@@ -14,6 +14,12 @@ export async function handler(event: {
     !timingSafeEqual(Buffer.from(expected), Buffer.from(supplied))
   )
     return { statusCode: 403, body: "Forbidden" };
-  await runNextJob(workerClient());
-  return { statusCode: 200, body: "Completed bounded queued work" };
+  try{
+    const result=await runNextJob(workerClient());
+    console.info(JSON.stringify({event:'bounded_job',jobId:'jobId' in result?result.jobId:null,status:result.status,degraded:result.degraded}));
+    return {statusCode:result.degraded?503:200,body:JSON.stringify(result)};
+  }catch{
+    console.error(JSON.stringify({event:'bounded_job',stage:'run',category:'WORKER_UNAVAILABLE',recovery:'durable_state_retained'}));
+    return {statusCode:503,body:JSON.stringify({status:'worker_unavailable',recovery:'durable_state_retained'})};
+  }
 }

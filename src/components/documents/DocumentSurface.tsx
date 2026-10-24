@@ -32,10 +32,12 @@ export function RecordHeader({
   provider = false,
   fixture = false,
   reception = false,
+  context,
 }: {
   provider?: boolean;
   fixture?: boolean;
   reception?: boolean;
+  context?:string;
 }) {
   return (
     <header className="record-header">
@@ -43,7 +45,7 @@ export function RecordHeader({
         CLINIQ<span>+</span>
       </Link>
       <span className="header-context">
-        {reception ? "Reception workspace" : provider ? "Clinician workspace" : "Personal health records"}
+        {context??(reception ? "Reception workspace" : provider ? "Clinician workspace" : "Personal health records")}
       </span>
       <div className="header-actions">
         <ThemeToggle />
@@ -105,13 +107,13 @@ export function RecordLayout({
           >
             <FileText size={18} /> {provider ? "Shared records" : "My records"}
           </Link>
-          <Link aria-current={section === "consultations" ? "page" : undefined} href={fixture?"/design/consultation":"/consultations"}>
+          <Link aria-current={section === "consultations" ? "page" : undefined} href={fixture?`/design/consultation?view=${provider?"clinician":"patient"}`:"/consultations"}>
             <FileText size={18}/> {provider?"Consultations":"Approved visits"}
           </Link>
           <Link aria-current={section === "evidence" ? "page" : undefined} href={fixture?"/design/evidence":"/evidence"}>
             <FileText size={18}/> Source review
           </Link></>}
-          <Link aria-current={section === "care" ? "page" : undefined} href={fixture?"/design/care":"/care"}><FileText size={18}/>{reception?"Reception & queue":provider?"Clinic queue":"Appointments"}</Link>
+          <Link aria-current={section === "care" ? "page" : undefined} href={fixture?`/design/care?view=${reception?"reception":provider?"clinician":"patient"}`:"/care"}><FileText size={18}/>{reception?"Reception & queue":provider?"Clinic queue":"Appointments"}</Link>
           {!provider&&!reception&&<Link aria-current={section==='continuity'?'page':undefined} href={fixture?'/design/continuity':'/continuity'}><FileText size={18}/>Medicines & tasks</Link>}
           {!provider&&!reception&&<Link aria-current={section==='account'?'page':undefined} href={fixture?'/design/account':'/patient/account'}><ShieldCheck size={18}/>Profile & privacy</Link>}
           <div className="nav-note">

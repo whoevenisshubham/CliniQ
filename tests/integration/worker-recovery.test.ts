@@ -1,0 +1,16 @@
+import {beforeAll,afterAll,it,expect,vi} from 'vitest';
+import {createClient,type SupabaseClient} from '@supabase/supabase-js';import {randomUUID} from 'node:crypto';
+import {localConfiguration} from '../../scripts/local-supabase.mjs';import {uploadDocument} from '@/lib/server/documents/service';import {runNextJob} from '@/lib/server/jobs/unified-runner';
+const cfg=localConfiguration(),admin=createClient(cfg.API_URL,cfg.SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}}),patient=createClient(cfg.API_URL,cfg.ANON_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+beforeAll(async()=>{vi.stubEnv('AI_ENABLED','false');const id=randomUUID(),email='recovery.'+randomUUID()+'@synthetic.example.test',password=randomUUID()+randomUUID();const u=await admin.auth.admin.createUser({email,password,email_confirm:true});expect(u.error).toBeNull();expect((await admin.from('users').insert({id,auth_user_id:u.data.user!.id,email,name:'Synthetic recovery patient',role:'patient',is_active:true})).error).toBeNull();expect((await admin.from('patients').insert({user_id:id,name:'Synthetic recovery patient'})).error).toBeNull();expect((await patient.auth.signInWithPassword({email,password})).error).toBeNull();},60000);
+afterAll(()=>vi.unstubAllEnvs());
+it('lost dispatch survives in SQL; an injected AI recovery outage does not prevent actual private-byte parsing and publication',async()=>{
+ const uploaded=await uploadDocument(patient,admin,{key:randomUUID(),title:'Synthetic recovery document',fileName:'recovery.txt',mime:'text/plain',bytes:new TextEncoder().encode('Synthetic durable source: no external inference.')});
+ const queued=await admin.from('document_jobs').select('id,status').eq('document_id',uploaded.document_id).single();expect(queued.error).toBeNull();expect(queued.data!.status).toBe('queued');
+ // Only the unavailable dependency is injected; identities, bytes, SQL claim,
+ // parser worker, fences and publication all use real isolated services.
+ const outage=new Proxy(admin,{get(target,prop){if(prop==='rpc')return(name:string,args?:Record<string,unknown>)=>name==='ai_reconcile'?Promise.resolve({data:null,error:{code:'SYNTHETIC_OUTAGE',message:'private diagnostic not to expose'}}):target.rpc(name,args);const value=Reflect.get(target,prop,target);return typeof value==='function'?value.bind(target):value;}}) as SupabaseClient;
+ const result=await runNextJob(outage,queued.data!.id);expect(result).toMatchObject({status:'text_ready',degraded:true,recovery:{ai:{state:'failed'},speech:{state:'completed'},continuity:{state:'completed'}}});expect(JSON.stringify(result)).not.toContain('private diagnostic');
+ const after=await admin.from('document_jobs').select('status,attempts').eq('id',queued.data!.id).single();expect(after.error).toBeNull();expect(after.data).toEqual({status:'succeeded',attempts:1});const chunks=await patient.from('document_chunks').select('text').eq('document_id',uploaded.document_id);expect(chunks.error).toBeNull();expect(chunks.data!.map(c=>c.text).join('')).toContain('Synthetic durable source');
+ expect(await runNextJob(admin,queued.data!.id)).toMatchObject({status:'idle',degraded:false});expect((await admin.from('document_jobs').select('attempts').eq('id',queued.data!.id).single()).data!.attempts).toBe(1);
+});
