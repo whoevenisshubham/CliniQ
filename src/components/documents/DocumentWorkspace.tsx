@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { readJsonResponse } from "@/lib/client/http-response";
 import {
   DocumentList,
   RecordLayout,
@@ -36,15 +37,7 @@ async function serverApi(path: string, init?: RequestInit) {
     cache: "no-store",
     signal: init?.signal ?? AbortSignal.timeout(45000),
   });
-  let body;
-  try {
-    body = await response.json();
-  } catch {
-    throw new Error("The server response could not be read. Try again.");
-  }
-  if (!response.ok)
-    throw Object.assign(new Error(body.error?.message ?? "The request could not be completed."),{status:response.status});
-  return body;
+  return readJsonResponse(response);
 }
 export function DocumentWorkspace({
   provider = false,
