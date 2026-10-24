@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prebuild": "node scripts/write-build-identity.mjs",
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",

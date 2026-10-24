@@ -15,7 +15,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" data-source-sha={process.env.NEXT_PUBLIC_BUILD_SHA??'unavailable'} suppressHydrationWarning>
       <body className="antialiased">
         <ThemeProvider>{children}</ThemeProvider>
       </body>

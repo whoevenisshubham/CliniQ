@@ -69,6 +69,8 @@ export function DocumentWorkspace({
     [selected, setSelected] = useState<string | null>(initialDocumentId),
     [selectionEpoch,setSelectionEpoch]=useState(0),
     [providers, setProviders] = useState<Provider[]>([]),
+    [providersLoading,setProvidersLoading]=useState(false),
+    [providersFailed,setProvidersFailed]=useState(false),
     [mode, setMode] = useState<
       "upload" | "replace" | "manual" | "share" | "delete" | null
     >(null);
@@ -212,10 +214,13 @@ export function DocumentWorkspace({
     setText("");
     setDialogError("");
     retry.current = null;
-    if (next === "share")
+    if (next === "share") {
+      setProviders([]);setProvidersLoading(true);setProvidersFailed(false);
       void api("/api/documents/providers")
         .then((d) => {if(live.current)setProviders(d.providers);})
-        .catch((e) => {if(live.current){hideAccessFailure(e);setDialogError(e.message);}});
+        .catch((e) => {if(live.current){setProvidersFailed(true);hideAccessFailure(e);setDialogError(e.message);}})
+        .finally(()=>{if(live.current)setProvidersLoading(false);});
+    }
   }
   async function submitPending(){
     const op=pendingRequest.current;if(!op||mutationLock.current)return;
@@ -543,7 +548,7 @@ export function DocumentWorkspace({
                   <p>Private · no active grants</p>
                 )}
                 <h3>Eligible care team</h3>
-                {providers.length ? (
+                {providersLoading ? <p role="status">Loading eligible clinicians…</p> : providersFailed ? <p>Eligible clinicians could not be loaded. Close and reopen sharing to retry.</p> : providers.length ? (
                   providers.map((p) => (
                     <div
                       className="sharing-row"

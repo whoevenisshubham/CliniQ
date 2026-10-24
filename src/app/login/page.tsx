@@ -103,8 +103,8 @@ export default function LoginPage() {
 
           <div className="mb-5 p-3 rounded-lg border border-[var(--border)] bg-[var(--surface)]">
             <p className="text-xs leading-relaxed text-[var(--foreground-muted)]">
-              Use a provisioned workspace account. Hosted demo access is not yet
-              configured.
+              Use an explicitly provisioned workspace account. Public sign-up
+              and shared demo credentials are unavailable.
             </p>
           </div>
 

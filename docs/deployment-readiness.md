@@ -2,6 +2,18 @@
 
 Main/production release is separate from branch CI and visual preview. Never copy production secrets into preview or infer that a public preview has an isolated backend.
 
+## Isolated preview evidence — 24 October 2026
+
+The owner-approved new Free Mumbai preview baseline is provisioned, with six synthetic Auth accounts explicitly mapped to application users, two workspaces, RLS and private document/audio buckets. The private provisioning journal reconciles against the database and all 14 committed migration hashes. Historical projects and production remain unchanged. Do not rerun the empty-project adapter.
+
+PR #3 uses exact `codex/v2-containment` Netlify branch overrides. General preview and production values were not populated or replaced. Secret variables retain Builds/Functions/Runtime scopes on this Free account; Functions-only scope selection is unavailable. Application imports and public-bundle checks must therefore enforce server credential separation.
+
+Actual hosted acceptance has now exercised patient upload, reload and returning login, private-original download, care-only denial, explicit provider sharing and revocation, typed transcript/manual findings and clinician approval. Real deployed workers completed UTF-8 text and a two-page PDF, reclaimed one deliberately expired synthetic lease with a higher fence, rejected stale publication and purged deleted test bytes. These are bounded synthetic checks, not production acceptance or proof that preview schedules run. Detailed private evidence stays outside the public repository.
+
+Builds publish only an allowlisted `build-identity.json` (source SHA, parser hash and migration hashes). The HTML source attribute, `/api/build`, and deployed worker log expose safe source identifiers independently. Schema identity remains the applied private provisioning record; a later application build does not imply a new migration. Check all sources after deployment. Missing identity is reported as `unavailable`, never guessed from the current Git branch.
+
+Live AI and speech remain disabled. The complete release matrix, authenticated peripheral journeys, actual 200% zoom and separately blocked scheduling SQL behavior still require reconciliation. V2 and the hosted release are not complete.
+
 ## Required environment names
 
 - `APP_ORIGIN`: exact origin for that environment.
