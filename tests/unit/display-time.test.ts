@@ -1,0 +1,4 @@
+import {afterEach,it,expect,vi} from 'vitest';import {displayDateTime,displayDate} from '@/lib/display-time';
+afterEach(()=>vi.unstubAllEnvs());
+it('keeps source dates stable across server/browser default zones at midnight',()=>{const source='2026-10-23T23:45:00Z';vi.stubEnv('TZ','UTC');const server=[displayDateTime(source),displayDate(source)];vi.stubEnv('TZ','Asia/Kolkata');expect([displayDateTime(source),displayDate(source)]).toEqual(server);expect(server[1]).toContain('23 Oct 2026');expect(displayDateTime(source,'Asia/Kolkata')).toContain('24 Oct 2026');});
+it('preserves unknown timestamps and visibly identifies fallback/default zones',()=>{expect(displayDateTime(null)).toBe('Not recorded');expect(displayDate(undefined)).toBe('Not recorded');expect(displayDateTime('bad')).toBe('Not recorded');expect(displayDateTime('2026-10-24T00:00:00Z')).toContain('UTC');expect(displayDateTime('2026-10-24T00:00:00Z','invalid-zone')).toBe('2026-10-24T00:00:00.000Z · UTC');});

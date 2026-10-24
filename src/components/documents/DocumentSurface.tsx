@@ -189,6 +189,7 @@ export function DocumentList({
                         day: "numeric",
                         month: "short",
                         year: "numeric",
+                        timeZone:"UTC",
                       })
                     : "Saved record"}{" "}
                   ·{" "}

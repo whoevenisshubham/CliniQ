@@ -29,3 +29,9 @@ A durable job uses a 90-second lease, monotonic fence and at most three claims. 
 All application reads use the caller's RLS client. The byte reader checks current access, reads only the exact registered key with a server-only capability, then rechecks access/version before returning private/no-store bytes. No ordinary Storage download, signed URL, listing, overwrite, direct upload or delete path is available. Source/detail reads recheck the revision after loading content. The UI reloads current access on return/focus and uses no persistent browser cache for private text. A copy already delivered to a user cannot be recalled.
 
 No hosted database migration, hosted account mapping, production mutation or provider call is established by these tests. The public visual sample is labelled fixture data and proves layout only.
+
+## Client reconciliation and access changes
+
+The document workspace retains the exact submitted body, source revision and operation key while a request outcome is uncertain. Editing inputs and starting another mutation are paused; “Reconcile saved request” resubmits that same operation for the server's durable operation lookup. It does not allocate a new key or silently advance the source revision. The pending body is held only in this mounted actor's memory; reload is not claimed to preserve an unsent local file.
+
+A known successful commit stays reported saved even if the subsequent view refresh fails. Access failures hide private rows, source detail, eligible providers and local form contents. Selection responses are fenced against rapid document changes and ignored after unmount. Returning-session persistence and the server ledger are exercised in isolated integration; browser timeout/actor-switch acceptance remains separate.

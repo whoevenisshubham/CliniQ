@@ -44,9 +44,15 @@ npx --no-install supabase start --workdir tests/infra
 npm run test:integration:prepare
 npm run test:integration
 npm run jobs:local
+node scripts/verify-inventory.mjs --local-synthetic
+node scripts/verify-worker-package.mjs
 ```
 
 The prepare command requires an empty, verified local test database; it refuses to reset existing data. It tests a seed-free baseline and representative legacy forward migration, then explicitly provisions bounded synthetic accounts. Integration suites explicitly provision additional isolated synthetic identities. Credentials stay private under ignored `tests/infra/.runtime/` or test-process memory. Never publish runtime credentials or infrastructure startup output. Public `/api/seed` remains unavailable.
+
+For an explicitly requested local synthetic demo, `npm run setup:demo:local` provisions separate bounded accounts, care relationships, labelled availability and the dated illustrative tariff after schema preparation. It refuses non-demo workspaces and configured inventory caps, preserves existing identities and never resets passwords. Keep its credential file private. Re-running is not a reset or a way to evade those caps.
+
+Migration execution and preservation evidence share [one active migration plan](supabase/baseline/README.md). Committed Git-blob hashes, working checkout hashes and normalized execution scope are distinguished. The staged worker check is explicitly a local packaging smoke test; actual hosted function acceptance remains separate.
 
 Copy `.env.example` for an independently verified development environment. Never use production credentials for preview. Intended hosted upgrades require inventory, backup and reconciliation first. See [identity and isolation](docs/identity-isolation.md), [document lifecycle and reproduction](docs/documents.md), and [baseline migration protocol](supabase/baseline/README.md).
 
