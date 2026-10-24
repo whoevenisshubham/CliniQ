@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import {announceSessionChange} from '@/lib/client/session-events';
 import {
   ArrowUpRight,
   FileText,
@@ -54,7 +55,7 @@ export function RecordHeader({
             className="quiet-button"
             onClick={async () => {
               const r = await fetch("/api/auth/logout", { method: "POST" });
-              if (r.ok) window.location.assign("/login");
+              if (r.ok) {announceSessionChange();window.location.assign("/login");}
               else window.alert("Sign-out failed. Please try again.");
             }}
           >

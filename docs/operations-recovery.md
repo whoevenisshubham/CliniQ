@@ -29,3 +29,5 @@ Docker runtime availability is independent from execution approval. Preserve exi
 
 The legacy `handler` export in `document-reconcile` is scheduled through `netlify.toml`. A module-level `config.schedule` alongside this legacy handler was not recognized by the deployed platform and left an ordinary HTTP endpoint. Verify the deployed function is classified as scheduled, direct unauthenticated HTTP invocation is blocked, and an explicit preview **Run now** invocation completes. Preview schedules are not assumed to run. The secret-guarded background worker remains a separate function.
 
+Successful application sign-in/sign-out announces a random session-change nonce to other tabs. The root session boundary hides mounted content before reloading to revalidate the current cookie and role. The signal contains no identity, credential or record. This complements server authorization and client denial handling; it does not establish natural session-expiry acceptance.
+

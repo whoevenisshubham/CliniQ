@@ -1,4 +1,5 @@
 "use client";
+import {announceSessionChange} from '@/lib/client/session-events';
 
 import React, { useState,useEffect } from "react";
 import { motion } from "framer-motion";
@@ -29,6 +30,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
       if (!response.ok) throw new Error();
       configureOfflineActor(null);
       useConsultationStore.getState().resetAll();
+      announceSessionChange();
       window.location.assign("/login");
     } catch { setSignOutError("Sign-out could not be completed. Please try again."); }
   };

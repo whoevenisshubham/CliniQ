@@ -1,6 +1,7 @@
 "use client";
 
 import { ThemeToggle } from "@/components/shared/ThemeProvider";
+import {announceSessionChange} from '@/lib/client/session-events';
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -50,6 +51,7 @@ export default function LoginPage() {
         return;
       }
       // A new document clears the previous actor's in-memory editor/capture state.
+      announceSessionChange();
       window.location.assign(ROLE_PATHS[role]);
     } catch {
       setError("Unable to reach sign-in. Check your connection and try again.");
