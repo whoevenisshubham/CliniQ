@@ -7,6 +7,8 @@ export async function runNextJob(admin: SupabaseClient, jobId?: string) {
         throw new Error('JOB_RECOVERY_UNAVAILABLE');
     const speech=await admin.rpc('speech_reconcile');
     if(speech.error)throw new Error('SPEECH_RECOVERY_UNAVAILABLE');
+    const continuity=await admin.rpc('continuity_reconcile');
+    if(continuity.error)throw new Error('CONTINUITY_RECOVERY_UNAVAILABLE');
     const now = new Date().toISOString();
     let query = admin.from('document_jobs').select('id,kind');
     query = jobId ? query.eq('id', jobId) : query.lte('available_at', now).or(`status.eq.queued,and(status.eq.running,lease_until.lt.${now})`).order('created_at').limit(1);

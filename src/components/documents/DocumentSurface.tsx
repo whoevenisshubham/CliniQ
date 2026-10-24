@@ -73,7 +73,7 @@ export function RecordLayout({
   children: React.ReactNode;
   provider?: boolean;
   fixture?: boolean;
-  section?: "documents" | "consultations" | "evidence" | "care";
+  section?: "documents" | "consultations" | "evidence" | "care" | "continuity";
   reception?: boolean;
 }) {
   return (
@@ -112,6 +112,7 @@ export function RecordLayout({
             <FileText size={18}/> Source review
           </Link></>}
           <Link aria-current={section === "care" ? "page" : undefined} href={fixture?"/design/care":"/care"}><FileText size={18}/>{reception?"Reception & queue":provider?"Clinic queue":"Appointments"}</Link>
+          {!provider&&!reception&&<Link aria-current={section==='continuity'?'page':undefined} href={fixture?'/design/continuity':'/continuity'}><FileText size={18}/>Medicines & tasks</Link>}
           <div className="nav-note">
             <LockKeyhole size={20} />
             <p>

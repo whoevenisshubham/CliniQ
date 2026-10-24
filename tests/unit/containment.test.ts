@@ -8,7 +8,7 @@ vi.mock("@/lib/supabase-server", () => ({ getSupabaseAdminClient: vi.fn(() => { 
 
 type Endpoint = (request: Request) => Promise<Response> | Response;
 const modules = import.meta.glob<Record<string, Endpoint>>("../../src/app/api/**/route.ts", { eager: true });
-const endpoints = Object.entries(modules).filter(([path]) => !path.includes("/auth/") && !path.includes("/api/me/") && !path.includes("/api/documents/") && !path.includes("/api/clinical/") && !path.includes("/api/ai/") && !path.includes("/api/jobs/") && !path.includes("/api/care/")).flatMap(([path, handlers]) =>
+const endpoints = Object.entries(modules).filter(([path]) => !path.includes("/auth/") && !path.includes("/api/me/") && !path.includes("/api/documents/") && !path.includes("/api/clinical/") && !path.includes("/api/ai/") && !path.includes("/api/jobs/") && !path.includes("/api/care/") && !path.includes("/api/continuity/")).flatMap(([path, handlers]) =>
   Object.entries(handlers).filter(([method]) => ["GET", "POST", "PATCH", "PUT", "DELETE"].includes(method) && !(path.includes("/consultations/[id]/emr/") && method==="GET"))
     .map(([method, handler]) => ({ path, method, handler })));
 

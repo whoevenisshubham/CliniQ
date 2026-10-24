@@ -25,4 +25,4 @@ Intake measurements require explicit units and observation time; correction even
 - Intake vital validation, correction provenance and role boundaries.
 - Authenticated listening-HTTP/browser workflows, hosted worker/schema acceptance and actual 200% zoom.
 
-Medicines/adherence, continuing-care task processing, profile/privacy/family/trends and reviewed illustrative billing/catalog remain unfinished. These are not implied by the scheduling endpoints.
+Medicines/adherence and durable in-app tasks now have a separate implementation and focused verification contract in [medicines-tasks.md](medicines-tasks.md). Profile/privacy/family/trends and reviewed illustrative billing/catalog remain unfinished. These are not implied by the scheduling endpoints.

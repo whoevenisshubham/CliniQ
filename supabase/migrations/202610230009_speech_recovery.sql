@@ -10,7 +10,7 @@ END $$;
 REVOKE ALL ON FUNCTION public.speech_reconcile() FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.speech_reconcile() TO service_role;
 ALTER TABLE public.clinical_segments ADD COLUMN speech_provenance jsonb;
-CREATE OR REPLACE FUNCTION public.speech_commit(oid uuid) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $
+CREATE OR REPLACE FUNCTION public.speech_commit(oid uuid) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE o public.speech_operations;c public.consultations;r jsonb;BEGIN
  SELECT * INTO o FROM public.speech_operations WHERE id=oid;
  IF NOT FOUND OR o.actor_id IS DISTINCT FROM private.current_app_user_id() OR NOT private.can_edit_encounter(o.consultation_id) THEN RAISE EXCEPTION 'NOT_FOUND';END IF;
@@ -23,6 +23,6 @@ DECLARE o public.speech_operations;c public.consultations;r jsonb;BEGIN
  UPDATE public.clinical_segments SET source_type='speech',start_ms=0,end_ms=o.duration_ms,speech_provenance=jsonb_build_object('mode',o.mode,'provider',o.provider,'model',o.model,'requestedLanguage',o.requested_language,'operationId',o.id,'audioSha256',o.audio_sha256,'durationMs',o.duration_ms) WHERE id=o.segment_id AND consultation_id=c.id;
  r:=r||jsonb_build_object('state','saved','operationId',oid,'segmentId',o.segment_id,'mode',o.mode);
  UPDATE public.speech_operations SET status='saved',response=r,lease_until=NULL WHERE id=oid;RETURN r;
-END $;
+END $$;
 NOTIFY pgrst,'reload schema';
 COMMIT;
