@@ -33,6 +33,15 @@ const billing={canReview:true,revision:1,bill:{id:'bill-one',items:[item],subtot
 const care={slots:[{id:'slot-one',provider_name:'Synthetic private clinician',starts_at:'2050-01-01T09:00:00Z',ends_at:'2050-01-01T09:15:00Z',time_zone:'UTC',synthetic:true}],appointments:[],patients:[],providers:[],queue:[]};
 const clinical={visit:{id:'encounter-one',patient_id:'patient-one',workspace_id:'workspace-one',status:'active',revision:0,started_at:'2026-10-24T04:00:00Z'},draft:{snapshot:emptySnapshot(),revision:0,provenance:{}},segments:[],patient:{id:'patient-one',name:'Synthetic private clinical patient',allergies:[]},approved:[],history:[],documents:[],prescriptions:[]};
 
+it.each(['2026-10-24T09:00:00+05:30',''])('clinical measurement time preserves explicit timezone or unknown null: %s',async(time)=>{
+ const sent:RequestInit[]=[];const measured={...clinical,draft:{...clinical.draft,snapshot:{...emptySnapshot(),vitals:[{name:'temperature',value:37.1,unit:'°C',observedAt:null}]}}};
+ vi.stubGlobal('fetch',vi.fn((url:string,init?:RequestInit)=>{if(url.endsWith('/speech'))return Promise.resolve(result({available:false,mode:'disabled'}));if(init?.method){sent.push(init);return Promise.resolve(result({consultationId:'encounter-one',revision:1,status:'active'}));}return Promise.resolve(result(measured));}));
+ await render(createElement(ConsultationReview,{actorId:'actor-one',provider:true,initialId:'encounter-one'}));
+ const field=[...host.querySelectorAll('input')].find(x=>x.closest('label')?.textContent?.includes('Observed time'))!;
+ await change(field,'2026-10-23T10:00:00Z');await change(field,time);await click('Save findings');
+ expect(JSON.parse(String(sent[0].body)).snapshot.vitals[0]).toEqual({name:'temperature',value:37.1,unit:'°C',observedAt:time||null});
+});
+
 it('account denial removes previously rendered private content and edit forms',async()=>{
  let reads=0;vi.stubGlobal('fetch',vi.fn(()=>Promise.resolve(++reads===1?result(account):new Response('<html>private diagnostic</html>',{status:403}))));
  await render(createElement(AccountWorkspace));await click('Edit profile');await click('Refresh saved state');
