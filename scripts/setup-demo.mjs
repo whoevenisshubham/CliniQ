@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { randomUUID, randomBytes } from 'node:crypto';
 import { localConfiguration } from './local-supabase.mjs';
 import { pathToFileURL } from 'node:url';
+import {readFileSync} from 'node:fs';
 
 // Explicit local-only synthetic provisioning. Never updates an existing password,
 // reuses accounts by email, links hosted projects or runs from an HTTP handler.
@@ -32,6 +33,8 @@ export async function provisionDemoWorkspace() {
   function check(result) { if(result.error) throw new Error('Explicit synthetic provisioning failed: '+(result.error.code??'unknown')); }
   check(await admin.from('users').insert(Object.values(actors).filter(a=>a.name!=='unlinked').map(a=>({id:a.appId,auth_user_id:a.authId,name:'Synthetic '+a.name,email:a.email,role:a.role,is_active:a.name!=='disabled'}))));
   check(await admin.from('workspaces').insert([{id:ids.workspaceA,name:'Synthetic demo A',is_demo:true},{id:ids.workspaceB,name:'Synthetic demo B',is_demo:true}]));
+  const tariff=JSON.parse(readFileSync(new URL('../src/lib/catalog/synthetic-tariff.json',import.meta.url),'utf8'));
+  check(await admin.from('illustrative_tariffs').insert(['A','B'].map(s=>({workspace_id:ids['workspace'+s],version:tariff.version,effective_on:tariff.effectiveOn,synthetic:true,source_revision:tariff.sourceRevision,items:tariff.items}))));
   check(await admin.from('patients').insert(['A','B'].map(s=>({id:ids['patient'+s],user_id:actors['patient'+s].appId,name:'Synthetic patient '+s}))));
   check(await admin.from('workspace_memberships').insert(['doctorA','doctorU','reception','admin','doctorB'].map(name=>({workspace_id:name==='doctorB'?ids.workspaceB:ids.workspaceA,user_id:actors[name].appId,role:actors[name].role}))));
   check(await admin.from('care_relationships').insert(['A','B'].map(s=>({patient_id:ids['patient'+s],workspace_id:ids['workspace'+s],provider_id:actors['doctor'+s].appId,granted_by:actors['patient'+s].appId,scope:'clinical'}))));

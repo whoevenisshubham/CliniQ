@@ -1,0 +1,237 @@
+{
+  "version": "synthetic-2026-10-24-v1",
+  "effectiveOn": "2026-10-24",
+  "synthetic": true,
+  "sourceRevision": "d2fadb62a87137ff0f7920803cc06563dcce282a",
+  "sourcePath": "src/lib/billing-engine.ts",
+  "items": [
+    {
+      "id": "consultation",
+      "description": "Illustrative consultation",
+      "category": "consultation",
+      "unitPaise": 30000
+    },
+    {
+      "id": "procedure-001",
+      "description": "Clinical Auscultation",
+      "category": "procedure",
+      "unitPaise": 15000
+    },
+    {
+      "id": "procedure-002",
+      "description": "Abdominal Palpation",
+      "category": "procedure",
+      "unitPaise": 10000
+    },
+    {
+      "id": "procedure-003",
+      "description": "Chest Percussion",
+      "category": "procedure",
+      "unitPaise": 10000
+    },
+    {
+      "id": "procedure-004",
+      "description": "Fundoscopy",
+      "category": "procedure",
+      "unitPaise": 25000
+    },
+    {
+      "id": "procedure-005",
+      "description": "PR Examination",
+      "category": "procedure",
+      "unitPaise": 20000
+    },
+    {
+      "id": "procedure-006",
+      "description": "Pelvic Examination",
+      "category": "procedure",
+      "unitPaise": 30000
+    },
+    {
+      "id": "procedure-007",
+      "description": "Wound Dressing",
+      "category": "procedure",
+      "unitPaise": 20000
+    },
+    {
+      "id": "procedure-008",
+      "description": "Wound Suturing",
+      "category": "procedure",
+      "unitPaise": 50000
+    },
+    {
+      "id": "procedure-009",
+      "description": "Injection Administration",
+      "category": "procedure",
+      "unitPaise": 10000
+    },
+    {
+      "id": "procedure-010",
+      "description": "IV Access + Fluid",
+      "category": "procedure",
+      "unitPaise": 25000
+    },
+    {
+      "id": "procedure-011",
+      "description": "Nebulisation (SABA/SAMA)",
+      "category": "procedure",
+      "unitPaise": 35000
+    },
+    {
+      "id": "procedure-012",
+      "description": "Urinary Catheterisation",
+      "category": "procedure",
+      "unitPaise": 40000
+    },
+    {
+      "id": "procedure-013",
+      "description": "NG Tube Insertion",
+      "category": "procedure",
+      "unitPaise": 40000
+    },
+    {
+      "id": "procedure-014",
+      "description": "12-Lead ECG",
+      "category": "investigation",
+      "unitPaise": 25000
+    },
+    {
+      "id": "procedure-015",
+      "description": "Chest X-Ray",
+      "category": "investigation",
+      "unitPaise": 50000
+    },
+    {
+      "id": "procedure-016",
+      "description": "USG / Sonography",
+      "category": "investigation",
+      "unitPaise": 80000
+    },
+    {
+      "id": "procedure-017",
+      "description": "CT Scan (reported)",
+      "category": "investigation",
+      "unitPaise": 350000
+    },
+    {
+      "id": "procedure-018",
+      "description": "MRI (reported)",
+      "category": "investigation",
+      "unitPaise": 650000
+    },
+    {
+      "id": "procedure-019",
+      "description": "Blood Glucose / HbA1c",
+      "category": "investigation",
+      "unitPaise": 15000
+    },
+    {
+      "id": "procedure-020",
+      "description": "Complete Blood Count",
+      "category": "investigation",
+      "unitPaise": 25000
+    },
+    {
+      "id": "procedure-021",
+      "description": "Liver Function Test",
+      "category": "investigation",
+      "unitPaise": 40000
+    },
+    {
+      "id": "procedure-022",
+      "description": "Renal Function Test",
+      "category": "investigation",
+      "unitPaise": 35000
+    },
+    {
+      "id": "procedure-023",
+      "description": "Thyroid Function Test",
+      "category": "investigation",
+      "unitPaise": 45000
+    },
+    {
+      "id": "procedure-024",
+      "description": "Urine Routine + Microscopy",
+      "category": "investigation",
+      "unitPaise": 15000
+    },
+    {
+      "id": "procedure-025",
+      "description": "Dengue Serology (NS1/IgM)",
+      "category": "investigation",
+      "unitPaise": 60000
+    },
+    {
+      "id": "procedure-026",
+      "description": "Malaria Thick Smear / ICT",
+      "category": "investigation",
+      "unitPaise": 30000
+    },
+    {
+      "id": "procedure-027",
+      "description": "Culture & Sensitivity",
+      "category": "investigation",
+      "unitPaise": 80000
+    },
+    {
+      "id": "procedure-028",
+      "description": "COVID-19 Testing",
+      "category": "investigation",
+      "unitPaise": 50000
+    },
+    {
+      "id": "procedure-029",
+      "description": "Coagulation Profile",
+      "category": "investigation",
+      "unitPaise": 60000
+    },
+    {
+      "id": "procedure-030",
+      "description": "Cardiac Enzymes",
+      "category": "investigation",
+      "unitPaise": 90000
+    },
+    {
+      "id": "procedure-031",
+      "description": "Arterial Blood Gas",
+      "category": "investigation",
+      "unitPaise": 70000
+    },
+    {
+      "id": "procedure-032",
+      "description": "Oxygen Therapy",
+      "category": "equipment",
+      "unitPaise": 20000
+    },
+    {
+      "id": "procedure-033",
+      "description": "Pulse Oximetry Monitoring",
+      "category": "equipment",
+      "unitPaise": 10000
+    },
+    {
+      "id": "procedure-034",
+      "description": "Cardiac Monitoring",
+      "category": "equipment",
+      "unitPaise": 50000
+    },
+    {
+      "id": "procedure-035",
+      "description": "Defibrillation",
+      "category": "equipment",
+      "unitPaise": 150000
+    },
+    {
+      "id": "procedure-036",
+      "description": "Glucometry",
+      "category": "equipment",
+      "unitPaise": 8000
+    },
+    {
+      "id": "procedure-037",
+      "description": "Spirometry",
+      "category": "equipment",
+      "unitPaise": 40000
+    }
+  ]
+}
