@@ -25,3 +25,7 @@ The parser starts `scripts/document-parser-worker.mjs` relative to the function 
 `node scripts/verify-worker-package.mjs` builds both function entries using the installed esbuild and stages their configured parser/assets. It runs multilingual UTF-8 text and a one-page synthetic Latin PDF through a worker from that staged directory. The small `worker-package-smoke` artifact labels this exact scope. It is not the actual Netlify archive; it does not establish arbitrary multilingual PDF coverage or a hosted worker. Required runtime resolution, representative document fonts/CMaps, worker-thread availability, memory/time caps and the actual function archive must still be verified on the intended host. A Next build or substitute local bundle is insufficient proof of that archive.
 
 Docker runtime availability is independent from execution approval. Preserve existing volumes and the isolated stack when diagnosing its engine IPC failure. Do not reset/reseed or use an alternate launcher for the recorded denied Next startup.
+# Hosted reconciliation configuration
+
+The legacy `handler` export in `document-reconcile` is scheduled through `netlify.toml`. A module-level `config.schedule` alongside this legacy handler was not recognized by the deployed platform and left an ordinary HTTP endpoint. Verify the deployed function is classified as scheduled, direct unauthenticated HTTP invocation is blocked, and an explicit preview **Run now** invocation completes. Preview schedules are not assumed to run. The secret-guarded background worker remains a separate function.
+

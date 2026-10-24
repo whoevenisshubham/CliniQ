@@ -2,7 +2,6 @@ import { workerClient } from "../../src/lib/server/jobs/client";
 import { dispatchDocumentWork } from "../../src/lib/server/jobs/dispatch";
 import { reconcileDocuments } from "../../src/lib/server/jobs/runner";
 import {recoverSubsystems,failedRecoveries} from '../../src/lib/server/jobs/recovery';
-export const config = { schedule: "*/15 * * * *" };
 export async function handler() {
   const client=workerClient(3000);
   const recovery=await recoverSubsystems(client);
