@@ -18,8 +18,9 @@ const ai=readFileSync(path.join(root,'supabase/migrations/202610230005_ai_jobs.s
 const care=readFileSync(path.join(root,'supabase/migrations/202610230006_continuing_care.sql'),'utf8').replace(/^BEGIN;/m,'').replace(/^COMMIT;/m,'');
 const fidelity=readFileSync(path.join(root,'supabase/migrations/202610230007_clinical_fidelity.sql'),'utf8').replace(/^BEGIN;/m,'').replace(/^COMMIT;/m,'');
 const speech=readFileSync(path.join(root,'supabase/migrations/202610230008_speech_transport.sql'),'utf8').replace(/^BEGIN;/m,'').replace(/^COMMIT;/m,'');
+const speechRecovery=readFileSync(path.join(root,'supabase/migrations/202610230009_speech_recovery.sql'),'utf8').replace(/^BEGIN;/m,'').replace(/^COMMIT;/m,'');
 const legacyPolicies = readFileSync(path.join(root,'tests/fixtures/legacy-policies.sql'),'utf8');
-const fresh = sql(`BEGIN;\n${base}\n${forward}\n${m2}\n${m3}\n${proposals}\n${ai}\n${care}\n${fidelity}\n${speech}\nSELECT json_build_object('users',(select count(*) from public.users),'patients',(select count(*) from public.patients),'memberships',(select count(*) from public.workspace_memberships));\nROLLBACK;`);
+const fresh = sql(`BEGIN;\n${base}\n${forward}\n${m2}\n${m3}\n${proposals}\n${ai}\n${care}\n${fidelity}\n${speech}\n${speechRecovery}\nSELECT json_build_object('users',(select count(*) from public.users),'patients',(select count(*) from public.patients),'memberships',(select count(*) from public.workspace_memberships));\nROLLBACK;`);
 assert.deepEqual(JSON.parse(fresh),{users:0,patients:0,memberships:0});
 const provision = await provisionSyntheticActors();
 const { actors:a } = provision;
@@ -51,7 +52,7 @@ sql(`BEGIN;\n${base}\n${legacyPolicies}\n${fixture}\nCOMMIT;`);
 const columns = JSON.parse(sql(`select json_object_agg(table_name,cols) from (select table_name,string_agg(quote_ident(column_name),',' order by ordinal_position) cols from information_schema.columns where table_schema='public' group by table_name) x`));
 const snapshots = () => Object.fromEntries(Object.entries(columns).map(([table,cols]) => [table,JSON.parse(sql(`select json_build_object('rows',count(*),'hash',md5(coalesce(string_agg(row_to_json(x)::text,'|' order by x.id),''))) from (select ${cols} from public.${table}) x`))]));
 const before=snapshots();
-sql(`BEGIN;\n${forward}\n${m2}\n${m3}\n${proposals}\n${ai}\n${care}\n${fidelity}\n${speech}\nCOMMIT;`);
+sql(`BEGIN;\n${forward}\n${m2}\n${m3}\n${proposals}\n${ai}\n${care}\n${fidelity}\n${speech}\n${speechRecovery}\nCOMMIT;`);
 const after=snapshots();
 assert.deepEqual(after,before,'Forward upgrade changed original IDs or historical values');
 

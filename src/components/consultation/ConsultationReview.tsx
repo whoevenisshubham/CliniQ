@@ -30,6 +30,7 @@ export type ClinicalDetail = {
     };
     segments: (SavedSegment & {
         source_type: string;
+        speech_provenance?:{mode?:string};
     })[];
     patient: {
         id: string;
@@ -261,7 +262,7 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
     </details>
     <section className="consultation-editor clinical-workbench" aria-label="Clinical findings"><div className="transcript-column">
      <div className="clinical-section-heading"><span className="section-number">01</span><div><h2>Transcript</h2><p>Saved final segments · speaker labels are explicit or unknown</p></div></div>
-     <ol className="clinical-transcript">{detail.segments.map(s => <li key={s.id} id={`segment-${s.id}`} tabIndex={-1}><span>{s.speaker} · {s.language} · {s.source_type}</span><p>{s.text}</p></li>)}</ol>{!detail.segments.length && <p className="clinical-muted">No transcript segments saved.</p>}
+     <ol className="clinical-transcript">{detail.segments.map(s => <li key={s.id} id={`segment-${s.id}`} tabIndex={-1}><span>{s.speaker} · {s.language} · {s.source_type}{s.speech_provenance?.mode==='offline_fixture'?' · synthetic offline output':''}</span><p>{s.text}</p></li>)}</ol>{!detail.segments.length && <p className="clinical-muted">No transcript segments saved.</p>}
      {active&&<SpeechCapture key={detail.visit.id+':'+detail.visit.revision} consultationId={detail.visit.id} revision={detail.visit.revision} sequence={detail.segments.length} disabled={locked||dirty||!!transcript.trim()} fixture={!!fixture} onBusy={setCaptureBusy} onSaved={()=>{setCaptureBusy(false);void loadRef.current(detail.visit.id,true);}}/>}
      {active && <form onSubmit={e => {
                     e.preventDefault();

@@ -10,6 +10,8 @@ Live execution is hard-disabled. No environment key or client flag enables it. T
 - At most20 admitted operations/day and200 retained operations/actor. No reset/deletion when caps are reached.
 - Explicit service-only offline allowances bind actor+encounter, requests and actual audio milliseconds. Global transmission concurrency1; no live allowance can be stored by this schema.
 - A durable send marker precedes transmission. Abort, disconnect, expiry or ambiguous response conservatively retains its usage; no automatic resend.
+- Shared local/background/scheduled recovery reconciles at most20 expired operations per call. Pre-send admission expiry cancels; post-marker expiry remains outcome_unknown. Valid retained responses are not retransmitted.
+- Saved speech segments retain their operation/hash/requested configuration and offline provenance. Returning-session UI labels synthetic offline speech explicitly.
 - A durable final response can be committed after interruption without another transcription. Stale revisions and revoked access cannot publish a segment. Retry cannot duplicate its stable segment.
 - Interim, empty or oversized output is rejected. Audio is held in request/browser memory only; it is not written to disk, SQL or Storage. Leaving the capture workspace aborts capture/request and discards local bytes. Saved operation/result history remains private.
 - The current adapter is bounded clip transcription, not proof of continuous streaming latency or historical transcription accuracy. The original streaming hook is retained; unsafe browser-key distribution remains contained.

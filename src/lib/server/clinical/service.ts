@@ -73,7 +73,7 @@ export async function clinicalDetail(client: SupabaseClient, encounterId: string
         throw new HttpError(404, "NOT_FOUND", "Consultation unavailable.");
     const [draft, segments, patient, approved, documents, history, prescriptions, proposals] = await Promise.all([
         client.from("clinical_drafts").select("*").eq("consultation_id", encounterId).maybeSingle(),
-        client.from("clinical_segments").select("id,sequence,text,speaker,language,start_ms,end_ms,source_type").eq("consultation_id", encounterId).order("sequence").limit(1000),
+        client.from("clinical_segments").select("id,sequence,text,speaker,language,start_ms,end_ms,source_type,speech_provenance").eq("consultation_id", encounterId).order("sequence").limit(1000),
         client.from("patients").select("id,name,allergies").eq("id", visit.data.patient_id).maybeSingle(),
         client.from("emr_versions").select("id,snapshot,reviewed_at,version_no,source_revision,field_provenance,amended_from_id").eq("consultation_id", encounterId).order("version_no"),
         client.from("documents").select("id,title,current_version_id,created_at").eq("patient_id", visit.data.patient_id).eq("status", "ready").limit(20),

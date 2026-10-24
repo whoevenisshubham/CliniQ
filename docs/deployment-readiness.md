@@ -10,7 +10,7 @@ Main/production release is separate from branch CI and visual preview. Never cop
 - `DOCUMENT_DISPATCH_SECRET`: server-only random secret of at least32 characters, shared by the existing background dispatch path.
 - `AI_ENABLED=false`: keep disabled unless a separate live allowance is recorded.
 - `GROQ_API_KEY`, `AI_TEXT_MODEL`, `LIVE_AI_AUTHORIZATION_REF`: optional server-only live configuration, insufficient without exact durable allowance/scope rows.
-- `AI_SPEECH_MODEL`: reserved adapter setting; speech transport is unavailable.
+- `AI_SPEECH_MODEL`: reserved, unused setting. Live speech is hard-disabled; no environment variable enables it. See `speech.md` for the bounded offline integration and separate live prerequisites.
 
 The historical default text model is preserved. Do not replace it merely to make an account probe succeed. Verify actual model/account/free eligibility and per-request/minute limits before proposing enablement; stop for a concrete incompatibility rather than automatically switching.
 
