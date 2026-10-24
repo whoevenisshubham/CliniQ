@@ -120,7 +120,7 @@ export function RecordLayout({
             <LockKeyhole size={20} />
             <p>
               {reception ? "Intake access does not include clinical notes or patient documents." : provider
-                ? "Only records explicitly shared with you appear here."
+                ? "Documents require an explicit share. Clinical access is checked for each encounter."
                 : "Your records are private. You choose who can read each file."}
             </p>
           </div>

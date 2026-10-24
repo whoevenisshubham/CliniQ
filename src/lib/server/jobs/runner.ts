@@ -104,7 +104,11 @@ export async function reconcileDocuments(admin: SupabaseClient, runJob = true) {
       p_operation: op.id,
     });
     dbError(done.error);
-    if(done.data)cleaned++;
+    // The maintained RPC returns void. Verify its durable acknowledgement rather
+    // than interpreting an empty successful response as a boolean result.
+    const acknowledged=await admin.from('upload_operations').select('state,object_key').eq('id',op.id).single();
+    dbError(acknowledged.error);
+    if(acknowledged.data?.state==='cleaned'&&acknowledged.data.object_key===op.object_key)cleaned++;
   }
   return {
     cleaned,
