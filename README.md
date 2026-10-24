@@ -56,6 +56,8 @@ Migration execution and preservation evidence share [one active migration plan](
 
 Copy `.env.example` for an independently verified development environment. Never use production credentials for preview. Intended hosted upgrades require inventory, backup and reconciliation first. See [identity and isolation](docs/identity-isolation.md), [document lifecycle and reproduction](docs/documents.md), and [baseline migration protocol](supabase/baseline/README.md).
 
+An owner-approved **new empty** hosted preview has a separate [guarded provisioning procedure](docs/hosted-preview-provisioning.md). Its read-only `node scripts/hosted-preview.mjs --plan` prints a source/hash template with no project reference assigned. It refuses historical targets and existing data; approval and securely configured credentials are required for any hosted execution.
+
 The application opens patient/provider accounts at `/records`; `/patient/reports` and `/doctor/documents` redirect there. `/design/documents` is a clearly labelled synthetic visual fixture, not a connected demo or an AI explanation. Real route integration, rendered visual fixtures and hosted acceptance are separate evidence layers.
 
 ## Worker operation

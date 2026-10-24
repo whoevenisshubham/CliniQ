@@ -60,6 +60,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "jsdom": "27.3.0",
+    "pg": "8.23.1",
     "supabase": "2.122.0",
     "tailwindcss": "^4",
     "tsx": "4.23.15",
