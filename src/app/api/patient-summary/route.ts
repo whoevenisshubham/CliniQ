@@ -1,3 +1,4 @@
+import { containLegacyRoute } from "@/lib/server/containment";
 import { NextResponse } from "next/server";
 import Groq from "groq-sdk";
 
@@ -52,7 +53,7 @@ Output schema (same as English):
 
 // ─── Route handler ────────────────────────────────────────────────────────────
 
-export async function POST(request: Request) {
+async function legacyPOST(request: Request) {
   const groq = getGroq();
   try {
     const { emr, patientName, language = "en" } = await request.json();
@@ -111,3 +112,6 @@ Generate the patient-friendly summary JSON now.`;
     );
   }
 }
+
+// Quarantined pending scoped service and database-policy verification.
+export const POST = containLegacyRoute(legacyPOST);

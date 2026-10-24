@@ -1,8 +1,9 @@
+import { containLegacyRoute } from "@/lib/server/containment";
 import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase-server";
 
 // GET — Fetch family members for a patient
-export async function GET(request: Request) {
+async function legacyGET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const patient_id = searchParams.get("patient_id");
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
 }
 
 // POST — Add a new family member
-export async function POST(request: Request) {
+async function legacyPOST(request: Request) {
     try {
         const body = await request.json();
         const { patient_id, name, relation, age, gender, conditions, deceased, is_patient, parent_id, generation } = body;
@@ -67,3 +68,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Failed to add family member" }, { status: 500 });
     }
 }
+
+// Quarantined pending scoped service and database-policy verification.
+export const GET = containLegacyRoute(legacyGET);
+export const POST = containLegacyRoute(legacyPOST);

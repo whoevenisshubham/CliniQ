@@ -1,0 +1,87 @@
+name: Identity and isolation checks
+
+on:
+  push:
+    branches: [main, codex/v2-containment]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  preview-provisioning-rehearsal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Start separate fresh services for the provisioning adapter rehearsal
+        run: npx --no-install supabase start --workdir tests/infra > "$RUNNER_TEMP/cliniq-provisioning-start.log" 2>&1
+        env:
+          DO_NOT_TRACK: "1"
+      - run: node scripts/verify-hosted-preview-local.mjs --local-synthetic
+      - name: Stop only this rehearsal runner's services
+        if: always()
+        run: npx --no-install supabase stop --workdir tests/infra
+        env:
+          DO_NOT_TRACK: "1"
+  containment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test:unit
+      - run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+      - run: node scripts/verify-worker-package.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: worker-package-smoke
+          path: tests/infra/.runtime/worker-package-evidence.json
+          if-no-files-found: error
+  supabase-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Start isolated Auth/Postgres/Storage/mail services without exposing credentials
+        run: npx --no-install supabase start --workdir tests/infra > "$RUNNER_TEMP/cliniq-supabase-start.log" 2>&1
+        env:
+          DO_NOT_TRACK: "1"
+      - run: npm run test:integration:prepare
+      - run: node scripts/verify-inventory.mjs --local-synthetic
+      - run: npm run test:integration -- --reporter=default --reporter=json --outputFile=tests/infra/.runtime/integration-results.json
+      - run: npm run jobs:local
+      - run: npm run setup:demo:local
+      - name: Retain preservation evidence only (never actor credentials or raw startup logs)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: isolated-preservation
+          path: |
+            tests/infra/.runtime/preservation.json
+            tests/infra/.runtime/integration-results.json
+            tests/infra/.runtime/ai-evaluation-results.json
+          if-no-files-found: error
+      - name: Stop this isolated runner's services
+        if: always()
+        run: npx --no-install supabase stop --workdir tests/infra
+        env:
+          DO_NOT_TRACK: "1"

@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import { useLocalStorageState } from "@/lib/use-local-storage";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Trophy, Star, TrendingUp, Award, Globe, Upload,
@@ -24,6 +25,8 @@ interface CreditHistoryEntry {
   timestamp: string;
 }
 
+const EMPTY_HISTORY: CreditHistoryEntry[] = [];
+
 // ─── Credit tier config ───────────────────────────────────────────────────────
 
 const CREDIT_TIERS = [
@@ -41,20 +44,12 @@ function getTier(credits: number) {
 // ─── Credit hook ──────────────────────────────────────────────────────────────
 
 export function useProtocolCredits() {
-  const [credits, setCredits] = useState<number>(0);
-  const [history, setHistory] = useState<CreditHistoryEntry[]>([]);
-
-  useEffect(() => {
-    const stored = localStorage.getItem(CREDIT_STORAGE_KEY);
-    if (stored) setCredits(Number(stored));
-    const hist = localStorage.getItem(CREDIT_HISTORY_KEY);
-    if (hist) setHistory(JSON.parse(hist));
-  }, []);
+  const [credits, setCredits] = useLocalStorageState<number>(CREDIT_STORAGE_KEY, 0);
+  const [history, setHistory] = useLocalStorageState<CreditHistoryEntry[]>(CREDIT_HISTORY_KEY, EMPTY_HISTORY);
 
   const addCredits = (points: number, description: string) => {
     setCredits((prev) => {
       const next = prev + points;
-      localStorage.setItem(CREDIT_STORAGE_KEY, String(next));
       return next;
     });
     setHistory((prev) => {
@@ -65,7 +60,6 @@ export function useProtocolCredits() {
         timestamp: new Date().toISOString(),
       };
       const next = [entry, ...prev].slice(0, 20);
-      localStorage.setItem(CREDIT_HISTORY_KEY, JSON.stringify(next));
       return next;
     });
   };

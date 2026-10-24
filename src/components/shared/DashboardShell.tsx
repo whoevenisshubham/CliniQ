@@ -1,10 +1,12 @@
 "use client";
+import {announceSessionChange} from '@/lib/client/session-events';
 
-import React from "react";
-import { useRouter } from "next/navigation";
+import React, { useState,useEffect } from "react";
 import { motion } from "framer-motion";
 import { AppSidebar } from "./AppSidebar";
 import type { UserRole } from "@/lib/types";
+import { useConsultationStore } from "@/store/consultationStore";
+import { configureOfflineActor } from "@/lib/offline-queue";
 
 interface DashboardShellProps {
   user: {
@@ -18,18 +20,26 @@ interface DashboardShellProps {
 }
 
 export function DashboardShell({ user, children }: DashboardShellProps) {
-  const router = useRouter();
+  useEffect(()=>{configureOfflineActor(user.id);return ()=>configureOfflineActor(null);},[user.id]);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   const handleSignOut = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
+    setSignOutError(null);
+    try {
+      const response = await fetch("/api/auth/logout", { method: "POST" });
+      if (!response.ok) throw new Error();
+      configureOfflineActor(null);
+      useConsultationStore.getState().resetAll();
+      announceSessionChange();
+      window.location.assign("/login");
+    } catch { setSignOutError("Sign-out could not be completed. Please try again."); }
   };
 
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--background)]">
       <AppSidebar user={user} onSignOut={handleSignOut} />
       <main className="flex-1 overflow-y-auto">
+        {signOutError && <p role="alert" className="p-3 text-sm text-red-400">{signOutError}</p>}
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}

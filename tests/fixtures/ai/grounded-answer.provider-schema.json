@@ -1,0 +1,103 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "answerKind",
+    "answer",
+    "facts",
+    "definitions",
+    "uncertainties",
+    "citedSourceIds"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    },
+    "answerKind": {
+      "enum": [
+        "grounded",
+        "insufficient_evidence"
+      ]
+    },
+    "answer": {
+      "type": "string"
+    },
+    "facts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "evidenceIds",
+          "quotedSupport"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "evidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "quotedSupport": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "evidenceId",
+                "quote"
+              ],
+              "properties": {
+                "evidenceId": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "definitions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "referenceId"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "referenceId": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "uncertainties": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "citedSourceIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

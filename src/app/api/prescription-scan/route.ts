@@ -1,7 +1,8 @@
+import { containLegacyRoute } from "@/lib/server/containment";
 import { NextResponse } from "next/server";
 import Groq from "groq-sdk";
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+function getGroq() { return new Groq({ apiKey: process.env.GROQ_API_KEY }); }
 
 const PRESCRIPTION_EXTRACTION_PROMPT = `You are a medical prescription OCR and extraction engine for an Indian healthcare platform.
 
@@ -42,7 +43,7 @@ const VISION_MODELS = [
     "meta-llama/llama-4-scout-17b-16e-instruct",
 ];
 
-export async function POST(request: Request) {
+async function legacyPOST(request: Request) {
     try {
         const { image_base64, image_url } = await request.json();
 
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
         for (const model of VISION_MODELS) {
             try {
                 console.log(`[Prescription Scan] Trying model: ${model}`);
-                response = await groq.chat.completions.create({
+                response = await getGroq().chat.completions.create({
                     model,
                     temperature: 0.1,
                     max_tokens: 2048,
@@ -139,3 +140,6 @@ export async function POST(request: Request) {
         );
     }
 }
+
+// Quarantined pending scoped service and database-policy verification.
+export const POST = containLegacyRoute(legacyPOST);

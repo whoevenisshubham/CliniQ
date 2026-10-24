@@ -1,0 +1,369 @@
+"use client";
+import Link from "next/link";
+import {announceSessionChange} from '@/lib/client/session-events';
+import {
+  ArrowUpRight,
+  FileText,
+  LockKeyhole,
+  Plus,
+  ArrowLeft,
+  ShieldCheck,
+} from "lucide-react";
+import { ThemeToggle } from "../shared/ThemeProvider";
+
+export type DocumentRow = {
+  id: string;
+  title: string;
+  status: string;
+  revision: number;
+  current_version_id: string | null;
+  created_at?: string;
+  kind?: string;
+};
+export type SourceChunk = {
+  id: string;
+  page: number;
+  ordinal: number;
+  text: string;
+  offset_start: number;
+  offset_end: number;
+  source_class?: string;
+};
+export function RecordHeader({
+  provider = false,
+  fixture = false,
+  reception = false,
+  context,
+}: {
+  provider?: boolean;
+  fixture?: boolean;
+  reception?: boolean;
+  context?:string;
+}) {
+  return (
+    <header className="record-header">
+      <Link className="wordmark" href="/">
+        CLINIQ<span>+</span>
+      </Link>
+      <span className="header-context">
+        {context??(reception ? "Reception workspace" : provider ? "Clinician workspace" : "Personal health records")}
+      </span>
+      <div className="header-actions">
+        <ThemeToggle />
+        {!fixture && (
+          <button
+            className="quiet-button"
+            onClick={async () => {
+              const r = await fetch("/api/auth/logout", { method: "POST" });
+              if (r.ok) {announceSessionChange();window.location.assign("/login");}
+              else window.alert("Sign-out failed. Please try again.");
+            }}
+          >
+            Sign out
+          </button>
+        )}
+      </div>
+    </header>
+  );
+}
+export function RecordLayout({
+  children,
+  provider = false,
+  fixture = false,
+  section = "documents",
+  reception = false,
+}: {
+  children: React.ReactNode;
+  provider?: boolean;
+  fixture?: boolean;
+  section?: "documents" | "consultations" | "evidence" | "care" | "continuity" | "account";
+  reception?: boolean;
+}) {
+  return (
+    <div className="record-app">
+      <a className="skip-link" href="#records-main">
+        Skip to records
+      </a>
+      <RecordHeader provider={provider} fixture={fixture} reception={reception} />
+      {fixture && (
+        <p className="fixture-banner">
+          Visual fixture · synthetic layout sample · no persisted data or AI
+          explanation
+        </p>
+      )}
+      <div className="record-grid">
+        <aside className="record-nav" aria-label="Workspace navigation">
+          <p className="eyebrow">
+            {reception ? "Clinic operations" : provider ? "Clinical workspace" : "Your workspace"}
+          </p>
+          {!reception && <><Link
+            aria-current={section === "documents" ? "page" : undefined}
+            href={
+              fixture
+                ? `/design/documents?view=${provider ? "provider" : "patient"}`
+                : provider
+                  ? "/doctor/documents"
+                  : "/patient/reports"
+            }
+          >
+            <FileText size={18} /> {provider ? "Shared records" : "My records"}
+          </Link>
+          <Link aria-current={section === "consultations" ? "page" : undefined} href={fixture?`/design/consultation?view=${provider?"clinician":"patient"}`:"/consultations"}>
+            <FileText size={18}/> {provider?"Consultations":"Approved visits"}
+          </Link>
+          <Link aria-current={section === "evidence" ? "page" : undefined} href={fixture?"/design/evidence":"/evidence"}>
+            <FileText size={18}/> Source review
+          </Link></>}
+          <Link aria-current={section === "care" ? "page" : undefined} href={fixture?`/design/care?view=${reception?"reception":provider?"clinician":"patient"}`:"/care"}><FileText size={18}/>{reception?"Reception & queue":provider?"Clinic queue":"Appointments"}</Link>
+          {!provider&&!reception&&<Link aria-current={section==='continuity'?'page':undefined} href={fixture?'/design/continuity':'/continuity'}><FileText size={18}/>Medicines & tasks</Link>}
+          {!provider&&!reception&&<Link aria-current={section==='account'?'page':undefined} href={fixture?'/design/account':'/patient/account'}><ShieldCheck size={18}/>Profile & privacy</Link>}
+          <div className="nav-note">
+            <LockKeyhole size={20} />
+            <p>
+              {reception ? "Intake access does not include clinical notes or patient documents." : provider
+                ? "Documents require an explicit share. Clinical access is checked for each encounter."
+                : "Your records are private. You choose who can read each file."}
+            </p>
+          </div>
+          <p className="workspace-limit">Educational synthetic-data product</p>
+        </aside>
+        <main id="records-main" className="record-main">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
+export function DocumentList({
+  rows,
+  provider = false,
+  onSelect,
+  children,
+}: {
+  rows: DocumentRow[];
+  provider?: boolean;
+  onSelect: (id: string) => void;
+  children?: React.ReactNode;
+}) {
+  return (
+    <>
+      <div className="page-lead">
+        <div>
+          <p className="eyebrow">
+            {provider ? "Shared with you" : "A place for your health history"}
+          </p>
+          <h1>
+            {provider
+              ? "Records for the next conversation."
+              : "Your records, together."}
+          </h1>
+          <p className="lead-description">
+            {provider
+              ? "Read the original source. Keep its context. Access stays with the patient."
+              : "Keep the original, add context and share a record when it matters."}
+          </p>
+        </div>
+        {children}
+      </div>
+      <div className="section-heading">
+        <h2>{provider ? "Patient-shared documents" : "Document library"}</h2>
+        <span>
+          {rows.length} {rows.length === 1 ? "record" : "records"}
+        </span>
+      </div>
+      {rows.length ? (
+        <div className="document-list">
+          {rows.map((d) => (
+            <button
+              key={d.id}
+              className="document-row"
+              onClick={() => onSelect(d.id)}
+            >
+              <span className="document-icon">
+                <FileText size={24} />
+              </span>
+              <span className="document-row-title">
+                <strong>{d.title}</strong>
+                <span>
+                  {d.created_at
+                    ? new Date(d.created_at).toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        timeZone:"UTC",
+                      })
+                    : "Saved record"}{" "}
+                  ·{" "}
+                  {d.kind === "manual_transcript"
+                    ? "Patient-entered transcript"
+                    : "Original source"}
+                </span>
+              </span>
+              <span className="record-state">
+                {d.status === "ready"
+                  ? "Available"
+                  : d.status.replaceAll("_", " ")}
+              </span>
+              <ArrowUpRight size={19} />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="empty-records">
+          <FileText size={36} />
+          <h3>
+            {provider
+              ? "No records have been shared yet."
+              : "Start with one record."}
+          </h3>
+          <p>
+            {provider
+              ? "A care relationship alone does not grant access to documents."
+              : "Add a PDF, image or text file. It stays private until you share it."}
+          </p>
+        </div>
+      )}
+      <div className="library-footnote">
+        <ShieldCheck size={18} />
+        <p>
+          {provider
+            ? "Access is checked every time you open a record."
+            : "PDF, text, PNG or JPEG · up to 4 MiB each · 10 records / 40 MiB total"}
+        </p>
+      </div>
+    </>
+  );
+}
+export function SourceDetail({
+  title,
+  chunks,
+  status,
+  version,
+  sourceClass = "original",
+  onBack,
+  children,
+}: {
+  title: string;
+  chunks: SourceChunk[];
+  status: string;
+  version: number;
+  sourceClass?: string;
+  onBack: () => void;
+  children?: React.ReactNode;
+}) {
+  return (
+    <>
+      <button className="back-link" onClick={onBack}>
+        <ArrowLeft size={16} /> All records
+      </button>
+      <div className="page-lead detail-lead">
+        <div>
+          <p className="eyebrow">
+            {sourceClass === "manual"
+              ? "Patient-entered transcript"
+              : "Original source"}{" "}
+            · Version {version}
+          </p>
+          <h1>{title}</h1>
+          <p className="lead-description">
+            {status.replaceAll("_", " ")} · Private source record
+          </p>
+        </div>
+        {children}
+      </div>
+      <div className="source-layout">
+        <section className="source-pages" aria-label="Document source">
+          <div className="source-toolbar">
+            <h2>Source text</h2>
+            <span>
+              {chunks.length
+                ? "Page references retained"
+                : "No extracted text yet"}
+            </span>
+          </div>
+          {chunks.length ? (
+            chunks.map((c) => (
+              <article
+                tabIndex={-1}
+                className="source-page"
+                key={c.id}
+                id={"source-" + c.id}
+              >
+                <p className="eyebrow">
+                  Page {c.page} ·{" "}
+                  {c.source_class === "manual"
+                    ? "Patient-entered text"
+                    : "Extracted text"}
+                </p>
+                <p className="source-text">{c.text}</p>
+                <span className="source-offset">
+                  Characters {c.offset_start}–{c.offset_end}
+                </span>
+              </article>
+            ))
+          ) : (
+            <div className="empty-records">
+              <h3>
+                {status === "needs_transcription"
+                  ? "This file needs a transcript."
+                  : status === "encrypted"
+                    ? "This PDF is encrypted."
+                    : status === "empty"
+                      ? "No readable text was found."
+                      : status === "unsupported"
+                        ? "Automatic parsing is unavailable."
+                        : "Text is not ready yet."}
+              </h3>
+              <p>
+                The original remains available to authorized readers. You can
+                add a clearly labelled manual transcript; no OCR or AI is
+                running.
+              </p>
+            </div>
+          )}
+        </section>
+        <aside className="source-context">
+          <p className="eyebrow">Read with context</p>
+          <h2>The source comes first.</h2>
+          <p>
+            This view contains source text, not a clinical interpretation or an
+            AI explanation.
+          </p>
+          <hr />
+          <h3>Check the original</h3>
+          <p>
+            PDF reading order and tables can be ambiguous. Compare extracted
+            text with the downloaded original.
+          </p>
+          {chunks.length > 0 && (
+            <nav aria-label="Source references">
+              {chunks.map((c) => (
+                <a
+                  className="source-reference"
+                  key={c.id}
+                  href={"#source-" + c.id}
+                  onClick={() =>
+                    setTimeout(
+                      () => document.getElementById("source-" + c.id)?.focus(),
+                      0,
+                    )
+                  }
+                >
+                  Page {c.page} · passage {c.ordinal + 1}{" "}
+                  <ArrowUpRight size={14} />
+                </a>
+              ))}
+            </nav>
+          )}
+        </aside>
+      </div>
+    </>
+  );
+}
+export function AddRecordButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button className="primary-button" onClick={onClick}>
+      <Plus size={18} /> Add a record
+    </button>
+  );
+}

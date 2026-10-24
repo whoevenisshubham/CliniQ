@@ -100,25 +100,7 @@ export function VisionAnonymizer({ onContributeToRepo }: VisionAnonymizerProps) 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const processFile = useCallback(async (file: File) => {
-    if (!file.type.startsWith("image/")) {
-      return;
-    }
-
-    setOriginalFile(file);
-    setAnonymizedDataUrl(null);
-    setContributed(false);
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const dataUrl = e.target?.result as string;
-      setOriginalDataUrl(dataUrl);
-      await anonymizeImage(dataUrl);
-    };
-    reader.readAsDataURL(file);
-  }, []);
-
-  const anonymizeImage = async (dataUrl: string) => {
+  const anonymizeImage = useCallback(async (dataUrl: string) => {
     setIsProcessing(true);
 
     await new Promise<void>((resolve) => {
@@ -169,7 +151,25 @@ export function VisionAnonymizer({ onContributeToRepo }: VisionAnonymizerProps) 
       };
       img.src = dataUrl;
     });
-  };
+  }, []);
+
+  const processFile = useCallback(async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      return;
+    }
+
+    setOriginalFile(file);
+    setAnonymizedDataUrl(null);
+    setContributed(false);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const dataUrl = e.target?.result as string;
+      setOriginalDataUrl(dataUrl);
+      await anonymizeImage(dataUrl);
+    };
+    reader.readAsDataURL(file);
+  }, [anonymizeImage]);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {

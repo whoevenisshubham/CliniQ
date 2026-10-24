@@ -1,0 +1,8 @@
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["public/build-identity.json", "scripts/document-parser-worker.mjs", "node_modules/pdfjs-dist/legacy/build/**", "node_modules/pdfjs-dist/cmaps/**", "node_modules/pdfjs-dist/standard_fonts/**"]
+  external_node_modules = ["pdfjs-dist"]
+
+# This entry uses the legacy handler API; schedule must be declared in TOML.
+[functions."document-reconcile"]
+  schedule = "*/15 * * * *"

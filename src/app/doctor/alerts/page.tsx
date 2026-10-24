@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
-import { getServerUser } from "@/lib/auth";
-import { SafetyAlertsClient } from "@/components/doctor/SafetyAlertsClient";
+import { requirePrincipal } from "@/lib/server/auth/context";
 
 export default async function SafetyAlertsPage() {
-  const user = await getServerUser();
+  const user = await requirePrincipal().catch(()=>null);
   if (!user) redirect("/login");
-  if (!["doctor", "nurse"].includes(user.role)) redirect("/login");
-  return <SafetyAlertsClient user={user} />;
+  if(user.role==='nurse')redirect('/staff');
+  if(user.role!=='doctor')redirect('/login');
+  redirect('/consultations');
 }

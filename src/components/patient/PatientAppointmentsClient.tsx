@@ -61,6 +61,29 @@ interface PatientAppointmentsClientProps {
     user: { id: string; name: string; email: string; role: string };
 }
 
+async function loadAppointments(userId: string) {
+    try {
+        const res = await fetch(`/api/patients/${userId}/appointments`);
+        const data = await res.json();
+        if (data.upcoming?.length > 0 || data.past?.length > 0) {
+            const mapAppt = (a: Record<string, unknown>) => ({
+                id: a.id as string,
+                doctor: ((a.doctor as { name?: string })?.name ?? 'Doctor') as string,
+                department: ((a.doctor as { department?: string })?.department ?? '') as string,
+                date: new Date(a.date as string).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }),
+                time: (a.time_slot ?? '') as string,
+                type: (a.type ?? 'general') as 'general' | 'followup' | 'emergency' | 'teleconsult',
+                mode: (a.mode ?? 'in-person') as 'in-person' | 'teleconsult',
+                status: (a.status ?? 'confirmed') as 'confirmed' | 'completed' | 'cancelled',
+                reason: (a.reason ?? '') as string,
+            });
+            return { upcoming: (data.upcoming ?? []).map(mapAppt), past: (data.past ?? []).map(mapAppt) };
+        }
+    } catch { /* keep mock data */ }
+    return null;
+}
+
+
 export function PatientAppointmentsClient({ user }: PatientAppointmentsClientProps) {
     const [showBooking, setShowBooking] = useState(false);
     const [selectedDoctor, setSelectedDoctor] = useState("");
@@ -73,28 +96,17 @@ export function PatientAppointmentsClient({ user }: PatientAppointmentsClientPro
     const [past, setPast] = useState(MOCK_PAST_APPOINTMENTS);
 
     const fetchAppointments = useCallback(async () => {
-        try {
-            const res = await fetch(`/api/patients/${user.id}/appointments`);
-            const data = await res.json();
-            if (data.upcoming?.length > 0 || data.past?.length > 0) {
-                const mapAppt = (a: Record<string, unknown>) => ({
-                    id: a.id as string,
-                    doctor: ((a.doctor as { name?: string })?.name ?? 'Doctor') as string,
-                    department: ((a.doctor as { department?: string })?.department ?? '') as string,
-                    date: new Date(a.date as string).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }),
-                    time: (a.time_slot ?? '') as string,
-                    type: (a.type ?? 'general') as 'general' | 'followup' | 'emergency' | 'teleconsult',
-                    mode: (a.mode ?? 'in-person') as 'in-person' | 'teleconsult',
-                    status: (a.status ?? 'confirmed') as 'confirmed' | 'completed' | 'cancelled',
-                    reason: (a.reason ?? '') as string,
-                });
-                if (data.upcoming?.length > 0) setUpcoming(data.upcoming.map(mapAppt));
-                if (data.past?.length > 0) setPast(data.past.map(mapAppt));
-            }
-        } catch { /* keep mock data */ }
+        const rows = await loadAppointments(user.id);
+        if (rows) { setUpcoming(rows.upcoming); setPast(rows.past); }
     }, [user.id]);
 
-    useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
+    useEffect(() => {
+        let active = true;
+        loadAppointments(user.id).then(rows => {
+            if (active && rows) { setUpcoming(rows.upcoming); setPast(rows.past); }
+        });
+        return () => { active = false; };
+    }, [user.id]);
 
     const selectedDoctorData = AVAILABLE_DOCTORS.find((d) => d.id === selectedDoctor);
 

@@ -801,8 +801,8 @@ export function ActiveConsultationClient({
     patientName,
     transcript,
     durationMs,
-    autoSave: true,
-    autoSync: true,
+    autoSave: false,
+    autoSync: false,
   });
 
 

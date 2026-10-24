@@ -1,0 +1,75 @@
+import {beforeAll,afterAll,it,expect,vi} from 'vitest';
+import {createClient,type SupabaseClient} from '@supabase/supabase-js';
+import {createServerClient} from '@supabase/ssr';
+import {readFileSync} from 'node:fs';import {randomUUID} from 'node:crypto';
+import {localConfiguration,root} from '../../scripts/local-supabase.mjs';
+import {GET,POST} from '@/app/api/continuity/route';
+import {continuityResponse} from '@/lib/client/workspace-response';
+import {emptySnapshot,type ClinicalSnapshot} from '@/lib/contracts/clinical';
+const state=vi.hoisted(()=>({jar:null as null|{getAll:()=>{name:string;value:string}[];set:(n:string,v:string)=>void;delete:(n:string)=>void}}));
+vi.mock('next/headers',()=>({cookies:async()=>state.jar}));
+const cfg=localConfiguration(),fixture=JSON.parse(readFileSync(root+'/tests/infra/.runtime/fixture.json','utf8'));
+const admin=createClient(cfg.API_URL,cfg.SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}}),actors:Record<string,{id:string;email:string;password:string;patient?:string}>={},clients:Record<string,SupabaseClient>={},jars:Record<string,NonNullable<typeof state.jar>>={};
+const workspace=fixture.ids.workspaceA,origin='http://localhost:3000',today=new Date().toISOString().slice(0,10),date=(delta:number)=>new Date(Date.parse(today)+delta*86400000).toISOString().slice(0,10);
+let cid='',approved='',rx='',scheduleId='',pastTask='',followup='';let scheduleBody:Record<string,unknown>;
+const medId=randomUUID();const snapshot:ClinicalSnapshot={...emptySnapshot(),chief_complaint:'Synthetic continuing-care review',medications:[{id:medId,name:'Synthetic approved medicine',dose:'2.5 mg',frequency:'Original twice daily wording',duration:'14 days',route:'oral',instructions:null,unknownFields:[]}]};
+function make(){const values=new Map<string,string>();const jar={getAll:()=>[...values].map(([name,value])=>({name,value})),set:(n:string,v:string)=>{values.set(n,v);},delete:(n:string)=>{values.delete(n);}};return{jar,client:createServerClient(cfg.API_URL,cfg.ANON_KEY,{cookies:{getAll:jar.getAll,setAll:vs=>vs.forEach(v=>jar.set(v.name,v.value))}})};}
+async function change(body:unknown,actor='patient',key=randomUUID()){state.jar=jars[actor];const r=await POST(new Request(origin+'/api/continuity',{method:'POST',headers:{origin,'content-type':'application/json','idempotency-key':key},body:JSON.stringify(body)}));if(r.ok)expect(continuityResponse(await r.clone().json(),true)).toBe(true);return r;}
+async function view(actor='patient',encounter?:string){state.jar=jars[actor];const r=await GET(new Request(origin+'/api/continuity'+(encounter?'?encounter='+encounter:'')));expect(r.status).toBe(200);const b=await r.json();expect(continuityResponse(b)).toBe(true);return b.data;}
+async function clinical(command:unknown){const r=await clients.doctor.rpc('clinical_mutate',{k:randomUUID(),command});expect(r.error).toBeNull();return r.data;}
+beforeAll(async()=>{vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL',cfg.API_URL);vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY',cfg.ANON_KEY);vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY',cfg.SERVICE_ROLE_KEY);vi.stubEnv('APP_ORIGIN',origin);
+ for(const [name,role] of [['patient','patient'],['other','patient'],['doctor','doctor']]){const id=randomUUID(),email='continuity.'+randomUUID()+'@synthetic.example.test',password=randomUUID()+randomUUID();const user=await admin.auth.admin.createUser({email,password,email_confirm:true});expect(user.error).toBeNull();expect((await admin.from('users').insert({id,auth_user_id:user.data.user!.id,email,name:'Synthetic '+name,role,is_active:true})).error).toBeNull();actors[name]={id,email,password};if(role==='patient'){const patient=randomUUID();expect((await admin.from('patients').insert({id:patient,user_id:id,name:'Synthetic '+name})).error).toBeNull();actors[name].patient=patient;}else expect((await admin.from('workspace_memberships').insert({workspace_id:workspace,user_id:id,role})).error).toBeNull();}
+ expect((await admin.from('care_relationships').insert({patient_id:actors.patient.patient,provider_id:actors.doctor.id,workspace_id:workspace,scope:'clinical',granted_by:actors.patient.id})).error).toBeNull();
+ for(const [name,a] of Object.entries({...actors,reception:fixture.actors.reception,doctorU:fixture.actors.doctorU,doctorB:fixture.actors.doctorB}) as [string,{email:string;password:string}][]){const c=make();expect((await c.client.auth.signInWithPassword(a)).error).toBeNull();clients[name]=c.client;jars[name]=c.jar;}
+ cid=(await clinical({action:'create',patientId:actors.patient.patient,workspaceId:workspace})).consultationId;await clinical({action:'save',consultationId:cid,expectedRevision:0,snapshot});approved=(await clinical({action:'finalize',consultationId:cid,expectedRevision:1,reviewedDraftRevision:1,confirmed:true,acknowledgements:{}})).approvedVersionId;
+ const r=await clients.patient.from('prescriptions').select('id').eq('approved_emr_version_id',approved).single();expect(r.error).toBeNull();rx=r.data!.id;
+},60000);afterAll(()=>vi.unstubAllEnvs());
+it('lists exact approved medicine wording and rejects another owner, staff and forged authority fields',async()=>{
+ const d=await view();expect(d.prescriptions).toHaveLength(1);expect(d.prescriptions[0]).toMatchObject({id:rx,dosage:'2.5 mg',frequency:'Original twice daily wording',duration:'14 days',route:'oral'});expect((await view('other')).prescriptions).toEqual([]);
+ scheduleBody={action:'save_schedule',prescriptionId:rx,localTimes:['00:00'],timeZone:'UTC',startsOn:date(-1),endsOn:date(1),enabled:true,expectedRevision:null};
+ expect((await change(scheduleBody,'other')).status).toBe(404);expect((await change(scheduleBody,'reception')).status).toBe(404);expect((await change({...scheduleBody,ownerId:actors.patient.id})).status).toBe(400);expect((await change({...scheduleBody,localTimes:['09:00','09:00']})).status).toBe(422);
+ expect((await clients.patient.from('medication_schedules').insert({patient_id:actors.patient.patient})).error?.code).toBe('42501');
+});
+it('persists explicitly selected tracking times without inferring them from directions and deduplicates retries/materialization',async()=>{
+ const key=randomUUID(),r=await change(scheduleBody,'patient',key);expect(r.status).toBe(200);const result=(await r.json()).data;scheduleId=result.scheduleId;expect((await change(scheduleBody,'patient',key)).status).toBe(200);
+ expect((await admin.rpc('continuity_reconcile')).error).toBeNull();const d=await view(),s=d.schedules[0];expect(s).toMatchObject({id:scheduleId,local_times:['00:00'],time_zone:'UTC',starts_on:date(-1),ends_on:date(1),revision:0});
+ const reminders=d.tasks.filter((t:{schedule_id:string})=>t.schedule_id===scheduleId);expect(reminders).toHaveLength(3);expect(new Set(reminders.map((t:{due_at:string})=>t.due_at)).size).toBe(3);pastTask=reminders.find((t:{due_at:string})=>t.due_at.startsWith(date(-1))).id;
+ const before=await admin.from('notifications').select('id').eq('schedule_id',scheduleId);expect(before.error).toBeNull();expect((await admin.rpc('continuity_reconcile')).data).toBe(0);expect((await admin.from('notifications').select('id').eq('schedule_id',scheduleId)).data).toEqual(before.data);
+ expect(d.prescriptions[0].frequency).toBe('Original twice daily wording');expect((await change({...scheduleBody,localTimes:['01:00']},'patient',key)).status).toBe(409);
+});
+it('self-reports are idempotent and corrections retain previous states; not-recorded is not a missed dose',async()=>{
+ const key=randomUUID(),body={action:'report_adherence',taskId:pastTask,status:'taken',expectedRevision:null};const r=await change(body,'patient',key);expect(r.status).toBe(200);const result=(await r.json()).data;expect((await(await change(body,'patient',key)).json()).data.eventId).toBe(result.eventId);
+ const correction=await change({...body,status:'missed',expectedRevision:0,correctionReason:'Synthetic correction after checking my record.'});expect(correction.status).toBe(200);
+ expect((await change({...body,status:'taken',expectedRevision:0,correctionReason:'Synthetic stale correction.'})).status).toBe(409);
+ expect((await change({...body,status:'not_recorded',expectedRevision:1,correctionReason:'Synthetic report withdrawn because status is unknown.'})).status).toBe(200);
+ const d=await view();expect(d.adherence).toHaveLength(1);expect(d.adherence[0]).toMatchObject({status:'not_recorded',revision:2});expect(d.adherence[0].history.map((h:{status:string})=>h.status)).toEqual(['taken','missed','not_recorded']);expect(d.tasks.find((t:{id:string})=>t.id===pastTask).completed_at).toBeNull();
+ expect((await clients.patient.from('adherence_event_revisions').update({status:'taken'}).eq('event_id',result.eventId)).error?.code).toBe('42501');
+});
+it('read/completed task state does not imply a dose report or create a confirmed appointment',async()=>{
+ const before=await admin.from('appointments').select('id').eq('patient_id',actors.patient.patient);expect(before.error).toBeNull();const dueAt=new Date(Date.now()+86400000).toISOString();const r=await change({action:'follow_up',approvedVersionId:approved,dueAt},'doctor');expect(r.status).toBe(200);const result=(await r.json()).data;followup=result.taskId;expect(result.state).toBe('intention_not_booking');
+ expect((await admin.from('appointments').select('id').eq('patient_id',actors.patient.patient)).data).toEqual(before.data);
+ const d=await view();const med=d.tasks.find((t:{id:string})=>t.id===pastTask);expect((await change({action:'task_state',taskId:pastTask,expectedRevision:med.revision,state:'complete'})).status).toBe(400);
+ expect((await change({action:'task_state',taskId:followup,expectedRevision:0,state:'read'})).status).toBe(200);expect((await change({action:'task_state',taskId:followup,expectedRevision:1,state:'complete'})).status).toBe(200);
+ const task=(await view()).tasks.find((t:{id:string})=>t.id===followup);expect(task.read_at).toBeTruthy();expect(task.completed_at).toBeTruthy();expect(task.kind).toBe('follow_up');
+});
+it('schedule edits cancel obsolete intentions, preserve reports and convert midnight using the explicit tracking zone',async()=>{
+ const indiaToday=new Date(Date.now()+330*60000).toISOString().slice(0,10),indiaDay=new Date(Date.parse(indiaToday)-86400000).toISOString().slice(0,10);
+ const r=await change({...scheduleBody,localTimes:['00:15'],timeZone:'Asia/Kolkata',startsOn:indiaDay,endsOn:indiaDay,expectedRevision:0});expect(r.status).toBe(200);expect((await admin.rpc('continuity_reconcile')).error).toBeNull();
+ const d=await view(),old=d.tasks.filter((t:{schedule_id:string;due_at:string})=>t.schedule_id===scheduleId&&new Date(t.due_at).toISOString().endsWith('T00:00:00.000Z'));expect(old).toHaveLength(3);expect(old.every((t:{cancelled_at:string})=>!!t.cancelled_at)).toBe(true);
+ const expected=new Date(Date.parse(indiaDay+'T00:15:00Z')-330*60000).toISOString();const current=d.tasks.find((t:{schedule_id:string;cancelled_at:string|null})=>t.schedule_id===scheduleId&&!t.cancelled_at);expect(new Date(current.due_at).toISOString()).toBe(expected);expect(current.display_time_zone).toBe('Asia/Kolkata');expect(d.adherence[0].history).toHaveLength(3);
+ expect((await change({...scheduleBody,expectedRevision:0})).status).toBe(409);
+});
+it('new sessions reload persisted preferences and active care alone does not reveal another provider’s tracking context',async()=>{
+ expect((await clients.patient.auth.signOut()).error).toBeNull();const c=make();expect((await c.client.auth.signInWithPassword({email:actors.patient.email,password:actors.patient.password})).error).toBeNull();clients.patient=c.client;jars.patient=c.jar;expect((await view()).schedules[0].local_times).toEqual(['00:15']);
+ expect((await admin.from('care_relationships').insert({patient_id:actors.patient.patient,provider_id:fixture.actors.doctorU.appId,workspace_id:workspace,scope:'clinical',granted_by:actors.patient.id})).error).toBeNull();const created=await clients.doctorU.rpc('clinical_mutate',{k:randomUUID(),command:{action:'create',patientId:actors.patient.patient,workspaceId:workspace}});expect(created.error).toBeNull();const foreign=await view('doctorU',created.data.consultationId);expect(foreign.prescriptions).toEqual([]);expect(foreign.schedules).toEqual([]);expect(foreign.adherence).toEqual([]);
+ state.jar=jars.doctorB;expect((await GET(new Request(origin+'?encounter='+cid))).status).toBe(404);
+});
+it('unclaimed follow-up intentions remain private even when recipient identity is null',async()=>{
+ const p=randomUUID();expect((await admin.from('patients').insert({id:p,name:'Synthetic unclaimed follow-up patient'})).error).toBeNull();expect((await admin.from('care_relationships').insert({patient_id:p,provider_id:actors.doctor.id,workspace_id:workspace,scope:'clinical',granted_by:actors.doctor.id})).error).toBeNull();const c=(await clinical({action:'create',patientId:p,workspaceId:workspace})).consultationId;await clinical({action:'save',consultationId:c,expectedRevision:0,snapshot:{...emptySnapshot(),chief_complaint:'Synthetic unclaimed follow-up'}});const v=(await clinical({action:'finalize',consultationId:c,expectedRevision:1,reviewedDraftRevision:1,confirmed:true,acknowledgements:{}})).approvedVersionId;
+ const r=await change({action:'follow_up',approvedVersionId:v,dueAt:new Date(Date.now()+86400000).toISOString()},'doctor');expect(r.status).toBe(200);const id=(await r.json()).data.taskId;expect((await admin.from('notifications').select('recipient_id').eq('id',id).single()).data!.recipient_id).toBeNull();expect((await change({action:'task_state',taskId:id,expectedRevision:0,state:'read'},'other')).status).toBe(404);expect((await view('doctor',c)).tasks.some((t:{id:string})=>t.id===id)).toBe(true);
+});
+it('approved amendments invalidate prior tracking and follow-up intentions without fabricating new tracking preferences',async()=>{
+ const current=(await view()).schedules[0];expect((await change({...scheduleBody,expectedRevision:current.revision,startsOn:today,endsOn:date(1),enabled:true})).status).toBe(200);
+ const child=(await clinical({action:'amend',approvedVersionId:approved})).consultationId;const changed=structuredClone(snapshot);changed.medications[0].dose='1.25 mg';await clinical({action:'save',consultationId:child,expectedRevision:0,snapshot:changed});await clinical({action:'finalize',consultationId:child,expectedRevision:1,reviewedDraftRevision:1,confirmed:true,acknowledgements:{}});
+ const d=await view();expect(d.schedules).toHaveLength(1);expect(d.schedules[0].enabled).toBe(false);expect(d.prescriptions.find((r:{id:string})=>r.id===rx).current_source).toBe(false);expect(d.prescriptions.some((r:{dosage:string;current_source:boolean})=>r.current_source&&r.dosage==='1.25 mg')).toBe(true);expect(d.tasks.filter((t:{resource_id:string;kind:string})=>t.resource_id===approved&&['follow_up','medication_reminder'].includes(t.kind)).every((t:{cancelled_at:string})=>!!t.cancelled_at)).toBe(true);expect(d.adherence[0].history).toHaveLength(3);expect((await change({...scheduleBody,expectedRevision:d.schedules[0].revision})).status).toBe(404);
+});

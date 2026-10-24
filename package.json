@@ -3,13 +3,23 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prebuild": "node scripts/write-build-identity.mjs",
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit --incremental false",
+    "test:unit": "vitest run",
+    "test:integration:prepare": "node scripts/prepare-isolated.mjs --apply-local-synthetic",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "setup:demo:local": "node scripts/setup-demo.mjs --local-synthetic",
+    "jobs:local": "node --conditions=react-server --import tsx scripts/run-document-jobs.ts --local-synthetic",
+    "eval:offline": "vitest run --config vitest.integration.config.ts tests/integration/ai.test.ts"
   },
   "dependencies": {
     "@deepgram/sdk": "^4.11.3",
+    "@fontsource-variable/geist": "5.3.0",
+    "@fontsource-variable/geist-mono": "5.3.0",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-collapsible": "^1.1.12",
     "@radix-ui/react-dialog": "^1.1.15",
@@ -35,9 +45,11 @@
     "lucide-react": "^0.575.0",
     "next": "16.1.6",
     "next-themes": "^0.4.6",
+    "pdfjs-dist": "6.4.299",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.7.0",
+    "server-only": "0.0.1",
     "tailwind-merge": "^3.5.0",
     "zustand": "^5.0.11"
   },
@@ -48,7 +60,12 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "jsdom": "27.3.0",
+    "pg": "8.23.1",
+    "supabase": "2.122.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "tsx": "4.23.15",
+    "typescript": "^5",
+    "vitest": "4.0.18"
   }
 }
