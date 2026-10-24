@@ -4,6 +4,8 @@ import Link from 'next/link';
 import {SupportedAnswer} from './SupportedAnswer';
 import { RecordLayout } from '../documents/DocumentSurface';
 import type { Evidence, GroundedAnswer } from '@/lib/contracts/ai';
+import {accessDenied,readJsonResponse} from '@/lib/client/http-response';
+import {evidenceResponse} from '@/lib/client/workspace-response';
 type Message = {
     id: string;
     kind: string;
@@ -25,8 +27,7 @@ type Thread = {
     consultation_id: string | null;
     created_at: string;
 };
-async function serverApi(path: string, init?: RequestInit) { const r = await fetch(path, { ...init, cache: 'no-store', signal: AbortSignal.timeout(30000) }); const b = await r.json(); if (!r.ok)
-    throw Object.assign(new Error(b.error?.message ?? 'Evidence service unavailable.'), { status: r.status }); return b.data; }
+async function serverApi(path: string, init?: RequestInit) { const r = await fetch(path, { ...init, cache: 'no-store', signal: AbortSignal.any([AbortSignal.timeout(30000),...(init?.signal?[init.signal]:[])]) });return (await readJsonResponse(r,b=>evidenceResponse(b,path,!!init?.method))).data; }
 const labels: Record<string, string> = { queued: 'Queued', running: 'Processing', succeeded: 'Saved result', unavailable: 'Generation unavailable', rejected: 'Output rejected', exhausted: 'Allowance exhausted', outcome_unknown: 'Provider outcome unknown', stale: 'Source changed', cancelled: 'Access revoked', failed: 'Processing failed' };
 export function EvidenceWorkspace({ actorId, provider, initialThread = null, consultationId = null, initialDocumentId = null, fixture }: {
     actorId: string;
@@ -56,14 +57,15 @@ export function EvidenceWorkspace({ actorId, provider, initialThread = null, con
         path: string;
         body: unknown;
         key: string;
-    } | null>(null), serial = useRef(0), busyRef = useRef(false), live = useRef(true);
-    const load = async () => { const seq = ++serial.current; try {
-        const list = await api('/api/ai/threads');
+    } | null>(null), serial = useRef(0), context=useRef(0),denied=useRef(false),reads=useRef<AbortController|null>(null), busyRef = useRef(false), live = useRef(true);
+    const hideAccess=useCallback((e:unknown)=>{if(!accessDenied(e))return;denied.current=true;++serial.current;++context.current;reads.current?.abort();pending.current=null;setThreads([]);setThread(null);setMessages([]);setDocuments([]);setQuestion('');setDocumentId('');setActive(null);setExpired(true);},[]);
+    const load = async () => { if(denied.current)return;const seq = ++serial.current;reads.current?.abort();const c=new AbortController();reads.current=c;setLoading(true);try {
+        const list = await api('/api/ai/threads',{signal:c.signal});
         if (!live.current || seq !== serial.current)
             return;
         setThreads(list);
         if (selected) {
-            const d = await api('/api/ai/threads/' + selected);
+            const d = await api('/api/ai/threads/' + selected,{signal:c.signal});
             if (!live.current || seq !== serial.current)
                 return;
             setThread(d.thread);
@@ -77,33 +79,32 @@ export function EvidenceWorkspace({ actorId, provider, initialThread = null, con
         }
     }
     catch (e) {
-        if (live.current) {
+        if (live.current && seq===serial.current) {
             setError(e instanceof Error ? e.message : 'Unable to load source review.');
-            if ((e as {
-                status?: number;
-            }).status === 401)
-                setExpired(true);
+            hideAccess(e);
         }
     }
     finally {
-        if (live.current)
+        if (live.current && seq===serial.current)
             setLoading(false);
     } };
     const loadRef = useRef(load);
     loadRef.current = load;
-    useEffect(() => { live.current = true; void loadRef.current(); return () => { live.current = false; }; }, [selected, actorId]);
+    const invalidate=useCallback(()=>{++serial.current;++context.current;reads.current?.abort();},[]);
+    useEffect(() => { live.current = true; void loadRef.current(); return () => { live.current = false;invalidate(); }; }, [selected, actorId,invalidate]);
     useEffect(() => { const focus = () => { if (!busyRef.current)
         void loadRef.current(); }; window.addEventListener('focus', focus); return () => window.removeEventListener('focus', focus); }, []);
     useEffect(() => {
         if (!active)
             return;
         let stopped = false, timer: ReturnType<typeof setTimeout> | undefined;
+        const generation=context.current,controller=new AbortController();
         const started = Date.now();
         let n = 0;
-        const poll = async () => { if (stopped || document.hidden || Date.now() - started > 60000)
+        const poll = async () => { if (stopped || !live.current || denied.current || generation!==context.current || document.hidden || Date.now() - started > 60000)
             return; try {
-            const v = await api('/api/jobs/' + active);
-            if (stopped)
+            const v = await api('/api/jobs/' + active,{signal:controller.signal});
+            if (stopped || !live.current || generation!==context.current || denied.current)
                 return;
             setMessages(old => old.map(m => m.id === active ? { ...m, state: v.state, result: v.result, resultKind: v.resultKind, sources: v.sources, sourceHash: v.sourceHash, errorCode: v.errorCode } : m));
             if (!['queued', 'running'].includes(v.state)) {
@@ -112,31 +113,30 @@ export function EvidenceWorkspace({ actorId, provider, initialThread = null, con
             }
         }
         catch (e) {
-            if (!stopped) {
+            if (!stopped && live.current && generation===context.current) {
                 setError(e instanceof Error ? e.message : 'Job state unavailable.');
-                if ((e as {
-                    status?: number;
-                }).status === 401)
-                    setExpired(true);
+                hideAccess(e);
             }
         } timer = setTimeout(poll, n++ < 2 ? 2000 : n < 5 ? 5000 : 10000); };
         const visibility = () => { if (!document.hidden)
             void poll(); };
         document.addEventListener('visibilitychange', visibility);
         timer = setTimeout(poll, 2000);
-        return () => { stopped = true; if (timer)
+        return () => { stopped = true;controller.abort(); if (timer)
             clearTimeout(timer); document.removeEventListener('visibilitychange', visibility); };
-    }, [active, api]);
+    }, [active, api,selected,actorId,hideAccess]);
     async function send(path: string, body: unknown, retry = false) {
-        if (busyRef.current || pending.current && !retry)
+        if (!live.current||denied.current||busyRef.current || pending.current && !retry)
             return;
         busyRef.current = true;
         setBusy(true);
         setError('');
-        const op = retry && pending.current ? pending.current : { path, body, key: crypto.randomUUID() };
+        const generation=context.current;
+        const op = retry && pending.current ? pending.current : { path, body:structuredClone(body), key: crypto.randomUUID() };
         pending.current = op;
         try {
             const data = await api(op.path, { method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': op.key }, body: JSON.stringify(op.body) });
+            if(!live.current||generation!==context.current)return;
             pending.current = null;
             if (data.threadId) {
                 setQuestion('');
@@ -150,18 +150,18 @@ export function EvidenceWorkspace({ actorId, provider, initialThread = null, con
             }
         }
         catch (e) {
+            if(!live.current||generation!==context.current)return;
             setError(e instanceof Error ? e.message : 'Request failed.');
             const status = (e as {
                 status?: number;
             }).status;
             if (status && status < 500)
                 pending.current = null;
-            if (status === 401)
-                setExpired(true);
+            hideAccess(e);
         }
         finally {
             busyRef.current = false;
-            setBusy(false);
+            if(live.current)setBusy(false);
         }
     }
     const sources = [...new Map(messages.flatMap(m => m.sources ?? []).map(s => [s.evidenceId, s])).values()];

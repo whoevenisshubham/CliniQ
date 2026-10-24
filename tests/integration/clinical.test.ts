@@ -1,4 +1,5 @@
 import { beforeAll, afterAll, it, expect, vi } from "vitest";
+import {clinicalResponse} from '@/lib/client/workspace-response';
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { readFileSync } from "node:fs";
@@ -38,12 +39,13 @@ const origin = "http://localhost:3000";
 function make() { const values = new Map<string, string>(); const jar = { getAll: () => [...values].map(([name, value]) => ({ name, value })), set: (n: string, v: string) => { values.set(n, v); }, delete: (n: string) => { values.delete(n); } }; return { jar, client: createServerClient(config.API_URL, config.ANON_KEY, { cookies: { getAll: jar.getAll, setAll: items => items.forEach(x => jar.set(x.name, x.value)) } }) }; }
 async function call(command: unknown, key = randomUUID(), actor = "doctor") {
     state.jar = jars[actor];
-    return mutate(new Request(origin + "/api/clinical", { method: "POST", headers: { origin, "content-type": "application/json", "idempotency-key": key }, body: JSON.stringify(command) }));
+    const r=await mutate(new Request(origin + "/api/clinical", { method: "POST", headers: { origin, "content-type": "application/json", "idempotency-key": key }, body: JSON.stringify(command) }));
+    if(r.ok)expect(clinicalResponse(await r.clone().json(),'/api/clinical',true)).toBe(true);return r;
 }
 const creation = () => ({ action: "create", patientId, workspaceId: workspace });
 const save = () => ({ action: "save", consultationId: encounter, expectedRevision: revision, snapshot });
 const finalize = () => ({ action: "finalize", consultationId: encounter, expectedRevision: revision, reviewedDraftRevision: revision, confirmed: true, acknowledgements: {} });
-async function current() { state.jar = jars.doctor; const r = await detail(new Request(origin), { params: Promise.resolve({ id: encounter }) }); expect(r.status).toBe(200); return (await r.json()).data; }
+async function current() { state.jar = jars.doctor; const r = await detail(new Request(origin), { params: Promise.resolve({ id: encounter }) }); expect(r.status).toBe(200);const b=await r.json();expect(clinicalResponse(b,'/api/clinical/'+encounter)).toBe(true);return b.data; }
 beforeAll(async () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", config.API_URL);
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", config.ANON_KEY);

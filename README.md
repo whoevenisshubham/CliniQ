@@ -60,7 +60,7 @@ The application opens patient/provider accounts at `/records`; `/patient/reports
 
 ## Worker operation
 
-See the [route/role/action map](docs/routes-and-roles.md) and [operational recovery contract](docs/operations-recovery.md) for connected navigation, partial failures and remaining acceptance boundaries.
+See the [route/role/action map](docs/routes-and-roles.md), [client privacy and uncertain-operation recovery](docs/client-reliability.md), and [operational recovery contract](docs/operations-recovery.md) for connected navigation, partial failures and remaining acceptance boundaries.
 
 Admission commits a durable job before dispatch. Configure a server-only `DOCUMENT_DISPATCH_SECRET` of at least 32 characters for authenticated background dispatch. The worker claims one job with a 90-second lease, increasing fence and at most three attempts. Publication checks the current document revision/version and unexpired claim. The scheduled reconciler performs a bounded exact-key cleanup and dispatches the same runner. Preview schedules are not assumed to run; use explicit maintenance or the isolated local runner.
 

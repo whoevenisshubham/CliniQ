@@ -6,6 +6,8 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { RecordLayout } from "../documents/DocumentSurface";
 import {SpeechCapture} from './SpeechCapture';
 import { emptySnapshot, type ClinicalSnapshot, type Medication, type SavedSegment } from "@/lib/contracts/clinical";
+import {accessDenied,readJsonResponse} from '@/lib/client/http-response';
+import {clinicalResponse} from '@/lib/client/workspace-response';
 type Approved = {
     id: string;
     consultation_id: string;
@@ -86,15 +88,9 @@ type Listing = {
     }[];
     approved?: Approved[];
 };
-class RequestError extends Error {
-    constructor(message: string, public status: number) { super(message); }
-}
 async function api(path: string, init?: RequestInit) {
-    const r = await fetch(path, { ...init, cache: "no-store", signal: AbortSignal.timeout(30000) });
-    const b = await r.json();
-    if (!r.ok)
-        throw new RequestError(b.error?.message ?? "The request failed.", r.status);
-    return b.data;
+    const r = await fetch(path, { ...init, cache: "no-store", signal: AbortSignal.any([AbortSignal.timeout(30000),...(init?.signal?[init.signal]:[])]) });
+    return (await readJsonResponse(r,b=>clinicalResponse(b,path,!!init?.method))).data;
 }
 // The manual findings/transcript/review vocabulary is retained from CliniQ's
 // ActiveConsultationClient/LiveTranscriptPanel. Authoritative orchestration is
@@ -112,6 +108,7 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
     const [patientChoice, setPatientChoice] = useState("");
     const [contextOpen, setContextOpen] = useState(false);
     const [captureBusy,setCaptureBusy]=useState(false);
+    const [accessLost,setAccessLost]=useState(false),[notice,setNotice]=useState('');
 
     const pending = useRef<{
         key: string;
@@ -119,19 +116,22 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
         path?: string;
     } | null>(null), epoch = useRef(0), dirtyRef = useRef(false);
     dirtyRef.current = dirty;
-    const mounted = useRef(true);
+    const mounted = useRef(true),denied=useRef(false),reads=useRef<AbortController|null>(null),mutationLock=useRef(false);
     const reviewButtonRef = useRef<HTMLButtonElement>(null);
     const transcriptRef = useRef(transcript);
     transcriptRef.current = transcript;
+    const hideAccess=useCallback((e:unknown)=>{if(!accessDenied(e))return;denied.current=true;++epoch.current;reads.current?.abort();pending.current=null;dirtyRef.current=false;setListing(null);setDetail(null);setSnapshot(emptySnapshot());setTranscript('');setPatientChoice('');setReview(false);setReasons({});setConfirmed(false);setDirty(false);setNotice('');setAccessLost(true);},[]);
     const load = useCallback(async (id: string | null, replace = false) => {
+        if(denied.current)return;
         const token = ++epoch.current;
+        reads.current?.abort();const controller=new AbortController();reads.current=controller;
         try {
             if (fixture) {
                 setDetail(fixture);
                 setStatus("visual fixture");
                 return;
             }
-            const data = id ? await api(`/api/clinical/${id}`) : await api("/api/clinical");
+            const data = await api(id?`/api/clinical/${id}`:"/api/clinical",{signal:controller.signal});
             if (!mounted.current || token !== epoch.current)
                 return;
             if (id) {
@@ -157,15 +157,16 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
             }
         }
         catch (e) {
-            if (token !== epoch.current)
+            if (!mounted.current || token !== epoch.current)
                 return;
             setError(e instanceof Error ? e.message : "Unable to load consultation.");
-            setStatus(e instanceof RequestError && e.status === 401 ? "session expired" : "failed");
+            hideAccess(e);setStatus("view unavailable");
         }
-    }, [fixture, detail?.visit.revision]);
+    }, [fixture, detail?.visit.revision,hideAccess]);
     const loadRef = useRef(load);
     loadRef.current = load;
-    useEffect(() => { mounted.current = true; void loadRef.current(selected); return () => { mounted.current = false; }; }, [selected, actorId]);
+    const invalidate=useCallback(()=>{++epoch.current;reads.current?.abort();},[]);
+    useEffect(() => { mounted.current = true; void loadRef.current(selected); return () => { mounted.current = false;invalidate(); }; }, [selected, actorId,invalidate]);
     useEffect(() => {
         const focus = () => {
             if (!busy && !pending.current)
@@ -183,19 +184,23 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
     }, [selected, busy]);
     function edit(next: ClinicalSnapshot) { setSnapshot(next); setDirty(true); setStatus("unsaved"); setConfirmed(false); }
     async function commit(command: unknown, retry = false, path = "/api/clinical") {
-        if (busy || pending.current && !retry)
+        if (!mounted.current||denied.current||mutationLock.current||busy || pending.current && !retry)
             return;
+        mutationLock.current=true;const token=epoch.current;
         setBusy(true);
         setError("");
+        setNotice('');
         setStatus("saving");
-        const operation = retry && pending.current ? pending.current : { key: crypto.randomUUID(), command, path };
+        const operation = retry && pending.current ? pending.current : { key: crypto.randomUUID(), command:structuredClone(command), path };
         pending.current = operation;
         try {
             if (fixture)
                 throw new Error("Visual fixture only. Changes are not persisted.");
             const committed = retry ? await api("/api/clinical/operations/" + operation.key) : null;
             const result = committed ?? await api(operation.path ?? "/api/clinical", { method: "POST", headers: { "content-type": "application/json", "idempotency-key": operation.key }, body: JSON.stringify(operation.command) });
+            if(!mounted.current||token!==epoch.current)return;
             pending.current = null;
+            setNotice('Saved to the clinical record.');
             setDirty(false);
             dirtyRef.current = false;
             setTranscript("");
@@ -210,19 +215,23 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
                 await loadRef.current(selected, true);
         }
         catch (e) {
+            if(!mounted.current||token!==epoch.current)return;
             const message = e instanceof Error ? e.message : "Save failed.";
             setError(message);
-            setStatus(e instanceof RequestError && e.status === 409 ? "conflicted" : e instanceof RequestError && e.status === 401 ? "session expired" : "failed");
+            const status=(e as{status?:number}).status;
+            setStatus(status===409?"conflicted":status&&status<500?"request rejected":"outcome unconfirmed");
             // Known rejected requests did not commit. Ambiguous transport failures keep
             // the exact request/key; only retry/reconcile is allowed until resolved.
-            if (e instanceof RequestError && e.status < 500 || fixture)
+            if (status && status < 500 || fixture)
                 pending.current = null;
+            hideAccess(e);
         }
         finally {
-            setBusy(false);
+            mutationLock.current=false;if(mounted.current)setBusy(false);
         }
     }
     const locked = busy || captureBusy || status === "session expired" || !!pending.current;
+    if(accessLost)return <RecordLayout provider={provider} section="consultations"><h1>Access changed</h1><p>Private clinical content and local drafts have been hidden.</p><Link href="/login">Sign in again</Link></RecordLayout>;
     const active = detail?.visit.status === "active";
     const notices = [...snapshot.medications.flatMap(m => [...m.unknownFields.map(f => ({ key: `${m.id}:${f}`, text: `${m.name}: ${f} is explicitly unknown.` })), ...(detail?.patient.allergies.some(a => a.trim().toLowerCase() === m.name.trim().toLowerCase()) ? [{ key: `allergy:${m.id}`, text: `${m.name} exactly matches a saved allergy label. Review the source facts.` }] : [])]), ...Array.from(new Set(snapshot.vitals.map(v => v.name))).filter(name => new Set(snapshot.vitals.filter(v => v.name === name).map(v => v.unit)).size > 1).map(name => ({ key: `unit:${name}`, text: `${name} has conflicting recorded units. Review original values.` }))];
     const labelled = (name: keyof Pick<ClinicalSnapshot, "chief_complaint" | "physical_examination" | "clinical_summary">, label: string) => <label className="clinical-field">{label}<textarea rows={3} maxLength={8000} value={snapshot[name] ?? ""} disabled={!active || locked} onChange={e => edit({ ...snapshot, [name]: e.target.value || null })}/></label>;
@@ -234,6 +243,7 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
   <h1 className="clinical-title">{detail ? detail.patient.name : provider ? "The conversation, kept in context." : "Your approved visit records."}</h1>
   {!detail && <p className="section-intro">{provider ? "Keep the conversation beside your findings. Save a draft, review it, and approve a lasting record." : "Only clinician-approved versions appear here. Earlier versions remain visible when a correction is issued."}</p>}
   {error && <div className="clinical-error" role="alert"><p>{error}</p>{pending.current && <button className="quiet-button" disabled={busy} onClick={() => void commit(pending.current!.command, true)}>Retry / reconcile the same operation</button>}{status === "session expired" && <Link href="/login">Sign in again</Link>}</div>}
+  {notice&&<p role="status">{notice}</p>}
   {!detail && !provider && <div className="clinical-history">{listing?.approved?.length ? listing.approved.map(a => <ApprovedRecord key={a.id} record={a}/>) : <p>{status === "loading" ? "Loading approved history…" : "No approved visit records yet."}</p>}</div>}
   {!detail && provider && <>
    <form className="clinical-start" onSubmit={e => {
@@ -264,7 +274,7 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
     <section className="consultation-editor clinical-workbench" aria-label="Clinical findings"><div className="transcript-column">
      <div className="clinical-section-heading"><span className="section-number">01</span><div><h2>Transcript</h2><p>Saved final segments · speaker labels are explicit or unknown</p></div></div>
      <ol className="clinical-transcript">{detail.segments.map(s => <li key={s.id} id={`segment-${s.id}`} tabIndex={-1}><span>{s.speaker} · {s.language} · {s.source_type}{s.speech_provenance?.mode==='offline_fixture'?' · synthetic offline output':''}</span><p>{s.text}</p></li>)}</ol>{!detail.segments.length && <p className="clinical-muted">No transcript segments saved.</p>}
-     {active&&<SpeechCapture key={detail.visit.id+':'+detail.visit.revision} consultationId={detail.visit.id} revision={detail.visit.revision} sequence={detail.segments.length} disabled={locked||dirty||!!transcript.trim()} fixture={!!fixture} onBusy={setCaptureBusy} onSaved={()=>{setCaptureBusy(false);void loadRef.current(detail.visit.id,true);}}/>}
+     {active&&<SpeechCapture key={detail.visit.id+':'+detail.visit.revision} consultationId={detail.visit.id} revision={detail.visit.revision} sequence={detail.segments.length} disabled={locked||dirty||!!transcript.trim()} fixture={!!fixture} onBusy={setCaptureBusy} onAccessLost={hideAccess} onSaved={()=>{setCaptureBusy(false);void loadRef.current(detail.visit.id,true);}}/>}
      {active && <form onSubmit={e => {
                     e.preventDefault();
                     if (dirty) {
@@ -290,7 +300,7 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
     </div></section>
    </div>
   </>}
-  <Dialog.Root open={review} onOpenChange={setReview}><Dialog.Portal><Dialog.Overlay className="dialog-overlay"/><Dialog.Content className="dialog-panel clinical-review-dialog" onCloseAutoFocus={e => { e.preventDefault(); reviewButtonRef.current?.focus(); }}><Dialog.Title>Review revision {detail?.draft.revision}</Dialog.Title><Dialog.Description>Approval saves an immutable record, its prescription set and an in-app notification together. A later correction creates a linked version.</Dialog.Description>{error && <p role="alert" className="clinical-error">{error}</p>}<p>{snapshot.chief_complaint ?? 'Chief complaint missing'}</p><p>{snapshot.medications.length} medicines · {snapshot.vitals.length} measurements. Review exact values in the saved findings before continuing.</p>{notices.map(n => <label className="clinical-field" key={n.key}>{n.text}<textarea required minLength={10} maxLength={1000} value={reasons[n.key] ?? ''} onChange={e => setReasons({ ...reasons, [n.key]: e.target.value })} placeholder="Record your review reason (at least 10 characters)"/></label>)}<label className="clinical-confirm"><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)}/>I reviewed this saved revision, medication fields, explicit unknowns and source context.</label><div className="clinical-inline"><Dialog.Close className="quiet-button">Return to findings</Dialog.Close><button className="primary-button" disabled={locked || !confirmed || notices.some(n => (reasons[n.key] ?? '').trim().length < 10)} onClick={() => detail && void commit({ action: 'finalize', consultationId: detail.visit.id, expectedRevision: detail.visit.revision, reviewedDraftRevision: detail.draft.revision, confirmed, acknowledgements: reasons })}>Approve record</button></div></Dialog.Content></Dialog.Portal></Dialog.Root>
+  <Dialog.Root open={review} onOpenChange={setReview}><Dialog.Portal><Dialog.Overlay className="dialog-overlay"/><Dialog.Content className="dialog-panel clinical-review-dialog" onCloseAutoFocus={e => { e.preventDefault(); reviewButtonRef.current?.focus(); }}><Dialog.Title>Review revision {detail?.draft.revision}</Dialog.Title><Dialog.Description>Approval saves an immutable record, its prescription set and an in-app notification together. A later correction creates a linked version.</Dialog.Description>{error && <div role="alert" className="clinical-error"><p>{error}</p>{pending.current&&<button className="quiet-button" disabled={busy} onClick={()=>void commit(pending.current!.command,true)}>Reconcile this approval</button>}</div>}<p>{snapshot.chief_complaint ?? 'Chief complaint missing'}</p><p>{snapshot.medications.length} medicines · {snapshot.vitals.length} measurements. Review exact values in the saved findings before continuing.</p>{notices.map(n => <label className="clinical-field" key={n.key}>{n.text}<textarea required disabled={locked} minLength={10} maxLength={1000} value={reasons[n.key] ?? ''} onChange={e => setReasons({ ...reasons, [n.key]: e.target.value })} placeholder="Record your review reason (at least 10 characters)"/></label>)}<label className="clinical-confirm"><input type="checkbox" disabled={locked} checked={confirmed} onChange={e => setConfirmed(e.target.checked)}/>I reviewed this saved revision, medication fields, explicit unknowns and source context.</label><div className="clinical-inline"><Dialog.Close className="quiet-button">Return to findings</Dialog.Close><button className="primary-button" disabled={locked || !confirmed || notices.some(n => (reasons[n.key] ?? '').trim().length < 10)} onClick={() => detail && void commit({ action: 'finalize', consultationId: detail.visit.id, expectedRevision: detail.visit.revision, reviewedDraftRevision: detail.draft.revision, confirmed, acknowledgements: reasons })}>Approve record</button></div></Dialog.Content></Dialog.Portal></Dialog.Root>
  </RecordLayout>;
 }
 export function ApprovedRecord({ record }: {

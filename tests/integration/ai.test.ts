@@ -1,4 +1,5 @@
 import { beforeAll, afterAll, it, expect, vi } from 'vitest';
+import {evidenceResponse} from '@/lib/client/workspace-response';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -115,12 +116,15 @@ it('normal application admission persists a private thread/job and truthfully re
     state.jar = jars.patient;
     const t = await threadRoute(new Request(origin, { method: 'POST', headers: { origin, 'content-type': 'application/json', 'idempotency-key': randomUUID() }, body: '{}' }));
     expect(t.status).toBe(200);
+    expect(evidenceResponse(await t.clone().json(),'/api/ai/threads',true)).toBe(true);
     const tid = (await t.json()).data.threadId;
     const r = await admitRoute(new Request(origin, { method: 'POST', headers: { origin, 'content-type': 'application/json', 'idempotency-key': randomUUID() }, body: JSON.stringify({ kind: 'answer_question', question: 'haemoglobin', documentIds: [docId] }) }), { params: Promise.resolve({ id: tid }) });
     expect(r.status).toBe(202);
+    expect(evidenceResponse(await r.clone().json(),'/api/ai/threads/'+tid,true)).toBe(true);
     const jobId = (await r.json()).data.jobId;
     const view = await jobRoute(new Request(origin), { params: Promise.resolve({ id: jobId }) });
     expect(view.status).toBe(200);
+    expect(evidenceResponse(await view.clone().json(),'/api/jobs/'+jobId)).toBe(true);
     expect(view.headers.get('cache-control')).toBe('private, no-store');
     const data = (await view.json()).data;
     expect(data.state).toBe('unavailable');

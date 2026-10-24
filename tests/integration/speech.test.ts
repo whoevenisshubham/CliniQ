@@ -6,6 +6,7 @@ import {randomUUID,createHash} from 'node:crypto';
 import {localConfiguration,root} from '../../scripts/local-supabase.mjs';
 import {encodeWav} from '@/lib/clinical/audio';
 import {GET,POST} from '@/app/api/clinical/[id]/speech/route';
+import {speechResponse} from '@/lib/client/workspace-response';
 import {GET as clinicalDetail} from '@/app/api/clinical/[id]/route';
 import {offlineDeepgramTransport,type SpeechTransport,type SpeechReply} from '@/lib/server/speech/transport';
 const state=vi.hoisted(()=>({jar:null as null|{getAll:()=>{name:string;value:string}[];set:(n:string,v:string)=>void;delete:(n:string)=>void},transport:null as import('@/lib/server/speech/transport').SpeechTransport|null}));
@@ -19,8 +20,32 @@ function make(){const values=new Map<string,string>();const jar={getAll:()=>[...
 async function encounter(){const r=await clients.doctorA.rpc('clinical_mutate',{k:randomUUID(),command:{action:'create',patientId:fixture.ids.patientA,workspaceId:fixture.ids.workspaceA}});expect(r.error).toBeNull();return r.data.consultationId as string;}
 async function allowance(cid:string,requests=3){expect((await admin.from('speech_allowances').insert({authorization_ref:authRef,actor_id:fixture.actors.doctorA.appId,consultation_id:cid,enabled:true,ends_at:new Date(Date.now()+3600000).toISOString(),max_requests:requests,max_audio_ms:3000})).error).toBeNull();}
 function command(cid:string){return{cid,key:randomUUID(),segment:randomUUID(),sequence:0,revision:0};}
+async function recover(c:ReturnType<typeof command>,actor='doctorA'){state.jar=jars[actor];const r=await POST(new Request(origin+'/api/clinical/'+c.cid+'/speech',{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({action:'save_retained',operationKey:c.key})}),{params:Promise.resolve({id:c.cid})});if(r.ok)expect(speechResponse(await r.clone().json(),'save')).toBe(true);return r;}
 function call(c:ReturnType<typeof command>,body=bytes,actor='doctorA',signal?:AbortSignal){state.jar=jars[actor];return POST(new Request(origin+'/api/clinical/'+c.cid+'/speech',{method:'POST',signal,headers:{origin,'content-type':'audio/wav','idempotency-key':c.key,'x-segment-id':c.segment,'x-sequence':String(c.sequence),'x-expected-revision':String(c.revision)},body:new Uint8Array(body).buffer}),{params:Promise.resolve({id:c.cid})});}
 function reply(){return{metadata:{request_id:'synthetic-offline'},results:{channels:[{alternatives:[{transcript:text}]}]}};}
+it('save-only recovery rejects a foreign encounter and revoked care; a stale revision cannot publish',async()=>{
+ const transmit=vi.fn(async()=>reply());state.transport=offlineDeepgramTransport(authRef,transmit);
+ async function retained(){const cid=await encounter(),c=command(cid);await allowance(cid);const sha=createHash('sha256').update(bytes).digest('hex');const a=await clients.doctorA.rpc('speech_admit',{k:c.key,cid,sid:c.segment,seq:0,expected:0,sha,duration:1000,bytes:bytes.length});expect(a.error).toBeNull();const oid=a.data;expect((await admin.rpc('speech_reserve',{oid,budget_ref:authRef,sha,duration:1000})).data).toBe(true);expect((await admin.rpc('speech_result',{oid,next_state:'responded',transcript:text,request_id:'synthetic-fenced-recovery'})).data).toBe(true);return c;}
+ const stale=await retained();expect((await recover({...stale,cid:await encounter()})).status).toBe(404);
+ expect((await clients.doctorA.rpc('clinical_mutate',{k:randomUUID(),command:{action:'transcript',consultationId:stale.cid,expectedRevision:0,segment:{id:randomUUID(),sequence:0,text:'Synthetic clinician correction',speaker:'clinician',language:'en',startMs:null,endMs:null}}})).error).toBeNull();
+ expect((await(await recover(stale)).json()).data.state).toBe('stale');expect((await admin.from('clinical_segments').select('id').eq('id',stale.segment)).data).toEqual([]);
+ const revoked=await retained();const relationship=()=>admin.from('care_relationships').update({revoked_at:new Date().toISOString()}).eq('patient_id',fixture.ids.patientA).eq('provider_id',fixture.actors.doctorA.appId).eq('scope','clinical');
+ try{expect((await relationship()).error).toBeNull();expect((await recover(revoked)).status).toBe(404);expect((await admin.from('clinical_segments').select('id').eq('id',revoked.segment)).data).toEqual([]);}
+ finally{expect((await admin.from('care_relationships').update({revoked_at:null}).eq('patient_id',fixture.ids.patientA).eq('provider_id',fixture.actors.doctorA.appId).eq('scope','clinical')).error).toBeNull();}
+ expect(transmit).not.toHaveBeenCalled();
+});
+it('save-only HTTP recovery never admits/transmits and saves a retained response once under actual access/revision fences',async()=>{
+ const cid=await encounter(),c=command(cid);await allowance(cid);const sha=createHash('sha256').update(bytes).digest('hex');
+ const admitted=await clients.doctorA.rpc('speech_admit',{k:c.key,cid,sid:c.segment,seq:0,expected:0,sha,duration:1000,bytes:bytes.length});expect(admitted.error).toBeNull();const oid=admitted.data;
+ const transmit=vi.fn(async()=>reply());state.transport=offlineDeepgramTransport(authRef,transmit);
+ expect((await(await recover(c)).json()).data.state).toBe('admitted');
+ expect((await admin.from('speech_allowances').select('used_requests').eq('consultation_id',cid).single()).data?.used_requests).toBe(0);
+ expect((await recover(c,'patientA')).status).toBe(403);expect((await recover({...c,key:randomUUID()})).status).toBe(404);
+ expect((await admin.rpc('speech_reserve',{oid,budget_ref:authRef,sha,duration:1000})).data).toBe(true);
+ expect((await admin.rpc('speech_result',{oid,next_state:'responded',transcript:text,request_id:'synthetic-retained-recovery'})).data).toBe(true);
+ expect((await(await recover(c)).json()).data.state).toBe('saved');expect((await(await recover(c)).json()).data.state).toBe('saved');
+ expect((await admin.from('clinical_segments').select('id').eq('consultation_id',cid)).data).toHaveLength(1);expect(transmit).not.toHaveBeenCalled();
+});
 beforeAll(async()=>{vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL',cfg.API_URL);vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY',cfg.ANON_KEY);vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY',cfg.SERVICE_ROLE_KEY);vi.stubEnv('APP_ORIGIN',origin);
  const native=globalThis.fetch;vi.stubGlobal('fetch',((input:RequestInfo|URL,init?:RequestInit)=>{const url=new URL(input instanceof Request?input.url:String(input));if(!['localhost','127.0.0.1'].includes(url.hostname))throw new Error('External network forbidden in speech integration');return native(input,init);}) as typeof fetch);
  for(const [name,role] of [['doctorA','doctor'],['patientA','patient']]){const appId=randomUUID(),email='speech.'+randomUUID()+'@synthetic.example.test',password=randomUUID()+randomUUID();const user=await admin.auth.admin.createUser({email,password,email_confirm:true});expect(user.error).toBeNull();expect((await admin.from('users').insert({id:appId,auth_user_id:user.data.user!.id,email,name:'Synthetic speech '+role,role,is_active:true})).error).toBeNull();fixture.actors[name]={appId,email,password};}

@@ -1,4 +1,5 @@
 import { beforeAll, afterAll, it, expect, vi } from "vitest";
+import {documentResponse} from '@/lib/client/workspace-response';
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -86,7 +87,7 @@ function formRequest(
 async function data() {
   const r = await detail(request("GET"), ctx());
   expect(r.status).toBe(200);
-  return r.json();
+  const b=await r.json();expect(documentResponse(b,'/api/documents/'+documentId)).toBe(true);return b;
 }
 async function mutation(action: string, extra: Record<string, unknown> = {}) {
   return change(

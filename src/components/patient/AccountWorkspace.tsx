@@ -2,20 +2,33 @@
 import {displayDateTime} from '@/lib/display-time';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import Link from 'next/link';import {RecordLayout} from '../documents/DocumentSurface';
+import {accessDenied,readJsonResponse} from '@/lib/client/http-response';
+import {accountResponse} from '@/lib/client/workspace-response';
 type Profile={name:string;phone:string|null;dob:string|null;gender:string|null;bloodGroup:string|null;address:string|null;emergencyContact:string|null;allergies:string[]|null;conditions:string[]|null;language:string};
 type Member={id:string;name:string;relation:string;age:number|null;gender:string|null;conditions:string[]|null;deceased:boolean;parent_id:string|null;archived_at:string|null};
 type Measurement={source_version:string;reviewed_at:string;current_source:boolean;ordinal:number;measurement:{name:string;value:number|null;unit:string;observedAt:string|null}};
 export type AccountData={revision:number;profile:Profile;family:Member[];preferences:{id:string;purpose:string;enabled:boolean;updated_at:string;managed_preference:boolean}[];measurements:Measurement[]};
 const purposes={research:'Research sharing',public_health:'Public-health aggregation',insurance:'Insurance sharing',whatsapp:'WhatsApp messages'};
-async function request(init?:RequestInit){const r=await fetch('/api/account',{...init,cache:'no-store',signal:AbortSignal.timeout(30000)});const b=await r.json();if(!r.ok)throw Object.assign(new Error(b.error?.message??'Account unavailable.'),{status:r.status});return b.data;}
+async function request(init?:RequestInit){const r=await fetch('/api/account',{...init,cache:'no-store',signal:AbortSignal.any([AbortSignal.timeout(30000),...(init?.signal?[init.signal]:[])])});return (await readJsonResponse(r,b=>accountResponse(b,!!init?.method))).data;}
 const terms=(s:string)=>s.split('\n').map(v=>v.trim()).filter(Boolean);
 export function AccountWorkspace({fixture}:{fixture?:AccountData}){
  const [data,setData]=useState<AccountData|null>(fixture??null),[loading,setLoading]=useState(!fixture),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[expired,setExpired]=useState(false),[failed,setFailed]=useState(false);
  const [edit,setEdit]=useState<{revision:number;profile:Profile}|null>(null),[familyEdit,setFamilyEdit]=useState<{revision:number;member:Member|null}|null>(null);
- const pending=useRef<{key:string;body:unknown}|null>(null),locked=useRef(false),live=useRef(true),serial=useRef(0);
- const load=useCallback(async()=>{const token=++serial.current;setLoading(true);try{const d=fixture??await request();if(live.current&&token===serial.current){setData(d);setError('');setFailed(false);}}catch(e){if(live.current&&token===serial.current){setFailed(true);setError((e as Error).message);if([401,403,404].includes((e as{status:number}).status)){setExpired(true);setData(null);}}}finally{if(live.current&&token===serial.current)setLoading(false);}},[fixture]);
- useEffect(()=>{live.current=true;void load();return()=>{live.current=false;};},[load]);
- async function send(body:unknown,retry=false){if(locked.current)return;if(fixture){setError('Visual fixture only. No account changes are saved.');return;}const op=retry?pending.current:{key:crypto.randomUUID(),body};if(!op)return;pending.current=op;locked.current=true;setBusy(true);setError('');try{await request({method:'POST',headers:{'content-type':'application/json','idempotency-key':op.key},body:JSON.stringify(op.body)});pending.current=null;if(live.current){const action=(op.body as{action:string}).action;if(action==='profile')setEdit(null);if(action==='family')setFamilyEdit(null);setNotice('Saved to your account.');await load();}}catch(e){const status=(e as{status?:number}).status;if(status&&status<500)pending.current=null;if(live.current){setError((e as Error).message);if(status&&[401,403].includes(status)){setExpired(true);setData(null);}}}finally{locked.current=false;if(live.current)setBusy(false);}}
+ const pending=useRef<{key:string;body:unknown}|null>(null),locked=useRef(false),live=useRef(true),serial=useRef(0),denied=useRef(false),reads=useRef<AbortController|null>(null);
+ const hideAccess=useCallback((e:unknown)=>{if(!accessDenied(e))return;denied.current=true;++serial.current;reads.current?.abort();pending.current=null;setData(null);setEdit(null);setFamilyEdit(null);setNotice('');setExpired(true);},[]);
+ const load=useCallback(async()=>{if(denied.current)return;const token=++serial.current;reads.current?.abort();const c=new AbortController();reads.current=c;setLoading(true);try{const d=fixture??await request({signal:c.signal});if(live.current&&token===serial.current){setData(d);setError('');setFailed(false);}}catch(e){if(live.current&&token===serial.current){setFailed(true);setError((e as Error).message);hideAccess(e);}}finally{if(live.current&&token===serial.current)setLoading(false);}},[fixture,hideAccess]);
+ const invalidate=useCallback(()=>{++serial.current;reads.current?.abort();},[]);
+ useEffect(()=>{live.current=true;void load();return()=>{live.current=false;invalidate();};},[load,invalidate]);
+ async function send(body:unknown,retry=false){
+  if(locked.current||!live.current||denied.current||pending.current&&!retry)return;
+  if(fixture){setError('Visual fixture only. No account changes are saved.');return;}
+  const token=serial.current,op=retry?pending.current:{key:crypto.randomUUID(),body:structuredClone(body)};if(!op)return;
+  pending.current=op;locked.current=true;setBusy(true);setError('');
+  try{await request({method:'POST',headers:{'content-type':'application/json','idempotency-key':op.key},body:JSON.stringify(op.body)});
+   if(!live.current||token!==serial.current)return;pending.current=null;const action=(op.body as{action:string}).action;if(action==='profile')setEdit(null);if(action==='family')setFamilyEdit(null);setNotice('Saved to your account.');await load();
+  }catch(e){if(!live.current||token!==serial.current)return;const status=(e as{status?:number}).status;if(status&&status<500)pending.current=null;setError((e as Error).message);hideAccess(e);}
+  finally{locked.current=false;if(live.current)setBusy(false);}
+ }
  const disabled=busy||loading||failed||!!pending.current;
  if(expired)return <RecordLayout section="account"><h1>Sign in again</h1><p>Private account details have been hidden.</p><Link href="/login">Sign in</Link></RecordLayout>;
  return <RecordLayout section="account" fixture={!!fixture}><div className="workspace-heading"><div><p className="eyebrow">Your account</p><h1>Profile, privacy & family</h1><p>Patient-entered context stays separate from clinician-approved findings.</p></div><button className="quiet-button" disabled={busy||loading} onClick={()=>void load()}>Refresh saved state</button></div>

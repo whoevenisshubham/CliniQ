@@ -3,21 +3,36 @@ import {displayDate} from '@/lib/display-time';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import Link from 'next/link';
 import {RecordLayout} from '../documents/DocumentSurface';
+import {accessDenied,readJsonResponse} from '@/lib/client/http-response';
+import {continuityResponse} from '@/lib/client/workspace-response';
 type Schedule={id:string;prescription_id:string;local_times:string[];time_zone:string;starts_on:string;ends_on:string;enabled:boolean;revision:number};
 type Prescription={id:string;medication_name:string;dosage:string|null;frequency:string|null;duration:string|null;route:string|null;instructions:string|null;approved_emr_version_id:string;reviewed_at:string;current_source:boolean};
 type Task={id:string;kind:string;due_at:string;read_at:string|null;completed_at:string|null;cancelled_at:string|null;revision:number;medication_name:string|null;reported_status:string|null;report_revision:number|null;resource_id:string|null;display_time_zone:string};
 export type ContinuityData={role:string;prescriptions:Prescription[];schedules:Schedule[];tasks:Task[];adherence:{id:string;prescription_id:string;scheduled_at:string;status:string;revision:number;history:{revision:number;status:string;reason:string|null;reportedAt:string}[]}[];approvedVersions:{id:string;reviewedAt:string}[]};
 const empty:ContinuityData={role:'patient',prescriptions:[],schedules:[],tasks:[],adherence:[],approvedVersions:[]};
-async function api(path:string,init?:RequestInit){const r=await fetch(path,{...init,cache:'no-store',signal:AbortSignal.timeout(30000)});const b=await r.json();if(!r.ok)throw Object.assign(new Error(b.error?.message??'Care tracking unavailable.'),{status:r.status});return b.data;}
+async function api(path:string,init?:RequestInit){const r=await fetch(path,{...init,cache:'no-store',signal:AbortSignal.any([AbortSignal.timeout(30000),...(init?.signal?[init.signal]:[])])});return (await readJsonResponse(r,b=>continuityResponse(b,!!init?.method))).data;}
 function when(s:string,zone='Asia/Kolkata'){try{return new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short',timeZone:zone}).format(new Date(s))+' · '+zone;}catch{return new Date(s).toISOString()+' · UTC';}}
 export function ContinuityWorkspace({provider=false,encounterId=null,fixture}:{provider?:boolean;encounterId?:string|null;fixture?:ContinuityData}){
  const [data,setData]=useState<ContinuityData>(fixture??empty),[loading,setLoading]=useState(!fixture),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[expired,setExpired]=useState(false),[dueAt,setDueAt]=useState('');
- const pending=useRef<{key:string;body:unknown}|null>(null),locked=useRef(false),serial=useRef(0),live=useRef(true),resetPending=useRef(new Set<string>());
+ const pending=useRef<{key:string;body:unknown}|null>(null),locked=useRef(false),serial=useRef(0),live=useRef(true),denied=useRef(false),reads=useRef<AbortController|null>(null),resetPending=useRef(new Set<string>());
  const [resets,setResets]=useState<Record<string,number>>({}),[loadFailed,setLoadFailed]=useState(false);
  const path='/api/continuity'+(encounterId?'?encounter='+encounterId:'');
- const load=useCallback(async()=>{const token=++serial.current;setLoading(true);try{const d=fixture??await api(path);if(live.current&&token===serial.current){setData(d);setLoadFailed(false);setError('');const keys=[...resetPending.current];resetPending.current.clear();setResets(old=>{const next={...old};keys.forEach(k=>{next[k]=(next[k]??0)+1;});return next;});}}catch(e){if(live.current&&token===serial.current){setLoadFailed(true);setError((e as Error).message);if([401,403,404].includes((e as{status:number}).status)){setExpired(true);setData(empty);}}}finally{if(live.current&&token===serial.current)setLoading(false);}},[path,fixture]);
- useEffect(()=>{live.current=true;void load();return()=>{live.current=false;};},[load]);
- const send=async(body:unknown,retry=false)=>{if(locked.current)return;if(fixture){setError('Visual fixture only: no preferences or reports are saved.');return;}const op=retry?pending.current:{key:crypto.randomUUID(),body};if(!op)return;pending.current=op;locked.current=true;setBusy(true);setError('');try{const result=await api('/api/continuity',{method:'POST',headers:{'content-type':'application/json','idempotency-key':op.key},body:JSON.stringify(op.body)});pending.current=null;const action=op.body as Record<string,unknown>;if(action.action==='save_schedule')resetPending.current.add('rx:'+action.prescriptionId);if(action.action==='report_adherence')resetPending.current.add('task:'+action.taskId);if(live.current){setNotice(result.processing==='pending'?'Saved. In-app reminders await server processing.':'Saved to your care record.');setDueAt('');await load();}}catch(e){const status=(e as{status?:number}).status;if(status&&status<500)pending.current=null;if(live.current){setError((e as Error).message);if(status&&[401,403].includes(status)){setExpired(true);setData(empty);}}}finally{locked.current=false;if(live.current)setBusy(false);}};
+ const hideAccess=useCallback((e:unknown)=>{if(!accessDenied(e))return;denied.current=true;++serial.current;reads.current?.abort();pending.current=null;resetPending.current.clear();setData(empty);setDueAt('');setNotice('');setExpired(true);},[]);
+ const load=useCallback(async()=>{if(denied.current)return;const token=++serial.current;reads.current?.abort();const c=new AbortController();reads.current=c;setLoading(true);try{const d=fixture??await api(path,{signal:c.signal});if(live.current&&token===serial.current){setData(d);setLoadFailed(false);setError('');const keys=[...resetPending.current];resetPending.current.clear();setResets(old=>{const next={...old};keys.forEach(k=>{next[k]=(next[k]??0)+1;});return next;});}}catch(e){if(live.current&&token===serial.current){setLoadFailed(true);setError((e as Error).message);hideAccess(e);}}finally{if(live.current&&token===serial.current)setLoading(false);}},[path,fixture,hideAccess]);
+ const invalidate=useCallback(()=>{++serial.current;reads.current?.abort();},[]);
+ useEffect(()=>{live.current=true;void load();return()=>{live.current=false;invalidate();};},[load,invalidate]);
+ const send=async(body:unknown,retry=false)=>{
+  if(locked.current||!live.current||denied.current||pending.current&&!retry)return;
+  if(fixture){setError('Visual fixture only: no preferences or reports are saved.');return;}
+  const token=serial.current,op=retry?pending.current:{key:crypto.randomUUID(),body:structuredClone(body)};if(!op)return;
+  pending.current=op;locked.current=true;setBusy(true);setError('');
+  try{const result=await api('/api/continuity',{method:'POST',headers:{'content-type':'application/json','idempotency-key':op.key},body:JSON.stringify(op.body)});
+   if(!live.current||token!==serial.current)return;pending.current=null;
+   const action=op.body as Record<string,unknown>;if(action.action==='save_schedule')resetPending.current.add('rx:'+action.prescriptionId);if(action.action==='report_adherence')resetPending.current.add('task:'+action.taskId);
+   setNotice(result.processing==='pending'?'Saved. In-app reminders await server processing.':'Saved to your care record.');setDueAt('');await load();
+  }catch(e){if(!live.current||token!==serial.current)return;const status=(e as{status?:number}).status;if(status&&status<500)pending.current=null;setError((e as Error).message);hideAccess(e);}
+  finally{locked.current=false;if(live.current)setBusy(false);}
+ };
  if(expired)return <RecordLayout section="continuity"><h1>Sign in again</h1><p>Private medicines and tasks have been hidden.</p><Link href="/login">Sign in</Link></RecordLayout>;
  const disabled=busy||!!pending.current||loading||loadFailed;
  return <RecordLayout provider={provider} fixture={!!fixture} section="continuity"><div className="workspace-heading"><div><p className="eyebrow">Continuing care</p><h1>{provider?'Follow-up intentions':'Medicines & tasks'}</h1><p>Approved sources, optional tracking and self-reported history. In-app only.</p></div><button className="quiet-button" disabled={busy||loading} onClick={()=>void load()}>Refresh saved state</button></div>

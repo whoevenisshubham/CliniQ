@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { readJsonResponse } from "@/lib/client/http-response";
+import {documentResponse} from '@/lib/client/workspace-response';
 import {
   DocumentList,
   RecordLayout,
@@ -37,7 +38,7 @@ async function serverApi(path: string, init?: RequestInit) {
     cache: "no-store",
     signal: init?.signal ?? AbortSignal.timeout(45000),
   });
-  return readJsonResponse(response);
+  return readJsonResponse(response,b=>documentResponse(b,path,!!init?.method));
 }
 export function DocumentWorkspace({
   provider = false,

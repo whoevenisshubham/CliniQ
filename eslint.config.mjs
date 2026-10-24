@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated isolated fixtures and staged third-party worker bundles.
+    "tests/infra/.runtime/**",
   ]),
 ]);
 

@@ -13,6 +13,7 @@ Live execution is hard-disabled. No environment key or client flag enables it. T
 - Shared local/background/scheduled recovery reconciles at most20 expired operations per call. Pre-send admission expiry cancels; post-marker expiry remains outcome_unknown. Valid retained responses are not retransmitted.
 - Saved speech segments retain their operation/hash/requested configuration and offline provenance. Returning-session UI labels synthetic offline speech explicitly.
 - A durable final response can be committed after interruption without another transcription. Stale revisions and revoked access cannot publish a segment. Retry cannot duplicate its stable segment.
+- The client uses an explicit JSON `save_retained` command on the same scoped speech endpoint. Recovery checks the original operation and calls only the existing commit fence; it never resends audio or reaches transcription transport. Admitted/transmitting/unknown states remain unresolved and cannot unlock new capture merely through inspection.
 - Interim, empty or oversized output is rejected. Audio is held in request/browser memory only; it is not written to disk, SQL or Storage. Leaving the capture workspace aborts capture/request and discards local bytes. Saved operation/result history remains private.
 - The current adapter is bounded clip transcription, not proof of continuous streaming latency or historical transcription accuracy. The original streaming hook is retained; unsafe browser-key distribution remains contained.
 
