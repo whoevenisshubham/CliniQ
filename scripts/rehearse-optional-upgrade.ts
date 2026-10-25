@@ -17,7 +17,7 @@ import {ocrReady} from '../src/lib/server/ocr/service';
 import {emptySnapshot} from '../src/lib/contracts/clinical';
 async function main(){
 if(process.argv[2]!=='--local-synthetic')throw Error('Explicit isolated rehearsal required');
-const cfg=localConfiguration(),fixture=JSON.parse(readFileSync(root+'/tests/infra/.runtime/fixture.json','utf8'));
+const cfg=localConfiguration();
 const options={auth:{persistSession:false,autoRefreshToken:false}},admin=createClient(cfg.API_URL,cfg.SERVICE_ROLE_KEY,options);
 const nativeFetch=globalThis.fetch;let externalCalls=0;
 globalThis.fetch=((input:RequestInfo|URL,init?:RequestInit)=>{const u=new URL(input instanceof Request?input.url:String(input));if(!['127.0.0.1','localhost'].includes(u.hostname)){externalCalls++;throw Error('EXTERNAL_CALL_FORBIDDEN');}return nativeFetch(input,init);}) as typeof fetch;
@@ -25,14 +25,20 @@ const patient=createClient(cfg.API_URL,cfg.ANON_KEY,options),doctor=createClient
 async function ready(){for(let n=0;n<30;n++){if(!(await admin.from('documents').select('id').limit(1)).error)return;await new Promise(r=>setTimeout(r,200));}throw Error('ISOLATED_SCHEMA_CACHE_UNAVAILABLE');}
 try{
  assert.equal(sql("select to_regprocedure('public.optional_capabilities()') is null"),'t');
- await ready();assert.equal((await patient.auth.signInWithPassword(fixture.actors.patientA)).error,null);assert.equal((await doctor.auth.signInWithPassword(fixture.actors.doctorA)).error,null);
+ await ready();
+ // Separate bounded actors/workspace keep this preservation fixture from
+ // changing the accepted baseline actors' expected historical visit inventory.
+ const actors:Record<string,{id:string;email:string;password:string}>={};
+ for(const role of ['patient','doctor']){const id=randomUUID(),email='upgrade.'+randomUUID()+'@synthetic.example.test',password=randomUUID()+randomUUID(),auth=await admin.auth.admin.createUser({email,password,email_confirm:true});assert.equal(auth.error,null);assert.equal((await admin.from('users').insert({id,auth_user_id:auth.data.user!.id,email,name:'Synthetic upgrade '+role,role,is_active:true})).error,null);actors[role]={id,email,password};}
+ const patientId=randomUUID(),workspaceId=randomUUID();assert.equal((await admin.from('patients').insert({id:patientId,user_id:actors.patient.id,name:'Synthetic upgrade patient'})).error,null);assert.equal((await admin.from('workspaces').insert({id:workspaceId,name:'Synthetic upgrade only',is_demo:true})).error,null);assert.equal((await admin.from('workspace_memberships').insert({workspace_id:workspaceId,user_id:actors.doctor.id,role:'doctor'})).error,null);assert.equal((await admin.from('care_relationships').insert({patient_id:patientId,provider_id:actors.doctor.id,workspace_id:workspaceId,scope:'clinical',granted_by:actors.patient.id})).error,null);
+ assert.equal((await patient.auth.signInWithPassword(actors.patient)).error,null);assert.equal((await doctor.auth.signInWithPassword(actors.doctor)).error,null);
  process.env.OCR_ENABLED='false';process.env.SPEECH_ENABLED='false';process.env.AI_ENABLED='false';
  const uploaded=await uploadDocument(patient,admin,{key:randomUUID(),title:'Synthetic preserved upgrade source',fileName:'upgrade.txt',mime:'text/plain',bytes:new TextEncoder().encode('SYNTHETIC preserved private source 12.4 g/dL')});
  const job=await admin.from('document_jobs').select('id').eq('version_id',uploaded.version_id).eq('kind','ingest_document').single();assert.equal(job.error,null);
  assert.equal((await runNextJob(admin,job.data!.id)).status,'text_ready');
- const detail=await documentDetail(patient,uploaded.document_id);await changeDocument(patient,uploaded.document_id,{key:randomUUID(),revision:detail.document.revision,action:'share',providerId:fixture.actors.doctorA.appId,workspaceId:fixture.ids.workspaceA});
+ const detail=await documentDetail(patient,uploaded.document_id);await changeDocument(patient,uploaded.document_id,{key:randomUUID(),revision:detail.document.revision,action:'share',providerId:actors.doctor.id,workspaceId:workspaceId});
  const shared=await admin.from('document_jobs').select('id').eq('version_id',uploaded.version_id).eq('kind','ingest_document').eq('status','queued').single();assert.equal(shared.error,null);assert.equal((await runNextJob(admin,shared.data!.id)).status,'text_ready');
- const c=await mutateClinical(doctor,randomUUID(),{action:'create',patientId:fixture.ids.patientA,workspaceId:fixture.ids.workspaceA}),cid=c.consultationId;
+ const c=await mutateClinical(doctor,randomUUID(),{action:'create',patientId:patientId,workspaceId:workspaceId}),cid=c.consultationId;
  const snapshot={...emptySnapshot(),chief_complaint:'Synthetic manually reviewed upgrade finding'};
  const saved=await mutateClinical(doctor,randomUUID(),{action:'save',consultationId:cid,expectedRevision:0,snapshot});
  await mutateClinical(doctor,randomUUID(),{action:'finalize',consultationId:cid,expectedRevision:saved.revision,reviewedDraftRevision:saved.revision,confirmed:true,acknowledgements:{}});

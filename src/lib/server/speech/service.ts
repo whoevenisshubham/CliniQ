@@ -26,7 +26,7 @@ export async function transcribeClip(client:SupabaseClient,admin:SupabaseClient,
  await speechContext(client,input.cid);id(input.key);id(input.segmentId);
  if(!Number.isInteger(input.sequence)||input.sequence<0||input.sequence>999||!Number.isInteger(input.expectedRevision)||input.expectedRevision<0)throw new HttpError(400,'INVALID_COMMAND','Check the saved transcript position.');
  let wav;try{wav=validateWav(input.bytes);}catch{throw new HttpError(422,'INVALID_AUDIO','Only a complete16kHz mono PCM WAV clip up to30 seconds is supported.');}
- if(speechTransport().mode==='disabled'||speechTransport().mode==='live'&&!await optionalSchema(client,'speech'))return{state:'unavailable'};
+ if(speechTransport().mode==='live'&&!await optionalSchema(client,'speech'))return{state:'unavailable'};
  const sha=createHash('sha256').update(input.bytes).digest('hex'),duration=Math.ceil(wav.durationMs);
  const admission=await client.rpc('speech_admit',{k:input.key,cid:input.cid,sid:input.segmentId,seq:input.sequence,expected:input.expectedRevision,sha,duration,bytes:input.bytes.length});check(admission.error);const oid=admission.data as string;
  const view=()=>speechView(client,input.cid,input.key);
