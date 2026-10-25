@@ -1,6 +1,7 @@
 import {syntheticAccounting} from '../support/ocr-accounting';
 import {requestBound} from '@/lib/server/ocr/accounting';
 import {OCR_PROMPT} from '@/lib/server/ocr/provider';
+import Groq from 'groq-sdk';
 import {afterEach,expect,it,vi} from 'vitest';
 const sdk=vi.hoisted(()=>({create:vi.fn(),options:vi.fn()}));
 vi.mock('groq-sdk',()=>{class APIError extends Error{constructor(public status:number){super('synthetic');}}class Groq{static APIError=APIError;chat={completions:{create:sdk.create}};constructor(options:unknown){sdk.options(options);}}return{default:Groq};});
@@ -8,6 +9,7 @@ import {executeLive,HISTORICAL_TEXT_MODEL} from '@/lib/server/ai/provider';
 import {speechTransport} from '@/lib/server/speech/transport';
 import {ocrProvider,PROPOSED_VISION_MODEL} from '@/lib/server/ocr/provider';
 afterEach(()=>{vi.unstubAllEnvs();vi.unstubAllGlobals();vi.clearAllMocks();});
+it.each([[401,'PROVIDER_AUTHENTICATION',true],[403,'PROVIDER_AUTHENTICATION',true],[429,'RATE_LIMITED',true],[500,'OUTCOME_UNKNOWN',false],[408,'OUTCOME_UNKNOWN',false]])('classifies OCR HTTP %s without retry or budget-refund authority',async(status,category,definite)=>{vi.stubEnv('OCR_ENABLED','true');vi.stubEnv('OCR_PROVIDER_VERIFIED','true');vi.stubEnv('GROQ_API_KEY','synthetic');vi.stubEnv('LIVE_OCR_AUTHORIZATION_REF','synthetic');vi.stubEnv('OCR_ACCOUNTING_JSON',JSON.stringify(syntheticAccounting));sdk.create.mockRejectedValue(Reflect.construct(Groq.APIError,[status]));const p=ocrProvider()!;await expect(p.execute([{page:1,width:1,height:1,bytes:new Uint8Array([137,80])}],AbortSignal.timeout(1000),requestBound(syntheticAccounting,OCR_PROMPT,[1],[{width:1,height:1}]))).rejects.toMatchObject({category,definite});expect(sdk.create).toHaveBeenCalledOnce();});
 const textInput=()=>({messages:[{role:'user' as const,content:'Synthetic transcript only'}],maxOutput:3000,signal:new AbortController().signal,attemptId:'synthetic-reserved-attempt',authorizationRef:'synthetic-authorization',model:HISTORICAL_TEXT_MODEL});
 const textConfig=()=>{vi.stubEnv('AI_ENABLED','true');vi.stubEnv('GROQ_API_KEY','synthetic-key-not-real');vi.stubEnv('LIVE_AI_AUTHORIZATION_REF','synthetic-authorization');vi.stubEnv('AI_TEXT_MODEL',HISTORICAL_TEXT_MODEL);};
 it('missing allowance/configuration or aborted text work performs zero SDK operations',async()=>{vi.stubEnv('AI_ENABLED','false');await expect(executeLive(textInput())).rejects.toThrow('PROVIDER_DISABLED');textConfig();await expect(executeLive({...textInput(),authorizationRef:'different'})).rejects.toThrow('PROVIDER_DISABLED');await expect(executeLive({...textInput(),signal:AbortSignal.abort()})).rejects.toThrow();expect(sdk.create).not.toHaveBeenCalled();expect(sdk.options).not.toHaveBeenCalled();});

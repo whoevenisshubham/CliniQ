@@ -1,0 +1,7 @@
+import {afterEach,expect,it,vi} from 'vitest';
+const state=vi.hoisted(()=>({worker:null as null|{emit:(name:string,value?:unknown)=>boolean;terminate:ReturnType<typeof vi.fn>}}));
+vi.mock('node:worker_threads',async()=>{const {EventEmitter}=await import('node:events');return{Worker:class extends EventEmitter{terminate=vi.fn(async()=>0);constructor(){super();state.worker=this;}}};});
+import {renderOCRImages} from '@/lib/server/ocr/images';
+afterEach(()=>vi.useRealTimers());
+it.each(['error','exit','malformed'])('cleans up %s and releases the process slot only after termination',async event=>{const p=renderOCRImages(new Uint8Array([1]),'image/png',[1]);const worker=state.worker!;const rejected=expect(p).rejects.toThrow();worker.emit(event==='malformed'?'message':event,event==='malformed'?{pages:[{page:2,width:1,height:1,bytes:new Uint8Array([1])}]}:undefined);await rejected;expect(worker.terminate).toHaveBeenCalledOnce();});
+it('enforces the deadline and removes the abort listener after worker termination',async()=>{vi.useFakeTimers();const controller=new AbortController(),remove=vi.spyOn(controller.signal,'removeEventListener');const p=renderOCRImages(new Uint8Array([1]),'image/png',[1],controller.signal),rejected=expect(p).rejects.toThrow('IMAGE_DEADLINE');await vi.advanceTimersByTimeAsync(15000);await rejected;expect(state.worker!.terminate).toHaveBeenCalledOnce();expect(remove).toHaveBeenCalledWith('abort',expect.any(Function));});

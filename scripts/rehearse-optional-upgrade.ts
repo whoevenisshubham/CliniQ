@@ -15,6 +15,7 @@ import {mutateClinical,clinicalList} from '../src/lib/server/clinical/service';
 import {speechAvailability} from '../src/lib/server/speech/service';
 import {ocrReady} from '../src/lib/server/ocr/service';
 import {emptySnapshot} from '../src/lib/contracts/clinical';
+async function main(){
 if(process.argv[2]!=='--local-synthetic')throw Error('Explicit isolated rehearsal required');
 const cfg=localConfiguration(),fixture=JSON.parse(readFileSync(root+'/tests/infra/.runtime/fixture.json','utf8'));
 const options={auth:{persistSession:false,autoRefreshToken:false}},admin=createClient(cfg.API_URL,cfg.SERVICE_ROLE_KEY,options);
@@ -56,3 +57,6 @@ try{
  const report={sourceSha:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),scope:'actual isolated older-schema Auth/database/Storage plus forward preservation; not hosted acceptance',olderSchemaBoundary:'through 202610240001; both optional migrations absent',before,after,preserved:true,sourceFunctionOIDPreserved:true,existingPoliciesPreserved:true,existingSharedPrivateBytes:'passed',existingApprovedRecord:'passed',oldSchemaAccidentalFlags:'unavailable; ordinary document still readable',disabledCapabilityNeedsNewSchema:false,newAllowanceRows:0,externalProviderCalls:externalCalls,migrations:files.map(file=>({file,...plan.manifest[file]}))};
  writeFileSync(root+'/tests/infra/.runtime/optional-upgrade.json',JSON.stringify(report,null,2));console.log(JSON.stringify({optionalUpgrade:'passed',tablesCompared:Object.keys(before).length,rowsPreserved:Object.values(before).reduce((n:number,x:unknown)=>n+(x as {rows:number}).rows,0),oldSchemaServices:'passed',externalProviderCalls:0,manifestHash:createHash('sha256').update(JSON.stringify(report.migrations)).digest('hex')}));
 }finally{globalThis.fetch=nativeFetch;}
+
+}
+void main().catch(error=>{console.error(error);process.exitCode=1;});
