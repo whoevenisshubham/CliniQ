@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { runDocumentJob } from './runner';
 import { runAIJob } from '../ai/runner';
 import {recoverSubsystems,failedRecoveries} from './recovery';
+import {runOCRJob} from '../ocr/runner';
 export async function runNextJob(admin: SupabaseClient, jobId?: string) {
     const recovery=await recoverSubsystems(admin),degraded=failedRecoveries(recovery).length>0;
     const now = new Date().toISOString();
@@ -18,6 +19,6 @@ export async function runNextJob(admin: SupabaseClient, jobId?: string) {
         return { status: degraded?'recovery_degraded':'idle',degraded,recovery };
     const document=['ingest_document','purge_document'].includes(job.kind);
     if(!document&&recovery.ai.state==='failed')return {jobId:job.id,status:'recovery_blocked',degraded:true,recovery};
-    const result=await(document?runDocumentJob(admin,job.id):runAIJob(admin,job.id));
+    const result=await(document?runDocumentJob(admin,job.id):job.kind==='ocr_document'?runOCRJob(admin,job.id):runAIJob(admin,job.id));
     return {...result,degraded,recovery};
 }

@@ -1,0 +1,18 @@
+import {getSupabaseServerClient,getSupabaseAdminClient} from '@/lib/supabase-server';
+import {privateJson,requireSameOrigin,errorResponse,HttpError,readJson} from '@/lib/server/http';
+import {resolvePrincipal} from '@/lib/server/auth/context';
+import {id} from '@/lib/server/documents/service';
+import {ocrCapability,admitOCR,saveOCRReview,ocrCheck} from '@/lib/server/ocr/service';
+import {createThread,jobView} from '@/lib/server/ai/service';
+import {dispatchDocumentWork} from '@/lib/server/jobs/dispatch';
+async function context(did:string){id(did);const client=await getSupabaseServerClient();await resolvePrincipal(client);const d=await client.from('documents').select('id').eq('id',did).maybeSingle();ocrCheck(d.error);if(!d.data)throw new HttpError(404,'NOT_FOUND','Record unavailable.');return client;}
+export async function GET(request:Request,{params}:{params:Promise<{id:string}>}){try{const did=(await params).id,client=await context(did);if(!ocrCapability())return privateJson({data:{available:false}});const jid=new URL(request.url).searchParams.get('job');if(jid)id(jid);let query=client.from('document_jobs').select('id').eq('document_id',did).eq('kind','ocr_document');query=jid?query.eq('id',jid):query.order('created_at',{ascending:false}).limit(1);const j=await query.maybeSingle();ocrCheck(j.error);if(!j.data){if(jid)throw new HttpError(404,'NOT_FOUND','Draft unavailable.');return privateJson({data:{available:true}});}return privateJson({data:await jobView(client,getSupabaseAdminClient(),j.data.id)});}catch(e){return errorResponse(e);}}
+export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){try{
+ requireSameOrigin(request);const did=(await params).id,client=await context(did);if(!ocrCapability())throw new HttpError(503,'OCR_DISABLED','Optional text extraction is disabled. Manual transcription remains available.');
+ const b=await readJson(request,60000) as Record<string,unknown>,key=request.headers.get('idempotency-key')??'';id(key);if(!b||typeof b!=='object'||Array.isArray(b)||typeof b.action!=='string')throw new HttpError(422,'INVALID_COMMAND','An extraction action is required.');
+ const fields:Record<string,string[]>={extract:['action','versionId','revision','pages','consultationId'],review:['action','jobId','title','pages','confirmed'],cancel:['action','jobId']};const action=String(b.action);if(!fields[action]||Object.keys(b).some(k=>!fields[action].includes(k)))throw new HttpError(422,'INVALID_COMMAND','Choose a supported extraction action.');
+ if(b.action==='extract'){const tid=await createThread(client,key,(b.consultationId??null) as string|null);const jid=await admitOCR(client,did,key,{threadId:tid,versionId:b.versionId as string,revision:b.revision as number,pages:b.pages as number[]});await dispatchDocumentWork();return privateJson({data:{jobId:jid}},202);}
+ id(b.jobId);const owned=await getSupabaseAdminClient().from('document_jobs').select('document_id').eq('id',b.jobId).eq('actor_id',(await resolvePrincipal(client)).id).eq('kind','ocr_document').maybeSingle();ocrCheck(owned.error);if(owned.data?.document_id!==did)throw new HttpError(404,'NOT_FOUND','Draft unavailable.');
+ if(b.action==='cancel'){const r=await client.rpc('ocr_cancel',{jid:b.jobId});ocrCheck(r.error);return privateJson({data:{cancelled:r.data}});}
+ if(b.confirmed!==true)throw new HttpError(422,'REVIEW_REQUIRED','Review every page against the original before saving.');const result=await saveOCRReview(client,getSupabaseAdminClient(),b.jobId as string,key,{title:b.title as string,pages:b.pages as {page:number;text:string}[]});await dispatchDocumentWork();return privateJson({data:result});
+}catch(e){return errorResponse(e);}}

@@ -1,0 +1,5 @@
+"use client";
+import {OCRReview,type OCRView} from '@/components/documents/OCRReview';
+import {RecordLayout} from '@/components/documents/DocumentSurface';
+const fixture:OCRView={id:'synthetic-ocr-job',state:'succeeded',resultKind:'offline_fixture',provenance:{model:'qwen/qwen3.8-27b · proposed, unverified',executionMode:'offline_fixture'},result:{requiresReview:true,confidence:'uncalibrated',pages:[{page:2,text:'SYNTHETIC REVIEW FIXTURE\nदवा का नाम: [unclear]\nDose: [unclear] mg\nReported: No fever / बुखार नहीं है।\nLiteral value: 12.4 g/dL\n\nThis is an injected provider double, not an actual OCR result.',unclear:['Unclear handwritten medicine name','Unreadable number before mg']}]}};
+export function OCRFixture(){return <RecordLayout fixture><h1>Review extracted source text</h1><p>Labelled visual fixture · synthetic content · persistence disabled. No inference or OCR request is made.</p><OCRReview documentId="synthetic-document" versionId="synthetic-version" revision={1} title="Synthetic prescription image" mime="image/png" onSaved={()=>{}} onDirty={()=>{}} onAccessLost={()=>{}} fixture={fixture}/></RecordLayout>;}

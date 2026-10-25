@@ -1,4 +1,9 @@
 @import "tailwindcss";
+
+.ocr-page-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 1.5rem; margin-block: 1.5rem; }
+.ocr-page-pair img { display: block; max-width: 100%; max-height: 38rem; object-fit: contain; border: 1px solid var(--border); }
+.ocr-page-pair textarea { width: 100%; min-height: 18rem; resize: vertical; line-height: 1.7; }
+@media (max-width: 800px) { .ocr-page-pair { grid-template-columns: minmax(0, 1fr); } }
 @source not "../../nul";
 @source not "**/nul";
 @source not "**/con";

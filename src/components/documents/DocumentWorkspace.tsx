@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { readJsonResponse } from "@/lib/client/http-response";
 import {documentResponse} from '@/lib/client/workspace-response';
+import {OCRReview} from './OCRReview';
 import {
   DocumentList,
   RecordLayout,
@@ -18,6 +19,7 @@ type Version = {
   extraction_status: string;
   mime: string;
   source_class: string;
+  reviewed_ocr?: {sourcePages:number[];sourceVersionId:string;providerConfidence:string};
 };
 type Grant = { id: string; provider_id: string; workspace_id: string };
 export type Detail = {
@@ -74,6 +76,7 @@ export function DocumentWorkspace({
     [mode, setMode] = useState<
       "upload" | "replace" | "manual" | "share" | "delete" | null
     >(null);
+  const [ocrDirty,setOcrDirty]=useState(false),[rechecking,setRechecking]=useState(false);
   const [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
     [uncertain,setUncertain]=useState(false),[accessLost,setAccessLost]=useState(false),
@@ -180,11 +183,11 @@ export function DocumentWorkspace({
     let active=true;
     const recheck = () => {
       if (document.hidden||!live.current) return;
-      setDetail(null);setLoading(true);
+      setRechecking(true);
       api("/api/documents/" + selected)
         .then(d=>{if(active&&live.current&&selectionRef.current===selected)setDetail(d);})
         .catch(e=>{if(active&&live.current&&selectionRef.current===selected){hideAccessFailure(e);setLoading(false);selectionRef.current=null;setSelected(null);setError(e.message);}})
-        .finally(()=>{if(active&&live.current&&selectionRef.current===selected)setLoading(false);});
+        .finally(()=>{if(active&&live.current){setRechecking(false);if(selectionRef.current===selected)setLoading(false);}});
     };
     window.addEventListener("focus", recheck);
     document.addEventListener("visibilitychange", recheck);
@@ -203,6 +206,7 @@ export function DocumentWorkspace({
   }
   const dialogOpener = useRef<HTMLElement | null>(null);
   function open(next: typeof mode) {
+    if(ocrDirty){setError('Save or reconcile your OCR review before starting another source action.');return;}
     if(mutationLock.current||pendingRequest.current){setError("Reconcile the saved request before starting another action.");return;}
     dialogOpener.current =
       document.activeElement instanceof HTMLElement
@@ -287,7 +291,7 @@ export function DocumentWorkspace({
         {loading ? (
           <p role="status">Loading your private records…</p>
         ) : detail ? (
-          <>
+          <div hidden={rechecking}>
             <SourceDetail
               title={detail.document.title}
               chunks={detail.chunks}
@@ -295,7 +299,7 @@ export function DocumentWorkspace({
               version={version?.version_no ?? 1}
               sourceClass={version?.source_class}
               onBack={() => {
-                if(busy||uncertain)return;
+                if(busy||uncertain)return;if(ocrDirty&&!window.confirm('Discard this unsaved OCR review? The saved job remains available.'))return;
                 selectionRef.current=null;setSelected(null);
                 setDetail(null);
               }}
@@ -321,9 +325,12 @@ export function DocumentWorkspace({
                 )}
               </div>
             </SourceDetail>
+            {version?.reviewed_ocr&&<p className="status-message">Human-reviewed OCR transcription · original pages {version.reviewed_ocr.sourcePages.join(', ')} · original version {version.reviewed_ocr.sourceVersionId.slice(0,8)}. Provider confidence was uncalibrated. This is source text, not a clinical approval.</p>}
+            {!provider&&!fixture&&process.env.NEXT_PUBLIC_OCR_ENABLED==='true'&&version&&version.extraction_status==='needs_transcription'&&<OCRReview key={selected+':'+version.id} documentId={selected!} versionId={version.id} revision={detail.document.revision} title={detail.document.title} mime={version.mime} onDirty={setOcrDirty} onAccessLost={hideAccessFailure} onSaved={()=>void refresh().catch(e=>setError(e.message))}/>}
             <div className="document-actions">
               <button
                 className="secondary-button"
+                disabled={ocrDirty}
                 onClick={() => void refresh().catch((e) => setError(e.message))}
               >
                 Refresh processing state
@@ -391,7 +398,7 @@ export function DocumentWorkspace({
                 ))}
               </section>
             )}
-          </>
+          </div>
         ) : (
           <DocumentList
             rows={rows}

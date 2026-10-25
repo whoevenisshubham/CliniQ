@@ -99,6 +99,11 @@ export async function documentDetail(
       .is("revoked_at", null),
   ]);
   for (const r of [versions, chunks, grants]) dbError(r.error);
+  const ocrMetadata:Record<string,unknown>={};
+  if(process.env.OCR_ENABLED==='true'){
+    const metadata=await client.from('document_versions').select('id,reviewed_ocr').eq('document_id',documentId);dbError(metadata.error);
+    for(const row of metadata.data??[])ocrMetadata[row.id]=row.reviewed_ocr;
+  }
   const current = await client
     .from("documents")
     .select("revision,current_version_id")
@@ -118,7 +123,7 @@ export async function documentDetail(
     );
   return {
     document: d.data,
-    versions: versions.data,
+    versions: versions.data?.map(v=>({...v,reviewed_ocr:ocrMetadata[v.id]})),
     chunks: chunks.data,
     grants: grants.data,
   };
