@@ -367,10 +367,13 @@ export function DocumentWorkspace({
             {!provider && detail.versions.length > 1 && (
               <section className="version-history">
                 <h2>Retained source versions</h2>
-                <p>
-                  Earlier sources are private to you. Replacement clears
-                  sharing; share the new source explicitly.
-                </p>
+                <details>
+                  <summary>About retained versions</summary>
+                  <p>
+                    Earlier sources are private to you. Replacement clears
+                    sharing; share the new source explicitly.
+                  </p>
+                </details>
                 {detail.versions.map((v) => (
                   <p key={v.id}>
                     <a

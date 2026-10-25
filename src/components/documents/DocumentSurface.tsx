@@ -323,18 +323,6 @@ export function SourceDetail({
           )}
         </section>
         <aside className="source-context">
-          <p className="eyebrow">Read with context</p>
-          <h2>The source comes first.</h2>
-          <p>
-            This view contains source text, not a clinical interpretation or an
-            AI explanation.
-          </p>
-          <hr />
-          <h3>Check the original</h3>
-          <p>
-            PDF reading order and tables can be ambiguous. Compare extracted
-            text with the downloaded original.
-          </p>
           {chunks.length > 0 && (
             <nav aria-label="Source references">
               {chunks.map((c) => (
@@ -355,6 +343,14 @@ export function SourceDetail({
               ))}
             </nav>
           )}
+          <details>
+            <summary>Reading notes</summary>
+            <p>
+              Source text is not a clinical interpretation or an AI explanation.
+              PDF reading order and tables can be ambiguous; compare with the
+              retained original.
+            </p>
+          </details>
         </aside>
       </div>
     </>

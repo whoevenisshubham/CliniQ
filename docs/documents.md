@@ -37,3 +37,9 @@ The document workspace retains the exact submitted body, source revision and ope
 A known successful commit stays reported saved even if the subsequent view refresh fails. Access failures hide private rows, source detail, eligible providers and local form contents. Selection responses are fenced against rapid document changes and ignored after unmount. Returning-session persistence and the server ledger are exercised in isolated integration; browser timeout/actor-switch acceptance remains separate.
 
 HTTP access-denial status survives an empty, non-JSON or null error body, so an intermediary's error page cannot turn a definitive denial into an uncertain mutation. An unreadable successful response remains uncertain: the client must reconcile the saved operation rather than assume the commit failed.
+
+## Representative PDF fidelity and source presentation
+
+The bounded parser regression set includes two visually reviewed, synthetic two-page PDFs: embedded-font Hindi/English and spatial columns/table-like values. Assertions preserve literal characters, decimal values, units and source pages. They do not infer table relationships, reading-order confidence or universal PDF support. Embedded font licenses and exact file hashes are retained in `tests/fixtures/documents`.
+
+Source passages use their natural height. Page/provenance references and current-version downloads remain visible; secondary reading guidance and version-history explanations use keyboard-operable disclosure controls. Manual transcripts remain separate versions linked to a retained original, with no claim that OCR or inference produced them.

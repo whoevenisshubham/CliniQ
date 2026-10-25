@@ -257,6 +257,7 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
+summary:focus-visible,
 [tabindex]:focus-visible {
   outline: 3px solid var(--primary);
 }
@@ -543,7 +544,7 @@ p {
 .source-page {
   background: var(--surface);
   padding: 40px;
-  min-height: 360px;
+  min-height: 0;
   border: 1px solid var(--border);
   margin-bottom: 20px;
   scroll-margin-top: 24px;
@@ -561,6 +562,16 @@ p {
 .source-context {
   padding-top: 8px;
   color: var(--foreground-muted);
+}
+.source-context details,
+.version-history details {
+  margin: 12px 0;
+}
+.source-context summary,
+.version-history summary {
+  cursor: pointer;
+  color: var(--foreground);
+  padding: 8px 0;
 }
 .source-context h2 {
   font-size: 24px;
@@ -930,7 +941,7 @@ p {
   }
   .source-page {
     padding: 24px;
-    min-height: 320px;
+    min-height: 0;
   }
   .source-toolbar {
     align-items: start;
