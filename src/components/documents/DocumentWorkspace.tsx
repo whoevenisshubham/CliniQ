@@ -306,7 +306,9 @@ export function DocumentWorkspace({
                     className="secondary-button"
                     href={`/api/documents/${selected}/content`}
                   >
-                    Download original
+                    {version?.source_class === "manual"
+                      ? "Download transcript"
+                      : "Download original"}
                   </a>
                 )}
                 {!provider && (
