@@ -2,6 +2,7 @@
 
 import { ThemeToggle } from "@/components/shared/ThemeProvider";
 import {announceSessionChange} from '@/lib/client/session-events';
+import {verifiedGoogleStartUrl} from '@/lib/client/oauth';
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -30,6 +31,12 @@ export default function LoginPage() {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const googleEnabled=process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED==='true';
+  async function startGoogle(){
+    if(loading)return;setLoading(true);setError(null);
+    try{const response=await fetch('/api/auth/google',{method:'POST'});const body=await response.json();if(!response.ok)throw new Error(body.error?.message||'Google sign-in is unavailable.');window.location.assign(verifiedGoogleStartUrl(body.data?.url,process.env.NEXT_PUBLIC_SUPABASE_URL));}
+    catch(e){setError(e instanceof Error?e.message:'Google sign-in is unavailable.');setLoading(false);}
+  }
 
   async function doLogin(e: string, p: string) {
     setLoading(true);
@@ -105,8 +112,7 @@ export default function LoginPage() {
 
           <div className="mb-5 p-3 rounded-lg border border-[var(--border)] bg-[var(--surface)]">
             <p className="text-xs leading-relaxed text-[var(--foreground-muted)]">
-              Use an explicitly provisioned workspace account. Public sign-up
-              and shared demo credentials are unavailable.
+              {googleEnabled?'Google opens an empty patient workspace. Existing history is not linked by matching email.':'Use an explicitly provisioned workspace account. Public sign-up and shared demo credentials are unavailable.'}
             </p>
           </div>
 
@@ -198,6 +204,7 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+          {googleEnabled&&<button type="button" className="secondary-button w-full mt-4" disabled={loading} onClick={()=>void startGoogle()}>Continue with Google</button>}
         </motion.div>
       </div>
     </div>

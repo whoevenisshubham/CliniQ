@@ -42,6 +42,14 @@ it.each(['2026-10-24T09:00:00+05:30',''])('clinical measurement time preserves e
  expect(JSON.parse(String(sent[0].body)).snapshot.vitals[0]).toEqual({name:'temperature',value:37.1,unit:'°C',observedAt:time||null});
 });
 
+it.each([['Edit profile','Name'],['Add relative','Relative’s name']])('account editor enters and restores keyboard focus: %s',async(opener,label)=>{
+ vi.stubGlobal('fetch',vi.fn(()=>Promise.resolve(result(account))));
+ await render(createElement(AccountWorkspace));const trigger=button(opener);await click(opener);
+ const input=[...host.querySelectorAll('input')].find(i=>i.closest('label')?.textContent===label)!;
+ expect(document.activeElement).toBe(input);await click('Cancel edit');
+ expect(document.activeElement).toBe(trigger);expect(host.querySelector('form')).toBeNull();
+});
+
 it('account denial removes previously rendered private content and edit forms',async()=>{
  let reads=0;vi.stubGlobal('fetch',vi.fn(()=>Promise.resolve(++reads===1?result(account):new Response('<html>private diagnostic</html>',{status:403}))));
  await render(createElement(AccountWorkspace));await click('Edit profile');await click('Refresh saved state');

@@ -5,6 +5,7 @@ import { getRoleDashboardPath } from "@/lib/auth";
 import { HttpError } from "../http";
 
 const returns = new Set(["/patient","/patient/reports","/doctor","/receptionist","/admin"]);
+export function completedSessionPath(home:string,next:string|null){return next&&returns.has(next)&&(next===home||next.startsWith(home+'/'))?next:home;}
 export function validateCallback(request: Request) {
   const url = new URL(request.url);
   if (!process.env.APP_ORIGIN || url.origin!==process.env.APP_ORIGIN) throw new HttpError(403,"CALLBACK_ORIGIN_DENIED","Invalid callback origin.");
@@ -23,6 +24,6 @@ export async function completeCallback(client: SupabaseClient, code:string, next
     if(bootstrapError) throw new HttpError(403,"ACCOUNT_UNAVAILABLE","Account linking requires attention. Contact the workspace owner.");
     const principal=await resolvePrincipal(client);
     const home=getRoleDashboardPath(principal.role);
-    return next && (next===home || next.startsWith(home+"/")) ? next : home;
+    return completedSessionPath(home,next);
   } catch(error) { await client.auth.signOut({scope:"local"}); throw error; }
 }

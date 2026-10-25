@@ -3,3 +3,4 @@ export const sessionChangeKey='cliniq-session-change';
 export function announceSessionChange(){try{localStorage.setItem(sessionChangeKey,crypto.randomUUID());}catch{/* Current-tab navigation still clears its document. */}}
 export function listenForSessionChanges(onChange:()=>void){const listener=(event:StorageEvent)=>{if(event.key===sessionChangeKey&&event.newValue)onChange();};window.addEventListener('storage',listener);return()=>window.removeEventListener('storage',listener);}
 export function reloadSessionDocument(){window.location.reload();}
+export function replaceSessionDocument(target:string){window.location.replace(target);}

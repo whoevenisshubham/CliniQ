@@ -14,7 +14,7 @@ The original speech-to-EMR hooks, adapters, prompts and clinical review componen
 
 ## Manual consultation foundation
 
-The `/consultations` workspace adds authorized encounter creation, durable typed transcripts and clinician findings, revision-checked review, atomic approval and linked corrections. Patients read only approved records and prescriptions, including returning sessions. See [consultation contracts and limitations](docs/consultations.md). `/design/consultation` is a labelled rendered fixture with persistence disabled. The retained speech path now has authenticated bounded admission, durable offline-double transport and transcript recovery; live transport remains disabled. See [speech boundaries and the unconsumed verification proposal](docs/speech.md). Authenticated browser and hosted acceptance remain open.
+The `/consultations` workspace adds authorized encounter creation, durable typed transcripts and clinician findings, revision-checked review, atomic approval and linked corrections. Patients read only approved records and prescriptions, including returning sessions. These manual paths have bounded synthetic hosted/browser evidence; complete release acceptance remains open. See [consultation contracts and limitations](docs/consultations.md). `/design/consultation` is a labelled rendered fixture with persistence disabled. The retained speech path now has authenticated bounded admission, durable offline-double transport and transcript recovery; live transport remains disabled. See [speech boundaries and the unconsumed verification proposal](docs/speech.md).
 
 ## Continuing care
 
@@ -66,7 +66,7 @@ See the [route/role/action map](docs/routes-and-roles.md), [client privacy and u
 
 Admission commits a durable job before dispatch. Configure a server-only `DOCUMENT_DISPATCH_SECRET` of at least 32 characters for authenticated background dispatch. The worker claims one job with a 90-second lease, increasing fence and at most three attempts. Publication checks the current document revision/version and unexpired claim. The scheduled reconciler performs a bounded exact-key cleanup and dispatches the same runner. Preview schedules are not assumed to run; use explicit maintenance or the isolated local runner.
 
-Background-function availability, packaged assets, deadlines and hosted environment configuration require verification on the intended Netlify account before hosted acceptance. No paid resource or fallback is required or enabled by the local tests. All inference remains disabled.
+The approved isolated preview has actual bounded worker completion, recovery and fencing evidence. This does not establish production schedules, every parser asset or release acceptance. No paid resource or fallback is required or enabled by the local tests. All inference remains disabled.
 
 ## Provenance and limits
 
