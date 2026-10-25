@@ -288,6 +288,7 @@ export function DocumentWorkspace({
             {notice}
           </p>
         )}
+        {rechecking&&<p role="status">Checking source access…</p>}
         {loading ? (
           <p role="status">Loading your private records…</p>
         ) : detail ? (
