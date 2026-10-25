@@ -231,7 +231,7 @@ export function DocumentWorkspace({
     finally{mutationLock.current=false;if(live.current)setBusy(false);}
     pendingRequest.current=null;if(!live.current)return;setUncertain(false);
     if(op.kind==='upload'){
-      retry.current=null;setMode(null);setNotice('Original bytes and metadata are saved. Text processing is queued; you can return later.');
+      retry.current=null;setMode(null);setNotice('File bytes and metadata are saved. Processing status is shown with the current version; you can return later.');
       try{await refresh(null);await choose(result.document_id);}catch(e){hideAccessFailure(e);setError('Saved; the refreshed view is unavailable. '+(e as Error).message);}
     }else{
       if(op.action==='delete'){selectionRef.current=null;setSelected(null);setDetail(null);setMode(null);setNotice('Access is removed. Private byte cleanup is queued.');}
