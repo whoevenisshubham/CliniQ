@@ -6,7 +6,7 @@ Last reconciled schema source: `e04fbcabcd3d6555ac6aa186b61e55348843953c`, throu
 
 | Order | Committed file | SHA-256 of Git blob (LF) |
 | --- | --- | --- |
-| 1 | `supabase/migrations/202610250001_reviewable_ocr.sql` | `c1731e7c655f41762a46c4b1110d362809f6b2306a014e2bc5a82fb1d2fc552e` |
+| 1 | `supabase/migrations/202610250001_reviewable_ocr.sql` | `524a9f51308881b2dff50dacc34a3e0bc67980bc13640332433e01229f41ccce` |
 | 2 | `supabase/migrations/202610250002_disabled_live_speech.sql` | `cc261b4af2b3917384b1bae92560c13feb63a8cf75f6f502a85c035b743176d7` |
 
 `node scripts/prepare-optional-rollout.mjs` validates the unchanged accepted manifest, exactly these two ordered files and their committed/working/executed hashes. It writes `tests/infra/.runtime/optional-rollout.json`; CI retains it beside the worker package smoke. No database/API connection is made by this generator. Compare hashes to the exact committed source before any execution; do not execute pasted or stale copies.
