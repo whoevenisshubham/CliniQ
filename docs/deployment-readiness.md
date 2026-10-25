@@ -23,7 +23,8 @@ Live AI and speech remain disabled. The complete release matrix, authenticated p
 - `AI_ENABLED=false`: keep disabled unless a separate live allowance is recorded.
 - `GOOGLE_AUTH_ENABLED=false`, `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=false`: server admission and visible Google sign-in are independently off by default. Prepared callback completion verifies the principal/role and announces a session change before navigation. It has offline regressions, not real Google consent acceptance. Enable only on the exact approved preview override after the owner completes the intended OAuth client/provider setup.
 - `GROQ_API_KEY`, `AI_TEXT_MODEL`, `LIVE_AI_AUTHORIZATION_REF`: optional server-only live configuration, insufficient without exact durable allowance/scope rows.
-- `AI_SPEECH_MODEL`: reserved, unused setting. Live speech is hard-disabled; no environment variable enables it. See `speech.md` for the bounded offline integration and separate live prerequisites.
+- `SPEECH_ENABLED=false`, `SPEECH_PROVIDER_VERIFIED=false`, `DEEPGRAM_API_KEY`, `LIVE_SPEECH_AUTHORIZATION_REF`, `AI_SPEECH_MODEL=nova-2`: prepared server-only retained transport; exact durable audio scope and separately authorized account verification are still required. See `speech.md`.
+- Optional OCR configuration and additive schema are described in [reviewed OCR](ocr.md). Its server/public/verification flags default off; it has no approved live allowance.
 
 The historical default text model is preserved. Do not replace it merely to make an account probe succeed. Verify actual model/account/free eligibility and per-request/minute limits before proposing enablement; stop for a concrete incompatibility rather than automatically switching.
 

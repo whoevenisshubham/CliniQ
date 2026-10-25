@@ -18,7 +18,7 @@ export function SpeechCapture({consultationId,revision,sequence,disabled,fixture
  useEffect(()=>{
   live.current=true;const n=generation.current,abort=new AbortController();
   if(!fixture)void fetch(path,{cache:'no-store',signal:AbortSignal.any([abort.signal,AbortSignal.timeout(30000)])})
-   .then(r=>readJsonResponse(r,b=>speechResponse(b,'availability'))).then(b=>{if(live.current&&generation.current===n){setAvailable(b.data.available===true);setState(b.data.available?'Synthetic offline transport · no live speech':'Speech unavailable · continue with typed transcript');}})
+   .then(r=>readJsonResponse(r,b=>speechResponse(b,'availability'))).then(b=>{if(live.current&&generation.current===n){setAvailable(b.data.available===true);setState(b.data.available?(b.data.mode==='live'?'Speech transport configured · allowance checked before send':'Synthetic offline transport · no live speech'):'Speech unavailable · continue with typed transcript');}})
    .catch(e=>{if(live.current&&generation.current===n){if(accessDenied(e))callbacks.current.onAccessLost(e);else setState('Speech status unavailable · typed transcript remains available');}});
   return()=>{live.current=false;abort.abort();invalidate();};
  },[path,fixture,invalidate]);
@@ -49,3 +49,4 @@ export function SpeechCapture({consultationId,revision,sequence,disabled,fixture
  };
  return <section className="speech-capture" aria-label="Speech capture"><p role="status">{state}</p><div className="clinical-inline"><button className="quiet-button" disabled={disabled||active||!available||!!pending.current} onClick={()=>void start()}>Capture 15-second clip</button>{active&&<button className="quiet-button" onClick={()=>{controller.current?.abort();setState('Capture stopped. Check saved status if transmission had started.');if(!pending.current)finish(generation.current);}}>Stop capture</button>}{pending.current&&<button className="quiet-button" disabled={active} onClick={()=>void inspect()}>Check saved clip</button>}{pending.current&&retained&&!active&&<button className="quiet-button" disabled={disabled} onClick={()=>void inspect(true)}>Save retained final response</button>}</div><small>Only final results are saved. Audio stays in request memory; recovery never uploads it again. An unresolved operation keeps new capture paused.</small></section>;
 }
+

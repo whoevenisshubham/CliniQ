@@ -1,14 +1,14 @@
-# Speech transport: disabled/offline integration
+# Speech transport: prepared live wiring, disabled by default
 
 `SpeechCapture` uses the bounded local PCM capture adapter, then sends a complete16kHz mono16-bit WAV to `/api/clinical/:id/speech`. The handler resolves the real current clinician and encounter before reading/admitting bytes. A stable operation key, segment UUID, expected revision, sequence and server-computed audio hash bind the request. Only final validated output can reach the existing `clinical_mutate` transcript authority. Speech provenance and clip-relative timings are committed in the same SQL transaction; speaker/language remain unknown rather than pretending diarization or detection ran.
 
-Live execution is hard-disabled. No environment key or client flag enables it. The retained Deepgram request/response adapter accepts an explicitly injected offline transmitter; the application has no global-fetch fallback in this path. Its medical vocabulary is the original CliniQ vocabulary, shared with the retained hook. Existing Groq/Llama extraction prompts and typed proposal/review/finalization remain in use after the saved transcript.
+Live execution defaults off. The server transport now requires `SPEECH_ENABLED=true`, `SPEECH_PROVIDER_VERIFIED=true`, a server-only `DEEPGRAM_API_KEY` and `LIVE_SPEECH_AUTHORIZATION_REF`, plus an exact durable live actor/encounter/model/language/audio allowance. A key alone never sends. The retained adapter also accepts an explicitly injected offline transmitter. Its fixed HTTPS endpoint refuses redirects, reads at most64KiB of response, uses the request/deadline signal and never retries automatically. Its medical vocabulary is the original CliniQ vocabulary, shared with the retained hook. Existing Groq/Llama extraction prompts and typed proposal/review/finalization remain in use after the saved transcript. No actual provider request has been made by this offline implementation.
 
 ## Boundaries and recovery
 
 - Complete WAV validation: at most1MiB/30 seconds; the UI prefers one15-second clip.
 - At most20 admitted operations/day and200 retained operations/actor. No reset/deletion when caps are reached.
-- Explicit service-only offline allowances bind actor+encounter, requests and actual audio milliseconds. Global transmission concurrency1; no live allowance can be stored by this schema.
+- Explicit service-only allowances bind mode, retained model/language, actor+encounter, requests and actual audio milliseconds. Global transmission concurrency1; live reservations enforce at least60 seconds between sends. The additive live-mode migration is prepared for isolated rehearsal only; it inserts no allowance and has not been applied to the hosted preview.
 - A durable send marker precedes transmission. Abort, disconnect, expiry or ambiguous response conservatively retains its usage; no automatic resend.
 - Shared local/background/scheduled recovery reconciles at most20 expired operations per call. Pre-send admission expiry cancels; post-marker expiry remains outcome_unknown. Valid retained responses are not retransmitted.
 - Saved speech segments retain their operation/hash/requested configuration and offline provenance. Returning-session UI labels synthetic offline speech explicitly.
@@ -21,7 +21,7 @@ Live execution is hard-disabled. No environment key or client flag enables it. T
 
 The inspected CliniQ hook uses `nova-2` + `hi`. Deepgram's current [model/language table](https://developers.deepgram.com/docs/models-languages-overview/) lists Hindi for Nova-2 and English for Nova-2 Medical. This supports preserving the inspected configuration; it does not prove the owner's remembered winning configuration, Hindi/Hinglish medical accuracy or account access. No automatic model/language/provider switch was made. The [pre-recorded endpoint](https://developers.deepgram.com/docs/pre-recorded-audio) accepts WAV bytes; [streaming final/interim semantics](https://developers.deepgram.com/reference/speech-to-text/listen-streaming) are a separate acceptance concern.
 
-Before any live enablement, verify the intended account, exact adapter/model/language, free eligibility, no paid fallback and enforceable account/audio allowance. Prepare at most3 synthetic clips of15 seconds each, total45 seconds, concurrency1, at least60 seconds apart, application/SDK retries0. Approval must specify exact synthetic actor/patient/encounter scope and account/provider/model. This is a proposal, not an authorization. Text verification keeps its separate unconsumed aggregate allowance.
+Before any live enablement, verify the intended account, exact adapter/model/language, free eligibility, no paid fallback and enforceable account/audio allowance. The existing unconsumed proposal is at most2 synthetic clips of15 seconds each, total30 seconds, concurrency1, at least60 seconds apart, application/SDK retries0; reserve one clip for final hosted-path verification. Approval must specify exact synthetic actor/patient/encounter scope and account/provider/model. This remains a proposal, not authorization. Text keeps its separate proposed two-request allowance; OCR is not included in either allowance.
 
 ## Evidence scope
 

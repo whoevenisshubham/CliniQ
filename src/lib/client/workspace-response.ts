@@ -90,7 +90,7 @@ export function evidenceResponse(body:unknown,path:string,mutation=false){
 const speechStates=['admitted','transmitting','responded','saved','outcome_unknown','stale','cancelled','unavailable','rejected','exhausted','failed'];
 export function speechResponse(body:unknown,kind:'availability'|'status'|'save'){
  if(!object(body)||!object(body.data))return false;const d=body.data;
- if(kind==='availability')return typeof d.available==='boolean'&&['disabled','offline_fixture'].includes(String(d.mode));
+ if(kind==='availability')return typeof d.available==='boolean'&&['disabled','offline_fixture','live'].includes(String(d.mode));
  if(kind==='status')return text(d.id)&&speechStates.includes(String(d.status));
  return speechStates.includes(String(d.state))&&text(d.operationId)&&(d.state!=='saved'||text(d.segmentId)&&text(d.consultationId)&&revision(d.revision));
 }

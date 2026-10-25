@@ -27,6 +27,7 @@ export async function executeLive(input: {
     const c = providerConfiguration();
     if (!c.enabled || c.authorizationRef !== input.authorizationRef || c.model !== input.model || !input.attemptId)
         throw new Error('PROVIDER_DISABLED');
+    if(input.signal.aborted)throw new ProviderFailure('OUTCOME_UNKNOWN',false);
     const client = new Groq({ apiKey: process.env.GROQ_API_KEY, maxRetries: 0, timeout: 45000 });
     let result;
     try {

@@ -2,7 +2,7 @@ import {getSupabaseServerClient,getSupabaseAdminClient} from '@/lib/supabase-ser
 import {speechContext,speechView,readAudio,transcribeClip,recoverSpeech} from '@/lib/server/speech/service';
 import {speechTransport} from '@/lib/server/speech/transport';
 import {errorResponse,HttpError,privateJson,requireSameOrigin,readJson} from '@/lib/server/http';
-export async function GET(request:Request,{params}:{params:Promise<{id:string}>}){try{const cid=(await params).id,client=await getSupabaseServerClient();await speechContext(client,cid);const key=new URL(request.url).searchParams.get('operation');return privateJson({data:key?await speechView(client,cid,key):{available:speechTransport().mode!=='disabled',mode:speechTransport().mode,reason:'Live speech is disabled pending account and bounded audio acceptance.'}});}catch(e){return errorResponse(e);}}
+export async function GET(request:Request,{params}:{params:Promise<{id:string}>}){try{const cid=(await params).id,client=await getSupabaseServerClient();await speechContext(client,cid);const key=new URL(request.url).searchParams.get('operation');return privateJson({data:key?await speechView(client,cid,key):{available:speechTransport().mode!=='disabled',mode:speechTransport().mode,reason:speechTransport().mode==='disabled'?'Speech is disabled pending account and bounded audio acceptance.':'A durable exact audio allowance is checked before any transmission.'}});}catch(e){return errorResponse(e);}}
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){try{requireSameOrigin(request);const cid=(await params).id,client=await getSupabaseServerClient();await speechContext(client,cid);
  if(request.headers.get('content-type')?.split(';')[0].trim()==='application/json'){
   const body=await readJson(request,1024);
@@ -10,3 +10,4 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   const data=await recoverSpeech(client,cid,(body as{operationKey:string}).operationKey);return privateJson({data},data.state==='saved'?200:202);
  }
  const integer=(name:string)=>{const v=request.headers.get(name);if(!v||!/^\d{1,6}$/.test(v))throw new HttpError(400,'INVALID_COMMAND','A saved revision and segment position are required.');return Number(v);};const sequence=integer('x-sequence'),expectedRevision=integer('x-expected-revision');const data=await transcribeClip(client,getSupabaseAdminClient(),{cid,key:request.headers.get('idempotency-key')??'',segmentId:request.headers.get('x-segment-id')??'',sequence,expectedRevision,bytes:await readAudio(request),signal:request.signal});return privateJson({data},data.state==='saved'?200:202);}catch(e){return errorResponse(e);}}
+

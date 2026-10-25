@@ -5,7 +5,7 @@ import {resolvePrincipal} from '../auth/context';
 import {HttpError} from '../http';
 import {id} from '../documents/service';
 import {validateWav} from '@/lib/clinical/audio';
-import {speechTransport,SpeechOutputError} from './transport';
+import {speechTransport,SpeechOutputError,SpeechUnavailableError} from './transport';
 function check(error:{code:string;message:string}|null){if(!error)return;const codes:Record<string,number>={AUTH_REQUIRED:401,NOT_FOUND:404,SYNTHETIC_ONLY:403,IDEMPOTENCY_CONFLICT:409,REVISION_CONFLICT:409,OPERATION_LIMIT:429,INVALID_AUDIO:422,RESULT_UNAVAILABLE:409};throw new HttpError(codes[error.message]??(['23514','22P02','23505'].includes(error.code)?422:503),codes[error.message]?error.message:'SPEECH_UNAVAILABLE','Speech processing is unavailable or conflicts with the saved encounter. Your existing record is unchanged.');}
 export async function speechContext(client:SupabaseClient,cid:string){const p=await resolvePrincipal(client);id(cid);if(p.role!=='doctor')throw new HttpError(403,'PROVIDER_REQUIRED','A treating clinician is required.');const c=await client.from('consultations').select('id,status,revision').eq('id',cid).maybeSingle();check(c.error);if(!c.data)throw new HttpError(404,'NOT_FOUND','Consultation unavailable.');return c.data;}
 export async function speechView(client:SupabaseClient,cid:string,key:string){await speechContext(client,cid);id(key);const r=await client.from('speech_operations').select('id,status,response,error_code,segment_id,mode,created_at').eq('consultation_id',cid).eq('operation_key',key).maybeSingle();check(r.error);if(!r.data)throw new HttpError(404,'NOT_FOUND','Speech operation unavailable.');return r.data;}
@@ -24,10 +24,10 @@ export async function transcribeClip(client:SupabaseClient,admin:SupabaseClient,
  const transport=speechTransport();const result=async(state:string,text?:string,requestId?:string)=>{const r=await admin.rpc('speech_result',{oid,next_state:state,transcript:text??null,request_id:requestId??null});check(r.error);return r.data as boolean;};
  if(transport.mode==='disabled'){await result('unavailable');return{state:'unavailable',operationId:oid};}
  if(input.signal.aborted){await result('cancelled');return{state:'cancelled',operationId:oid};}
- const reservation=await admin.rpc('speech_reserve',{oid,budget_ref:transport.authorizationRef,sha,duration});check(reservation.error);if(!reservation.data){const current=await view();return current.status==='saved'?current.response:{state:current.status,operationId:oid};}
+ const reservation=await admin.rpc('speech_reserve',{oid,budget_ref:transport.authorizationRef,sha,duration,...(transport.mode==='live'?{execution_mode:'live'}:{})});check(reservation.error);if(!reservation.data){const current=await view();return current.status==='saved'?current.response:{state:current.status,operationId:oid};}
  const signal=AbortSignal.any([input.signal,AbortSignal.timeout(45000)]);let reply;
  try{reply=await Promise.race([transport.transcribe(input.bytes,signal),new Promise<never>((_,reject)=>{if(signal.aborted)reject(new Error('CANCELLED'));else signal.addEventListener('abort',()=>reject(new Error('SPEECH_OUTCOME_UNKNOWN')),{once:true});})]);}
- catch(e){const state=e instanceof SpeechOutputError?'rejected':'outcome_unknown';if(!await result(state)){const current=await view();return{state:current.status,operationId:oid};}return{state,operationId:oid};}
+ catch(e){const state=e instanceof SpeechUnavailableError?'unavailable':e instanceof SpeechOutputError?'rejected':'outcome_unknown';if(!await result(state)){const current=await view();return{state:current.status,operationId:oid};}return{state,operationId:oid};}
  if(!reply.final||typeof reply.text!=='string'||!reply.text.trim()||reply.text.length>8000){await result('rejected');return{state:'rejected',operationId:oid};}
  if(signal.aborted){await result('outcome_unknown');return{state:'outcome_unknown',operationId:oid};}
  if(!await result('responded',reply.text,reply.providerRequestId)){const current=await view();return{state:current.status,operationId:oid};}

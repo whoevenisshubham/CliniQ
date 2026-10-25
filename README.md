@@ -10,6 +10,8 @@ Uploads are bounded to 4 MiB each, 10 live records, 10 retained versions per rec
 
 PDF/text parsing is local and bounded: 20 pages, 100,000 extracted characters, 100 chunks and a 30-second parser deadline. Page references and Unicode source offsets are retained. Scanned images, encrypted PDFs, unsupported bounds and empty text have explicit states. Patient-entered transcripts are separate, labelled versions linked to the retained original. No OCR, inference or embedding is invoked.
 
+An optional [reviewed OCR path](docs/ocr.md) is implemented behind disabled capabilities: exact private source/page admission, bounded local rasterization, durable budgeted jobs, uncalibrated draft text and human-corrected transcription with retained original/page provenance. Its additive migration is tested in isolated infrastructure, not applied to the hosted preview. `/design/ocr` is a labelled nonpersistent UI fixture. External OCR remains off; manual transcription stays usable.
+
 The original speech-to-EMR hooks, adapters, prompts and clinical review components remain in the repository. Most legacy clinical write endpoints are still contained. Provider/model choices were preserved; the exact historically successful runtime is not asserted. See the [reuse map](docs/core-pipeline-reuse.md).
 
 ## Manual consultation foundation
