@@ -15,7 +15,11 @@ export function renderOCRImages(bytes:Uint8Array,mime:string,pages:number[],sign
   let done=false;
   const finish=(error?:Error,result?:OCRImage[])=>{if(done)return;done=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);
    // Do not release the process raster slot while native work is still alive.
-   void worker.terminate().catch(()=>{}).finally(()=>{release();if(error)reject(error);else resolve(result!);});};
+   void worker.terminate().then(()=>{release();if(error)reject(error);else resolve(result!);},()=>{
+    // Unknown native termination must not permit another renderer in this
+    // process. Fail closed until the function instance is recycled.
+    waiting?.cancel();reject(Error('IMAGE_TERMINATION_UNCONFIRMED'));
+   });};
   const abort=()=>finish(Error('CANCELLED'));const timer=setTimeout(()=>finish(Error('IMAGE_DEADLINE')),15000);signal?.addEventListener('abort',abort,{once:true});
   worker.once('error',()=>finish(Error('IMAGE_UNAVAILABLE')));worker.once('exit',()=>finish(Error('IMAGE_EXIT')));
   worker.once('message',(r:{error?:string;pages?:OCRImage[]})=>{if(r.error){finish(Error(r.error));return;}const out=r.pages;
