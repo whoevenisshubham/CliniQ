@@ -51,10 +51,13 @@ try{
  process.env.OCR_ENABLED='false';process.env.SPEECH_ENABLED='false';
  const columns=JSON.parse(sql("select json_object_agg(table_name,cols) from (select table_name,string_agg(quote_ident(column_name),',' order by ordinal_position) cols from information_schema.columns where table_schema='public' group by table_name) x"));
  const snapshotRows=()=>Object.fromEntries(Object.entries(columns).map(([table,cols])=>[table,JSON.parse(sql(`select json_build_object('rows',count(*),'hash',md5(coalesce(string_agg(row_to_json(x)::text,'|' order by row_to_json(x)::text),''))) from (select ${cols} from public.${table}) x`))]));
+ sql(readFileSync(root+'/scripts/optional-rollout-preflight.sql','utf8'));
+ const preparedSnapshot=sql(readFileSync(root+'/scripts/optional-preservation-snapshot.sql','utf8'));
  const before=snapshotRows(),sourceFunction=sql("select 'private.ai_sources_current(public.document_jobs)'::regprocedure::oid"),policies=sql("select md5(string_agg(row_to_json(x)::text,'|' order by row_to_json(x)::text)) from (select * from pg_policies where schemaname='public') x");
  const plan=loadMigrationPlan(root),files=Object.keys(plan.manifest).filter(f=>/20261025000[12]_/.test(f));assert.equal(files.length,2);
  sql('BEGIN;\n'+files.map(f=>transactionBody(readFileSync(root+'/'+f,'utf8'))).join('\n')+'\nCOMMIT;');
  const after=snapshotRows();assert.deepEqual(after,before,'Optional upgrade changed existing row fields');assert.equal(sql("select 'private.ai_sources_current(public.document_jobs)'::regprocedure::oid"),sourceFunction);assert.equal(sql("select md5(string_agg(row_to_json(x)::text,'|' order by row_to_json(x)::text)) from (select * from pg_policies where schemaname='public') x"),policies);
+ assert.equal(sql(readFileSync(root+'/scripts/optional-preservation-snapshot.sql','utf8')),preparedSnapshot,'Prepared read-only digest must preserve existing rows');sql(readFileSync(root+'/scripts/optional-rollout-postflight.sql','utf8'));
  assert.equal(sql('select count(*) from public.provider_allowances'),'0');assert.equal(sql('select count(*) from public.speech_allowances'),'0');
  let refreshed=false;for(let n=0;n<30;n++){const r=await admin.rpc('optional_capabilities');if(!r.error&&r.data?.ocr===1&&r.data?.speech===1){refreshed=true;break;}await new Promise(r=>setTimeout(r,200));}assert.ok(refreshed,'Optional schema cache must converge');
  await ready();assert.equal((await documentDetail(patient,uploaded.document_id)).document.id,uploaded.document_id);assert.equal((await documentDetail(doctor,uploaded.document_id)).document.id,uploaded.document_id);assert.equal((await clinicalList(patient)).approved!.length,1);assert.ok(await accountView(patient));
