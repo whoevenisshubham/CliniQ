@@ -8,7 +8,7 @@ ALTER TABLE public.document_jobs DROP CONSTRAINT document_jobs_document_id_versi
 CREATE UNIQUE INDEX document_local_job_once ON public.document_jobs(document_id,version_id,input_revision,kind) WHERE kind IN ('ingest_document','purge_document');
 CREATE UNIQUE INDEX ocr_source_once ON public.document_jobs(actor_id,document_id,version_id,input_revision) WHERE kind='ocr_document';
 CREATE OR REPLACE FUNCTION private.invalidate_document(p_document uuid) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$ BEGIN
- UPDATE public.document_jobs SET status='cancelled',lease_until=CASE WHEN kind='ocr_document' AND provider_attempt_id IS NOT NULL THEN lease_until ELSE NULL END WHERE document_id=p_document AND status IN ('queued','running');
+ UPDATE public.document_jobs SET status='cancelled',lease_until=CASE WHEN kind='ocr_document' THEN lease_until ELSE NULL END WHERE document_id=p_document AND status IN ('queued','running');
  DELETE FROM public.document_chunks WHERE document_id=p_document;
  UPDATE public.document_results SET status='stale' WHERE document_id=p_document;
 END $$;
@@ -16,6 +16,20 @@ ALTER TABLE public.provider_budgets DROP CONSTRAINT provider_budgets_kind_check;
 ALTER TABLE public.provider_budgets ADD CONSTRAINT provider_budgets_kind_check CHECK(kind IN ('answer_question','explain_document','extract_emr','ocr_document'));
 ALTER TABLE public.document_versions ADD COLUMN reviewed_ocr jsonb;
 ALTER TABLE public.upload_operations ADD COLUMN reviewed_ocr jsonb;
+-- OCR uses the existing thread/budget authority, but must not appear as an
+-- evidence-chat thread with an incompatible question/answer envelope.
+CREATE OR REPLACE FUNCTION private.owns_ai_thread(t uuid) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+ SELECT private.actor_thread(private.current_app_user_id(),t) AND NOT EXISTS(SELECT 1 FROM public.document_jobs WHERE thread_id=t AND kind='ocr_document')
+$$;
+CREATE FUNCTION private.ocr_thread_family() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+ IF NEW.thread_id IS NOT NULL THEN
+ PERFORM 1 FROM public.ai_threads WHERE id=NEW.thread_id FOR UPDATE;
+ IF EXISTS(SELECT 1 FROM public.document_jobs WHERE thread_id=NEW.thread_id AND (kind='ocr_document')<>(NEW.kind='ocr_document')) THEN RAISE EXCEPTION 'INVALID_COMMAND';END IF;
+ END IF;RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION private.ocr_thread_family() FROM PUBLIC,anon,authenticated;
+CREATE TRIGGER ocr_thread_family BEFORE INSERT ON public.document_jobs FOR EACH ROW EXECUTE FUNCTION private.ocr_thread_family();
 
 CREATE OR REPLACE FUNCTION private.ai_sources_current(j public.document_jobs) RETURNS boolean LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE s jsonb;BEGIN
@@ -33,6 +47,27 @@ DECLARE s jsonb;BEGIN
  END LOOP;RETURN true;
 END $$;
 REVOKE ALL ON FUNCTION private.ai_sources_current(public.document_jobs) FROM PUBLIC,anon,authenticated;
+-- One bounded raster/provider pipeline at a time, before native image work.
+-- Generic text claims must never consume an OCR job.
+CREATE OR REPLACE FUNCTION public.ai_claim(p_id uuid DEFAULT NULL) RETURNS SETOF public.document_jobs LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE j public.document_jobs;BEGIN
+ PERFORM private.ai_recover();
+ SELECT * INTO j FROM public.document_jobs WHERE thread_id IS NOT NULL AND kind<>'ocr_document' AND status='queued' AND available_at<=now() AND attempts<3 AND (p_id IS NULL OR id=p_id) ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1;
+ IF NOT FOUND THEN RETURN;END IF;
+ IF NOT private.ai_sources_current(j) THEN UPDATE public.document_jobs SET status='stale',result=NULL,error_code='SOURCE_STALE' WHERE id=j.id;RETURN;END IF;
+ UPDATE public.document_jobs SET status='running',fence=fence+1,attempts=attempts+1,lease_until=now()+interval '90 seconds' WHERE id=j.id RETURNING * INTO j;RETURN NEXT j;
+END $$;
+CREATE FUNCTION public.ocr_claim(p_id uuid) RETURNS SETOF public.document_jobs LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE j public.document_jobs;BEGIN
+ PERFORM pg_advisory_xact_lock(hashtextextended('cliniq-ocr-render',0));PERFORM private.ai_recover();
+ IF EXISTS(SELECT 1 FROM public.document_jobs WHERE kind='ocr_document' AND lease_until>now()) THEN RETURN;END IF;
+ SELECT * INTO j FROM public.document_jobs WHERE id=p_id AND kind='ocr_document' AND status='queued' AND available_at<=now() AND attempts<3 FOR UPDATE SKIP LOCKED;
+ IF NOT FOUND THEN RETURN;END IF;
+ IF NOT private.ai_sources_current(j) THEN UPDATE public.document_jobs SET status='stale',result=NULL,error_code='SOURCE_STALE' WHERE id=j.id;RETURN;END IF;
+ UPDATE public.document_jobs SET status='running',fence=fence+1,attempts=attempts+1,lease_until=now()+interval '90 seconds' WHERE id=j.id RETURNING * INTO j;RETURN NEXT j;
+END $$;
+REVOKE ALL ON FUNCTION public.ocr_claim(uuid) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.ocr_claim(uuid) TO service_role;
 
 CREATE FUNCTION public.ocr_admit(k uuid,tid uuid,did uuid,vid uuid,expected integer,pages integer[]) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE a uuid:=private.current_app_user_id();d public.documents;v public.document_versions;j public.document_jobs;req jsonb;inp jsonb;BEGIN
@@ -40,10 +75,11 @@ DECLARE a uuid:=private.current_app_user_id();d public.documents;v public.docume
  IF NOT private.actor_thread(a,tid) OR NOT private.actor_thread_document(a,tid,did) THEN RAISE EXCEPTION 'NOT_FOUND';END IF;
  SELECT * INTO d FROM public.documents WHERE id=did FOR SHARE;
  IF NOT EXISTS(SELECT 1 FROM public.ai_threads WHERE id=tid AND patient_id=d.patient_id) THEN RAISE EXCEPTION 'NOT_FOUND';END IF;
+ IF EXISTS(SELECT 1 FROM public.document_jobs WHERE thread_id=tid AND kind<>'ocr_document') THEN RAISE EXCEPTION 'INVALID_COMMAND';END IF;
  IF d.revision IS DISTINCT FROM expected OR d.current_version_id IS DISTINCT FROM vid THEN RAISE EXCEPTION 'REVISION_CONFLICT';END IF;
  SELECT * INTO v FROM public.document_versions WHERE id=vid;
  IF pages IS NULL OR cardinality(pages) NOT BETWEEN 1 AND 2 OR array_position(pages,NULL) IS NOT NULL OR (SELECT count(DISTINCT x) FROM unnest(pages) x)<>cardinality(pages) OR EXISTS(SELECT 1 FROM unnest(pages) x WHERE x NOT BETWEEN 1 AND 20) THEN RAISE EXCEPTION 'INVALID_PAGES';END IF;
- IF v.mime NOT IN ('image/png','image/jpeg','application/pdf') OR v.source_class<>'original' OR v.extraction_status<>'needs_transcription' OR (v.mime<>'application/pdf' AND pages<>ARRAY[1]) OR (v.mime='application/pdf' AND EXISTS(SELECT 1 FROM unnest(pages) x WHERE x>v.page_count)) THEN RAISE EXCEPTION 'OCR_SOURCE_UNSUPPORTED';END IF;
+ IF v.mime NOT IN ('image/png','image/jpeg','application/pdf') OR v.source_class<>'original' OR NOT (v.extraction_status='needs_transcription' OR (v.mime='application/pdf' AND v.extraction_status='text_ready')) OR (v.mime<>'application/pdf' AND pages<>ARRAY[1]) OR (v.mime='application/pdf' AND EXISTS(SELECT 1 FROM unnest(pages) x WHERE x>v.page_count)) THEN RAISE EXCEPTION 'OCR_SOURCE_UNSUPPORTED';END IF;
  req:=jsonb_build_object('documentId',did,'versionId',vid,'revision',expected,'pages',pages);
  PERFORM pg_advisory_xact_lock(hashtextextended(a::text||did::text,0));
  SELECT * INTO j FROM public.document_jobs WHERE actor_id=a AND operation_key=k;
@@ -90,7 +126,9 @@ GRANT EXECUTE ON FUNCTION public.ocr_cancel(uuid) TO authenticated;
 CREATE FUNCTION public.ocr_before_send_fail(jid uuid,f integer,reason text) RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE j public.document_jobs;BEGIN
  PERFORM private.ai_lock_sources(jid);SELECT * INTO j FROM public.document_jobs WHERE id=jid FOR UPDATE;
- IF NOT FOUND OR j.kind<>'ocr_document' OR j.status<>'running' OR j.fence<>f OR j.provider_attempt_id IS NOT NULL THEN RETURN false;END IF;
+ IF NOT FOUND OR j.kind<>'ocr_document' OR j.fence<>f OR j.provider_attempt_id IS NOT NULL THEN RETURN false;END IF;
+ IF j.status IN ('cancelled','stale') THEN UPDATE public.document_jobs SET lease_until=NULL WHERE id=jid;RETURN false;END IF;
+ IF j.status<>'running' THEN RETURN false;END IF;
  UPDATE public.document_jobs SET status=CASE WHEN NOT private.ai_sources_current(j) THEN 'stale' WHEN reason='CANCELLED_BEFORE_SEND' THEN 'cancelled' ELSE 'unavailable' END,result=NULL,error_code=left(reason,80),lease_until=NULL WHERE id=jid;RETURN true;
 END $$;
 REVOKE ALL ON FUNCTION public.ocr_before_send_fail(uuid,integer,text) FROM PUBLIC,anon,authenticated;

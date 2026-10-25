@@ -7,6 +7,7 @@ Live execution defaults off. The server transport now requires `SPEECH_ENABLED=t
 ## Boundaries and recovery
 
 - Complete WAV validation: at most1MiB/30 seconds; the UI prefers one15-second clip.
+- Read-only preflight hides capture when no matching allowance remains or live pacing applies. Its remaining audio bound caps the existing capture window; preflight never reserves or transmits. The authoritative reservation checks run again after the complete WAV is validated.
 - At most20 admitted operations/day and200 retained operations/actor. No reset/deletion when caps are reached.
 - Explicit service-only allowances bind mode, retained model/language, actor+encounter, requests and actual audio milliseconds. Global transmission concurrency1; live reservations enforce at least60 seconds between sends. The additive live-mode migration is prepared for isolated rehearsal only; it inserts no allowance and has not been applied to the hosted preview.
 - A durable send marker precedes transmission. Abort, disconnect, expiry or ambiguous response conservatively retains its usage; no automatic resend.

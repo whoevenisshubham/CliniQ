@@ -4,10 +4,11 @@ import {act,createElement} from 'react';
 import {createRoot,type Root} from 'react-dom/client';
 import {SpeechCapture} from '@/components/consultation/SpeechCapture';
 import {speechPhase} from '@/lib/client/speech-state';
-vi.mock('@/lib/clinical/capture',()=>({captureClip:async(o:{onClip:(b:Uint8Array)=>void})=>o.onClip(new Uint8Array([1,2,3]))}));
+import {captureClip} from '@/lib/clinical/capture';
+vi.mock('@/lib/clinical/capture',()=>({captureClip:vi.fn(async(o:{onClip:(b:Uint8Array)=>void})=>o.onClip(new Uint8Array([1,2,3])))}));
 let root:Root,host:HTMLDivElement;
 beforeEach(()=>{vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);host=document.createElement('div');document.body.append(host);root=createRoot(host);});
-afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals();});
+afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals();vi.clearAllMocks();});
 const result=(data:unknown)=>Response.json({data});
 const button=(text:string)=>[...host.querySelectorAll('button')].find(b=>b.textContent===text)!;
 const click=async(text:string)=>{await act(async()=>button(text).click());};
@@ -29,4 +30,12 @@ it('availability denial propagates access loss and cannot enable capture',async(
 });
 it('only retained results permit save-only recovery; unknown and active states retain the operation',()=>{
  expect(speechPhase('responded')).toBe('retained');for(const state of ['outcome_unknown','unexpected'])expect(speechPhase(state)).toBe('unknown');for(const state of ['admitted','transmitting'])expect(speechPhase(state)).toBe('pending');expect(speechPhase('saved')).toBe('saved');
+});
+it('remaining audio admission bounds actual capture instead of implying a full 15-second allowance',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async(_url:string,init?:RequestInit)=>result(init?.method?{state:'unavailable',operationId:'bounded-op'}:{available:true,mode:'offline_fixture',maxClipMs:7000})));
+ await act(async()=>root.render(createElement(SpeechCapture,{consultationId:'encounter-one',revision:0,sequence:0,disabled:false,fixture:false,onBusy:vi.fn(),onSaved:vi.fn(),onAccessLost:vi.fn()})));await click('Capture 7-second clip');expect(captureClip).toHaveBeenLastCalledWith(expect.objectContaining({windowMs:7000}));
+});
+it('malformed successful preflight cannot enable capture beyond the supported bound',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>result({available:true,mode:'live',maxClipMs:900000})));
+ await act(async()=>root.render(createElement(SpeechCapture,{consultationId:'encounter-one',revision:0,sequence:0,disabled:false,fixture:false,onBusy:vi.fn(),onSaved:vi.fn(),onAccessLost:vi.fn()})));expect(button('Capture 15-second clip').disabled).toBe(true);expect(captureClip).not.toHaveBeenCalled();
 });

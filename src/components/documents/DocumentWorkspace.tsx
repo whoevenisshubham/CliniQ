@@ -327,7 +327,7 @@ export function DocumentWorkspace({
               </div>
             </SourceDetail>
             {version?.reviewed_ocr&&<p className="status-message">Human-reviewed OCR transcription · original pages {version.reviewed_ocr.sourcePages.join(', ')} · original version {version.reviewed_ocr.sourceVersionId.slice(0,8)}. Provider confidence was uncalibrated. This is source text, not a clinical approval.</p>}
-            {!provider&&!fixture&&process.env.NEXT_PUBLIC_OCR_ENABLED==='true'&&version&&version.extraction_status==='needs_transcription'&&<OCRReview key={selected+':'+version.id} documentId={selected!} versionId={version.id} revision={detail.document.revision} title={detail.document.title} mime={version.mime} onDirty={setOcrDirty} onAccessLost={hideAccessFailure} onSaved={()=>void refresh().catch(e=>setError(e.message))}/>}
+            {!provider&&!fixture&&process.env.NEXT_PUBLIC_OCR_ENABLED==='true'&&version&&(version.extraction_status==='needs_transcription'||version.mime==='application/pdf'&&version.extraction_status==='text_ready')&&<OCRReview key={selected+':'+version.id} documentId={selected!} versionId={version.id} revision={detail.document.revision} title={detail.document.title} mime={version.mime} onDirty={setOcrDirty} onAccessLost={hideAccessFailure} onSaved={()=>void refresh().catch(e=>setError(e.message))}/>}
             <div className="document-actions">
               <button
                 className="secondary-button"

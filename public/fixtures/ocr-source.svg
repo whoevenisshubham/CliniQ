@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 760" role="img" aria-labelledby="title description">
+ <title id="title">Illustrative synthetic source</title><desc id="description">A fictional printed source page for layout review. Question marks are intentionally unreadable placeholders. No OCR result or clinical accuracy is demonstrated.</desc>
+ <rect width="720" height="760" fill="#fffdf5"/><rect x="36" y="36" width="648" height="688" rx="4" fill="none" stroke="#b5b8af"/>
+ <g font-family="Arial, Nirmala UI, sans-serif" fill="#202c2a">
+  <text x="66" y="96" font-size="22" letter-spacing="2">SYNTHETIC SOURCE · PAGE 2</text>
+  <text x="66" y="136" font-size="17" fill="#59675e">Illustrative layout only · no clinical use</text>
+  <path d="M66 166H654" stroke="#a6b2a8"/>
+  <text x="66" y="232" font-size="27">दवा का नाम:  ? ? ?</text>
+  <text x="66" y="296" font-size="27">Dose:  ? ?  mg</text>
+  <text x="66" y="374" font-size="24">Reported: No fever</text>
+  <text x="66" y="416" font-size="27">बुखार नहीं है।</text>
+  <text x="66" y="494" font-size="25">Literal value: 12.4 g/dL</text>
+  <path d="M66 552H654" stroke="#a6b2a8"/>
+  <text x="66" y="600" font-size="18">Question marks are intentional placeholders.</text>
+  <text x="66" y="634" font-size="18">The review text is an injected provider double.</text>
+  <text x="66" y="688" font-size="16" fill="#59675e">Not an OCR benchmark or handwriting-quality claim.</text>
+ </g>
+</svg>

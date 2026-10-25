@@ -22,7 +22,7 @@ DECLARE o public.speech_operations;b public.speech_allowances;BEGIN
  IF EXISTS(SELECT 1 FROM public.speech_operations WHERE status='transmitting') THEN RETURN false;END IF;
  SELECT * INTO b FROM public.speech_allowances WHERE authorization_ref=budget_ref AND mode=execution_mode AND model=o.model AND requested_language=o.requested_language AND actor_id=o.actor_id AND consultation_id=o.consultation_id AND enabled AND starts_at<=now() AND ends_at>now() ORDER BY id FOR UPDATE LIMIT 1;
  IF NOT FOUND OR b.used_requests>=b.max_requests OR b.used_audio_ms+duration>b.max_audio_ms THEN UPDATE public.speech_operations SET status='unavailable',error_code='NO_AUDIO_ALLOWANCE' WHERE id=oid;RETURN false;END IF;
- IF b.mode='live' AND b.next_send_at>now() THEN RETURN false;END IF;
+ IF b.mode='live' AND b.next_send_at>now() THEN UPDATE public.speech_operations SET status='unavailable',error_code='AUDIO_PACING' WHERE id=oid;RETURN false;END IF;
  UPDATE public.speech_allowances SET next_send_at=CASE WHEN mode='live' THEN now()+make_interval(secs=>min_interval_seconds) ELSE next_send_at END,used_requests=used_requests+1,used_audio_ms=used_audio_ms+duration WHERE id=b.id;
  UPDATE public.speech_operations SET status='transmitting',mode=execution_mode,lease_until=now()+interval '60 seconds' WHERE id=oid;RETURN true;
 END $$;
