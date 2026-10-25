@@ -1,10 +1,13 @@
 import type {SupabaseClient} from '@supabase/supabase-js';
 import {createHash} from 'node:crypto';
 import {renderOCRImages} from './images';
-import {ocrProvider,validateOCR,type OCRProvider} from './provider';
+import {ocrProvider,validateOCR,OCR_PROMPT,type OCRProvider} from './provider';
+import {requestBound,validUsage,parseAccounting} from './accounting';
+import {optionalSchema} from '../optional-schema';
 import {ProviderFailure} from '../ai/failure';
 function check(e:unknown){if(e)throw Error('OCR_DATABASE_UNAVAILABLE');}
 export async function runOCRJob(admin:SupabaseClient,jobId:string,offline?:OCRProvider,signal=AbortSignal.timeout(60000)){
+ if(!offline&&(process.env.OCR_ENABLED!=='true'||!await optionalSchema(admin,'ocr')))return{status:'unavailable'};
  const claim=await admin.rpc('ocr_claim',{p_id:jobId});check(claim.error);const j=claim.data?.[0];if(!j)return{status:'idle'};
  if(j.kind!=='ocr_document')throw Error('OCR_JOB_REQUIRED');
  const publish=async()=>{const r=await admin.rpc('ai_publish',{jid:j.id,f:j.fence});check(r.error);return{jobId:j.id,status:r.data?'review_required':'stale'};};
@@ -15,13 +18,12 @@ export async function runOCRJob(admin:SupabaseClient,jobId:string,offline?:OCRPr
  let images;
  try{const v=await admin.from('document_versions').select('object_key,mime,sha256,byte_size').eq('id',j.version_id).eq('document_id',j.document_id).single();check(v.error);const file=await admin.storage.from('clinical-documents').download(v.data!.object_key);if(file.error||!file.data)throw Error('BYTES_UNAVAILABLE');const bytes=new Uint8Array(await file.data.arrayBuffer());if(bytes.length!==v.data!.byte_size||bytes.length>4194304||createHash('sha256').update(bytes).digest('hex')!==j.input_snapshot.byteHash)throw Error('BYTE_INTEGRITY');images=await renderOCRImages(bytes,v.data!.mime,j.input_snapshot.pages,signal);}catch(e){if(signal.aborted){await unavailable('CANCELLED_BEFORE_SEND');return{jobId:j.id,status:'cancelled'};}return unavailable(e instanceof Error&&e.message==='LOCAL_TEXT_AVAILABLE'?'LOCAL_TEXT_AVAILABLE':'OCR_SOURCE_UNREADABLE');}
  if(signal.aborted){await unavailable('CANCELLED_BEFORE_SEND');return{jobId:j.id,status:'cancelled'};}
- // Conservative reservation of the full available input bound for vision.
- // Live verification must reconcile actual model image-token accounting first.
- const reserved=await admin.rpc('ai_reserve',{jid:j.id,f:j.fence,execution_mode:provider.mode,model_name:provider.model,input_bound:50000,output_bound:3000,budget_ref:provider.authorizationRef});check(reserved.error);if(!reserved.data){await unavailable('OCR_NOT_ADMITTED');return{jobId:j.id,status:'not_admitted'};}
+ let bound;try{const admitted=j.input_snapshot.accounting,profile=parseAccounting(admitted?.profile,provider.model);if(JSON.stringify(profile)!==JSON.stringify(parseAccounting(provider.accounting,provider.model)))throw Error();bound=requestBound(profile,OCR_PROMPT,j.input_snapshot.pages,images);if(bound.input>admitted.input||bound.output!==admitted.output)throw Error();}catch{return unavailable('OCR_ACCOUNTING_UNAVAILABLE');}
+ const reserved=await admin.rpc('ocr_reserve',{jid:j.id,f:j.fence,execution_mode:provider.mode,model_name:provider.model,input_bound:bound.input,output_bound:bound.output,budget_ref:provider.authorizationRef});check(reserved.error);if(!reserved.data){await unavailable('OCR_NOT_ADMITTED');return{jobId:j.id,status:'not_admitted'};}
  const deadline=AbortSignal.any([signal,AbortSignal.timeout(45000)]);let reply;
- try{reply=await Promise.race([provider.execute(images,deadline),new Promise<never>((_,reject)=>{if(deadline.aborted)reject(Error('OCR_OUTCOME_UNKNOWN'));else deadline.addEventListener('abort',()=>reject(Error('OCR_OUTCOME_UNKNOWN')),{once:true});})]);}
+ try{reply=await Promise.race([provider.execute(images,deadline,bound),new Promise<never>((_,reject)=>{if(deadline.aborted)reject(Error('OCR_OUTCOME_UNKNOWN'));else deadline.addEventListener('abort',()=>reject(Error('OCR_OUTCOME_UNKNOWN')),{once:true});})]);}
  catch(e){if(e instanceof ProviderFailure&&e.definite){const r=await admin.rpc('ai_record_response',{jid:j.id,f:j.fence,aid:reserved.data,p_result:{reason:e.category},p_kind:provider.mode==='offline_fixture'?'offline_fixture':'generated',p_state:'unavailable',used_input:null,used_output:null});check(r.error);if(r.data)await publish();return{jobId:j.id,status:'unavailable'};}const u=await admin.rpc('ai_unknown',{jid:j.id,f:j.fence});check(u.error);return{jobId:j.id,status:'outcome_unknown'};}
- let result:unknown,state='succeeded';try{if(deadline.aborted)throw Error('OCR_DEADLINE');result={...validateOCR(reply.text,reply.finishReason,j.input_snapshot.pages),requiresReview:true,confidence:'uncalibrated'};}catch{result={reason:'OCR_OUTPUT_REJECTED'};state='rejected';}
- const r=await admin.rpc('ai_record_response',{jid:j.id,f:j.fence,aid:reserved.data,p_result:result,p_kind:provider.mode==='offline_fixture'?'offline_fixture':'generated',p_state:state,used_input:null,used_output:null});check(r.error);if(!r.data)return{jobId:j.id,status:'stale'};
+ const usage=validUsage(reply.usage,bound);let result:unknown,state='succeeded';try{if(deadline.aborted)throw Error('OCR_DEADLINE');result={...validateOCR(reply.text,reply.finishReason,j.input_snapshot.pages),requiresReview:true,confidence:'uncalibrated',accounting:bound,usage};}catch{result={reason:'OCR_OUTPUT_REJECTED',accounting:bound,usage};state='rejected';}
+ const r=await admin.rpc('ai_record_response',{jid:j.id,f:j.fence,aid:reserved.data,p_result:result,p_kind:provider.mode==='offline_fixture'?'offline_fixture':'generated',p_state:state,used_input:usage?.input??null,used_output:usage?.output??null});check(r.error);if(!r.data)return{jobId:j.id,status:'stale'};
  const p=await publish();return{...p,status:p.status==='stale'?'stale':state==='succeeded'?'review_required':state};
 }

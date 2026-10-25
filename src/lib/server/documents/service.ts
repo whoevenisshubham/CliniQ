@@ -1,3 +1,4 @@
+import {optionalSchema} from '../optional-schema';
 import "server-only";
 import type { SupabaseClient, PostgrestError } from "@supabase/supabase-js";
 import { resolvePrincipal } from "../auth/context";
@@ -100,7 +101,7 @@ export async function documentDetail(
   ]);
   for (const r of [versions, chunks, grants]) dbError(r.error);
   const ocrMetadata:Record<string,unknown>={};
-  if(process.env.OCR_ENABLED==='true'){
+  if(process.env.OCR_ENABLED==='true'&&await optionalSchema(client,'ocr')){
     const metadata=await client.from('document_versions').select('id,reviewed_ocr').eq('document_id',documentId);dbError(metadata.error);
     for(const row of metadata.data??[])ocrMetadata[row.id]=row.reviewed_ocr;
   }

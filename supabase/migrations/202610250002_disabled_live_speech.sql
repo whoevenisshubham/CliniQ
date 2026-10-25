@@ -40,5 +40,6 @@ DECLARE o public.speech_operations;BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.speech_reserve(uuid,text,text,integer,text) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.speech_reserve(uuid,text,text,integer,text) TO service_role;
+CREATE OR REPLACE FUNCTION public.optional_capabilities() RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$ SELECT '{"ocr":1,"speech":1}'::jsonb $$;
 NOTIFY pgrst,'reload schema';
 COMMIT;

@@ -46,10 +46,12 @@ export function DocumentWorkspace({
   provider = false,
   fixture,
   initialDocumentId = null,
+  initialVersionId = null,
 }: {
   provider?: boolean;
   fixture?: { rows: DocumentRow[]; detail: Detail; providers: Provider[] };
   initialDocumentId?: string | null;
+  initialVersionId?: string | null;
 }) {
   const api = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -86,6 +88,8 @@ export function DocumentWorkspace({
     [title, setTitle] = useState(""),
     [file, setFile] = useState<File | null>(null),
     [text, setText] = useState("");
+  const expectedSourceVersion=useRef(initialVersionId);
+  const assertSourceVersion=(data:Detail)=>{if(expectedSourceVersion.current&&data.document.current_version_id!==expectedSourceVersion.current)throw new Error('The cited source version is no longer current. Its obsolete passage is hidden. Open the current record from the list.');};
   const retry = useRef<{ signature: string; key: string } | null>(null),
     headingRef = useRef<HTMLDivElement>(null),live=useRef(true),selectionRef=useRef<string|null>(initialDocumentId);
   useEffect(()=>{live.current=true;return()=>{live.current=false;};},[]);
@@ -99,7 +103,7 @@ export function DocumentWorkspace({
     if (target) {
       try {
         const data = await api("/api/documents/" + target);
-        if(live.current&&selectionRef.current===target)setDetail(data);
+        assertSourceVersion(data);if(live.current&&selectionRef.current===target)setDetail(data);
       } catch (e) {
         hideAccessFailure(e);
         if(!live.current||selectionRef.current!==target)throw e;
@@ -144,7 +148,7 @@ export function DocumentWorkspace({
         const d: Detail = await api("/api/documents/" + selected);
         if (cancelled||!live.current) return;
         if(selectionRef.current!==selected)return;
-        setDetail(d);
+        assertSourceVersion(d);setDetail(d);
         setLoading(false);
         const version = d.versions.find(
           (v) => v.id === d.document.current_version_id,
@@ -185,7 +189,7 @@ export function DocumentWorkspace({
       if (document.hidden||!live.current) return;
       setRechecking(true);
       api("/api/documents/" + selected)
-        .then(d=>{if(active&&live.current&&selectionRef.current===selected)setDetail(d);})
+        .then(d=>{assertSourceVersion(d);if(active&&live.current&&selectionRef.current===selected)setDetail(d);})
         .catch(e=>{if(active&&live.current&&selectionRef.current===selected){hideAccessFailure(e);setLoading(false);selectionRef.current=null;setSelected(null);setError(e.message);}})
         .finally(()=>{if(active&&live.current){setRechecking(false);if(selectionRef.current===selected)setLoading(false);}});
     };
@@ -199,7 +203,7 @@ export function DocumentWorkspace({
   }, [selected, mode, api,hideAccessFailure]);
   async function choose(id: string) {
     if(mutationLock.current||pendingRequest.current)return;
-    selectionRef.current=id;setSelectionEpoch(n=>n+1);setError("");setDetail(null);setSelected(id);setLoading(true);
+    expectedSourceVersion.current=null;selectionRef.current=id;setSelectionEpoch(n=>n+1);setError("");setDetail(null);setSelected(id);setLoading(true);
     // The selected-document effect owns fetching/polling, preventing duplicate
     // competing requests from painting another document after a fast selection.
     headingRef.current?.focus();
@@ -326,8 +330,8 @@ export function DocumentWorkspace({
                 )}
               </div>
             </SourceDetail>
-            {version?.reviewed_ocr&&<p className="status-message">Human-reviewed OCR transcription · original pages {version.reviewed_ocr.sourcePages.join(', ')} · original version {version.reviewed_ocr.sourceVersionId.slice(0,8)}. Provider confidence was uncalibrated. This is source text, not a clinical approval.</p>}
-            {!provider&&!fixture&&process.env.NEXT_PUBLIC_OCR_ENABLED==='true'&&version&&(version.extraction_status==='needs_transcription'||version.mime==='application/pdf'&&version.extraction_status==='text_ready')&&<OCRReview key={selected+':'+version.id} documentId={selected!} versionId={version.id} revision={detail.document.revision} title={detail.document.title} mime={version.mime} onDirty={setOcrDirty} onAccessLost={hideAccessFailure} onSaved={()=>void refresh().catch(e=>setError(e.message))}/>}
+            {version?.reviewed_ocr&&<p className="status-message">Human-reviewed OCR transcription · original pages {version.reviewed_ocr.sourcePages.join(', ')} · original version {version.reviewed_ocr.sourceVersionId.slice(0,8)}. Provider confidence was uncalibrated. This is source text, not a clinical approval. <a href={'/api/documents/'+selected+'/content?version='+version.reviewed_ocr.sourceVersionId}>Download retained original</a></p>}
+            {!provider&&!fixture&&process.env.NEXT_PUBLIC_OCR_ENABLED==='true'&&version&&(version.extraction_status==='needs_transcription'||version.mime==='application/pdf'&&version.extraction_status==='text_ready')&&<OCRReview key={selected+':'+version.id} documentId={selected!} versionId={version.id} revision={detail.document.revision} title={detail.document.title} mime={version.mime} onDirty={setOcrDirty} onAccessLost={hideAccessFailure} onSaved={()=>refresh()}/>}
             <div className="document-actions">
               <button
                 className="secondary-button"

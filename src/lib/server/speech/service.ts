@@ -1,3 +1,4 @@
+import {optionalSchema} from '../optional-schema';
 import 'server-only';
 import {createHash} from 'node:crypto';
 import type {SupabaseClient} from '@supabase/supabase-js';
@@ -14,7 +15,7 @@ export async function speechView(client:SupabaseClient,cid:string,key:string){aw
 export async function recoverSpeech(client:SupabaseClient,cid:string,key:string){const op=await speechView(client,cid,key);if(op.status==='saved')return op.response;if(op.status!=='responded')return{state:op.status,operationId:op.id};const r=await client.rpc('speech_commit',{oid:op.id});check(r.error);return r.data;}
 export async function speechAvailability(client:SupabaseClient,admin:()=>SupabaseClient,cid:string){
  await speechContext(client,cid);const transport=speechTransport(),mode=transport.mode;
- if(mode==='disabled')return{available:false,mode,reason:'Speech is disabled. Continue with typed transcript.'};
+ if(mode==='disabled'||mode==='live'&&!await optionalSchema(client,'speech'))return{available:false,mode,reason:'Speech is disabled. Continue with typed transcript.'};
  const actor=await resolvePrincipal(client),now=Date.now();const allowance=await admin().from('speech_allowances').select('mode,model,requested_language,max_requests,used_requests,max_audio_ms,used_audio_ms,next_send_at').eq('authorization_ref',transport.authorizationRef).eq('actor_id',actor.id).eq('consultation_id',cid).eq('mode',mode).eq('enabled',true).lte('starts_at',new Date(now).toISOString()).gt('ends_at',new Date(now).toISOString()).maybeSingle();check(allowance.error);
  const a=allowance.data;if(!a||a.model!=='nova-2'||a.requested_language!=='hi'||a.used_requests>=a.max_requests||a.max_audio_ms-a.used_audio_ms<1000)return{available:false,mode,reason:'No matching audio allowance remains. Continue with typed transcript.'};
  if(mode==='live'&&Date.parse(a.next_send_at)>now)return{available:false,mode,reason:'Speech is waiting for its allowed send time. Typed transcript remains available.'};
@@ -25,6 +26,7 @@ export async function transcribeClip(client:SupabaseClient,admin:SupabaseClient,
  await speechContext(client,input.cid);id(input.key);id(input.segmentId);
  if(!Number.isInteger(input.sequence)||input.sequence<0||input.sequence>999||!Number.isInteger(input.expectedRevision)||input.expectedRevision<0)throw new HttpError(400,'INVALID_COMMAND','Check the saved transcript position.');
  let wav;try{wav=validateWav(input.bytes);}catch{throw new HttpError(422,'INVALID_AUDIO','Only a complete16kHz mono PCM WAV clip up to30 seconds is supported.');}
+ if(speechTransport().mode==='disabled'||speechTransport().mode==='live'&&!await optionalSchema(client,'speech'))return{state:'unavailable'};
  const sha=createHash('sha256').update(input.bytes).digest('hex'),duration=Math.ceil(wav.durationMs);
  const admission=await client.rpc('speech_admit',{k:input.key,cid:input.cid,sid:input.segmentId,seq:input.sequence,expected:input.expectedRevision,sha,duration,bytes:input.bytes.length});check(admission.error);const oid=admission.data as string;
  const view=()=>speechView(client,input.cid,input.key);

@@ -7,6 +7,9 @@ export type Evidence = {
     revision?: number;
     chunkId?: string;
     page?: number;
+    reviewedOCR?: boolean;
+    originalVersionId?: string;
+    originalPage?: number;
     title?: string;
     date?: string;
     segmentId?: string;

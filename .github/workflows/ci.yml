@@ -46,10 +46,13 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
       - run: node scripts/verify-worker-package.mjs
+      - run: node scripts/prepare-optional-rollout.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: worker-package-smoke
-          path: tests/infra/.runtime/worker-package-evidence.json
+          path: |
+            tests/infra/.runtime/worker-package-evidence.json
+            tests/infra/.runtime/optional-rollout.json
           if-no-files-found: error
   supabase-isolation:
     runs-on: ubuntu-latest
@@ -77,6 +80,7 @@ jobs:
           name: isolated-preservation
           path: |
             tests/infra/.runtime/preservation.json
+            tests/infra/.runtime/optional-upgrade.json
             tests/infra/.runtime/integration-results.json
             tests/infra/.runtime/ai-evaluation-results.json
           if-no-files-found: error

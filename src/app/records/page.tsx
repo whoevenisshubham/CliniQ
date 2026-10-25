@@ -3,7 +3,7 @@ import { resolvePrincipal } from "@/lib/server/auth/context";
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
-export default async function Page({searchParams}:{searchParams:Promise<{document?:string}>}) {
+export default async function Page({searchParams}:{searchParams:Promise<{document?:string;version?:string}>}) {
   let role: string;
   let actorId:string;
   try {
@@ -13,6 +13,6 @@ export default async function Page({searchParams}:{searchParams:Promise<{documen
     redirect("/login");
   }
   if (!["doctor", "patient"].includes(role)) redirect("/login");
-  const documentId=(await searchParams).document??null;
-  return <DocumentWorkspace key={actorId+':'+(documentId??'library')} provider={role === "doctor"} initialDocumentId={documentId} />;
+  const query=await searchParams,documentId=query.document??null,versionId=query.version??null;
+  return <DocumentWorkspace key={actorId+':'+(documentId??'library')} provider={role === "doctor"} initialDocumentId={documentId} initialVersionId={versionId} />;
 }

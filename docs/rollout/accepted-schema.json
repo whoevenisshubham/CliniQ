@@ -1,0 +1,20 @@
+{
+  "lastReconciledSource": "e04fbcabcd3d6555ac6aa186b61e55348843953c",
+  "scope": "Last reconciled preview schema manifest; not a current remote inspection",
+  "migrations": {
+    "supabase/baseline/001_domain.sql": "d172f113bd9da4d43bba79d1d408a94c04b6907d5d941e0478a82ebdd9525f53",
+    "supabase/migrations/202610230001_identity_isolation.sql": "3111108a951f52cc0637002b4c181ae0ead1aa0b8b2aa035fd6687001d29ad85",
+    "supabase/migrations/202610230002_documents_jobs.sql": "208b180f20ff3644948b7163dfa6c0a9a1489db71f02f024d04ca46b6776f65b",
+    "supabase/migrations/202610230003_approved_records.sql": "fae873daca169e93b3787a850209ddf461c04668563ebec7aea0b27e16f0c552",
+    "supabase/migrations/202610230004_clinical_proposals.sql": "0f85a38879362eadb6daf76c5e5046ac28e0b75ed6b8d0f972454b67ae98cb98",
+    "supabase/migrations/202610230005_ai_jobs.sql": "21e355e18200290632059e4228011e749982145d034ff5aa111609f299394849",
+    "supabase/migrations/202610230006_continuing_care.sql": "45f337544f3136d249d21a3d86ea2bfa70714c959b60cae0d69970f9d06e36ae",
+    "supabase/migrations/202610230007_clinical_fidelity.sql": "483a8ca4301666d34b522f7d859aa54b31eaf9557e90f9dc5585380afc46326c",
+    "supabase/migrations/202610230008_speech_transport.sql": "dff5ac07fbd880c50fd1c1e6a2c9ecedcf54bbafdff338179c85b4eab0281798",
+    "supabase/migrations/202610230009_speech_recovery.sql": "b03be665c2a53b08660c3b40b9bdbc4f26905e43a1c2b8f2180c1544a1d63fad",
+    "supabase/migrations/202610230010_medicines_tasks.sql": "d13074596285d520ea8ef354cf179bb9d455df482db390eaf9bc8c90e11db86c",
+    "supabase/migrations/202610230011_patient_account.sql": "1bb3e20405a73ef1245e544ec35fabfc96ec5d0d89d1cd2e4fad457493597857",
+    "supabase/migrations/202610230012_reviewed_billing.sql": "6c2b8a06baacb30e3bb01f81938d63fa1d51c3fed40a4a9ce94c434f2b5bb2a7",
+    "supabase/migrations/202610240001_care_owner_correction.sql": "cf7154765025c0db3f233eace2127ef28a630d3f3d78a7d43ae7863135adbaf3"
+  }
+}

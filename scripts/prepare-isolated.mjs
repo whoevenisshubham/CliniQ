@@ -5,13 +5,13 @@ import { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { root, sql, localConfiguration } from './local-supabase.mjs';
 import { provisionSyntheticActors } from './setup-demo.mjs';
-import {loadMigrationPlan} from './migration-plan.mjs';
+import {loadMigrationPlan,transactionBody} from './migration-plan.mjs';
 
 if (process.argv[2] !== '--apply-local-synthetic') throw new Error('Explicit --apply-local-synthetic required');
 localConfiguration();
 if (sql("select to_regclass('public.users') is not null") !== 'f') throw new Error('Existing application schema preserved: use existing fixture or a separately named isolated project; no reset permitted');
 const plan=loadMigrationPlan(root);
-const base=plan.baseline,forwardSQL=plan.forward;
+const base=plan.baseline,forwardSQL=Object.keys(plan.manifest).filter(f=>f.startsWith('supabase/migrations/')&&!/20261025000[12]_/.test(f)).map(f=>transactionBody(readFileSync(path.join(root,f),'utf8'))).join('\n');
 const legacyPolicies = readFileSync(path.join(root,'tests/fixtures/legacy-policies.sql'),'utf8');
 const fresh = sql(`BEGIN;\n${base}\n${forwardSQL}\nSELECT json_build_object('users',(select count(*) from public.users),'patients',(select count(*) from public.patients),'memberships',(select count(*) from public.workspace_memberships));\nROLLBACK;`);
 assert.deepEqual(JSON.parse(fresh),{users:0,patients:0,memberships:0});
@@ -65,5 +65,6 @@ for (const s of ['A','B']) {
 sql(`insert into public.care_relationships(patient_id,workspace_id,provider_id,scope,granted_by) values(${q(ids.patientA)},${q(ids.workspaceA)},${q(a.reception.appId)},'intake',${q(a.patientA.appId)})`);
 const target=path.join(root,'tests/infra/.runtime');mkdirSync(target,{recursive:true});
 writeFileSync(path.join(target,'fixture.json'),JSON.stringify({actors:a,ids,runId:provision.runId}));
+execFileSync(process.execPath,['--conditions=react-server','--import','tsx','scripts/rehearse-optional-upgrade.ts','--local-synthetic'],{cwd:root,stdio:'inherit'});
 writeFileSync(path.join(target,'preservation.json'),JSON.stringify({timestamp:new Date().toISOString(),sourceSha:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),dirty:!!execFileSync('git',['status','--porcelain'],{cwd:root,encoding:'utf8'}).trim(),migrationManifest:plan.manifest,hashScope:plan.hashScope,databaseVersion:sql('show server_version'),freshBaseline:{users:0,patients:0,memberships:0},before,after,originalFieldsPreserved:true,explicitMappingOnly:true},null,2));
 console.log(JSON.stringify({freshBaseline:'passed; no seeded identities',legacyUpgrade:'passed',tablesCompared:Object.keys(before).length,historicalRowsPreserved:Object.values(before).reduce((n,x)=>n+x.rows,0),authAccounts:Object.keys(a).length,credentialOutput:false}));

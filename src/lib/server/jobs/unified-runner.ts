@@ -11,6 +11,7 @@ export async function runNextJob(admin: SupabaseClient, jobId?: string) {
     // An AI recovery outage must not starve independent document jobs. Explicit
     // AI requests remain blocked until that subsystem recovers; never resend.
     if(!jobId&&recovery.ai.state==='failed')query=query.in('kind',['ingest_document','purge_document']);
+    if(!jobId&&process.env.OCR_ENABLED!=='true')query=query.neq('kind','ocr_document');
     const rows = await query;
     if (rows.error)
         throw new Error('JOB_DATABASE_UNAVAILABLE');
