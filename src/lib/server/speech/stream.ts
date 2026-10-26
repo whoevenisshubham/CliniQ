@@ -5,15 +5,18 @@ import type {SupabaseClient} from '@supabase/supabase-js';
 import {SpeechStreamText} from '@/lib/clinical/speech-stream';
 import {MEDICAL_KEYWORDS} from '@/lib/clinical/medical-hints';
 import {speechConfiguration} from './transport';
+import {incrementalExtraction} from './incremental';
 
 // All upstream bytes and credentials remain in this authenticated function instance.
 // Reconnects create no implicit reservation and never resume/replay audio.
 export async function relaySpeech(socket:WebSocket,client:SupabaseClient,admin:SupabaseClient,command:{cid:string;key:string;segmentId:string;sequence:number;revision:number;capMs:number;ref:string}){
- const text=new SpeechStreamText(),hash=createHash('sha256');let upstream:WebSocket|undefined,oid:string|undefined,total=0,ended=false,finishing=false,requestId:string|undefined;
+ const text=new SpeechStreamText(),hash=createHash('sha256');let upstream:WebSocket|undefined,oid:string|undefined,total=0,ended=false,finishing=false,requestId:string|undefined,revision=command.revision,checkpointEnabled=false;
+ let checkpointQueue=Promise.resolve();
  let timer:ReturnType<typeof setTimeout>|undefined,accessTimer:ReturnType<typeof setInterval>|undefined,drain:ReturnType<typeof setTimeout>|undefined;
  const send=(v:unknown)=>{if(socket.readyState===WebSocket.OPEN)socket.send(JSON.stringify(v));};
  const clear=()=>{if(timer)clearTimeout(timer);if(accessTimer)clearInterval(accessTimer);if(drain)clearTimeout(drain);};
- const fail=async(code:string)=>{if(ended)return;ended=true;clear();upstream?.terminate();if(oid){try{await admin.rpc('speech_result',{oid,next_state:'outcome_unknown',transcript:null,request_id:requestId??null});}catch{}}send({type:'error',code});socket.close(1011,'Speech stopped; no automatic resend');};
+ const extraction=incrementalExtraction(client,admin,command.cid,send);
+ const fail=async(code:string)=>{if(ended)return;ended=true;extraction.stop();clear();upstream?.terminate();if(oid){try{await admin.rpc('speech_result',{oid,next_state:'outcome_unknown',transcript:null,request_id:requestId??null});}catch{}}send({type:'error',code});socket.close(1011,'Speech stopped; no automatic resend');};
  socket.on('error',()=>{void fail('CONNECTION_LOST');});
  socket.on('close',()=>{if(!ended)void fail('CLIENT_DISCONNECTED');});
  // Installed before any DB await: early audio cannot disappear or queue unboundedly.
@@ -42,6 +45,7 @@ export async function relaySpeech(socket:WebSocket,client:SupabaseClient,admin:S
   const binding=await admin.rpc('speech_bind_target',{oid,budget_ref:command.ref});if(binding.error||binding.data!==true)throw Error('BINDING_FAILED');
   const reserved=await admin.rpc('speech_reserve',{oid,budget_ref:command.ref,sha,duration:command.capMs,execution_mode:'live'});if(reserved.error||reserved.data!==true)throw Error('ALLOWANCE_UNAVAILABLE');
   const marked=await admin.rpc('speech_stream_mark',{oid});if(marked.error||marked.data!==true)throw Error('STREAM_RECEIPT_UNAVAILABLE');
+  const checkpointCapability=await client.rpc('speech_checkpoint_capability');checkpointEnabled=!checkpointCapability.error&&checkpointCapability.data===1;
   if(ended||socket.readyState!==WebSocket.OPEN)throw Error('CLIENT_DISCONNECTED');
   const url=new URL('wss://api.deepgram.com/v1/listen');for(const [k,v]of Object.entries({model:configuration.model,language:configuration.language,encoding:'linear16',sample_rate:'16000',channels:'1',interim_results:'true',smart_format:'true',punctuate:'true',endpointing:'300'}))url.searchParams.set(k,v);
   for(const hint of MEDICAL_KEYWORDS.slice(0,100))url.searchParams.append('keyterm',hint);
@@ -56,6 +60,17 @@ export async function relaySpeech(socket:WebSocket,client:SupabaseClient,admin:S
     if(typeof raw.metadata?.request_id==='string')requestId=raw.metadata.request_id.slice(0,200);
     if(typeof raw.request_id==='string')requestId=raw.request_id.slice(0,200);
     const event=text.accept(raw);if(event)send(event);
+    if(checkpointEnabled&&event?.type==='final'){
+     const span=Math.round(raw.start*1000),transcript=raw.channel.alternatives[0].transcript.trim();
+     checkpointQueue=checkpointQueue.then(async()=>{
+      if(ended)return;
+      const staged=await admin.rpc('speech_stream_stage',{oid,span_ms:span,transcript,raw});
+      if(staged.error||staged.data!==true)throw Error('FINAL_STAGE_FAILED');
+      const saved=await client.rpc('speech_stream_checkpoint',{oid,span_ms:span});
+      if(saved.error||!Number.isInteger(saved.data?.revision))throw Error('CHECKPOINT_NOT_SAVED');
+      revision=saved.data.revision;send({type:'checkpoint',...saved.data});extraction.notify();
+     }).catch(()=>fail('CHECKPOINT_NOT_SAVED'));
+    }
    }catch{void fail('INVALID_PROVIDER_STREAM');}
   });
   upstream.on('error',()=>{void fail('PROVIDER_STREAM_FAILED');});
@@ -63,13 +78,15 @@ export async function relaySpeech(socket:WebSocket,client:SupabaseClient,admin:S
    if(ended)return;
    if(!finishing||!total||!text.text){await fail('INCOMPLETE_PROVIDER_STREAM');return;}
    clear();
+   await checkpointQueue;if(ended)return;
    const auth=await client.auth.getUser();if(auth.error||!auth.data.user){await fail('AUTH_REQUIRED');return;}
    const receipt=await admin.rpc('speech_stream_receipt',{oid,sha:hash.digest('hex'),pcm_bytes:total,transcript:text.text,request_id:requestId??null,raw:{transport:'streaming',finalResults:text.rawFinals,pcmBytes:total}});
    if(receipt.error||receipt.data!==true){await fail('RECEIPT_NOT_SAVED');return;}
    const saved=await client.rpc('speech_commit',{oid});if(saved.error||saved.data?.state!=='saved'){await fail('TRANSCRIPT_NOT_COMMITTED');return;}
-   ended=true;send({type:'saved',...saved.data,audioMs:total/32});socket.close(1000,'Transcript saved');
+   send({type:'transcript_saved',...saved.data,audioMs:total/32});await extraction.finish();
+   if(ended)return;ended=true;send({type:'saved',...saved.data,audioMs:total/32});socket.close(1000,'Transcript saved');
   })().catch(()=>fail('SAVE_OUTCOME_UNKNOWN'));});
   let checking=false;
-  accessTimer=setInterval(()=>{if(checking||ended)return;checking=true;void Promise.resolve(client.from('consultations').select('id,revision,status').eq('id',command.cid).maybeSingle()).then(r=>{if(r.error||!r.data)void fail('ACCESS_CHANGED');else if(r.data.status!=='active'||r.data.revision!==command.revision)void fail('REVISION_CHANGED');}).finally(()=>{checking=false;});},5000);
+  accessTimer=setInterval(()=>{if(checking||ended)return;checking=true;void checkpointQueue.then(()=>client.from('consultations').select('id,revision,status').eq('id',command.cid).maybeSingle()).then(r=>{if(r.error||!r.data)void fail('ACCESS_CHANGED');else if(r.data.status!=='active'||r.data.revision!==revision)void fail('REVISION_CHANGED');}).finally(()=>{checking=false;});},5000);
  }catch(e){await fail(e instanceof Error&&/^[A-Z_]+$/.test(e.message)?e.message:'STREAM_UNAVAILABLE');}
 }

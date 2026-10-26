@@ -32,7 +32,7 @@ export async function executeLive(input: {
     const client = new Groq({ apiKey: process.env.GROQ_API_KEY, maxRetries: 0, timeout: 45000 });
     let result;
     try {
-        result = await client.chat.completions.create({ model: c.model, messages: input.messages, response_format: { type: 'json_object' }, temperature: 0.1, max_completion_tokens: input.maxOutput }, { signal: input.signal });
+        result = await client.chat.completions.create({ model: c.model, messages: input.messages, response_format: { type: 'json_object' }, ...(c.model==='openai/gpt-oss-20b'?{reasoning_effort:'low' as const,include_reasoning:false}:{}), temperature: 0.1, max_completion_tokens: input.maxOutput }, { signal: input.signal });
     }
     catch (e) {
         throw classifyProviderFailure(e instanceof Groq.APIError?e.status:undefined);

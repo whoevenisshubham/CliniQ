@@ -108,3 +108,22 @@ it('stream receipt preserves actual duration/hash, charges full reserved cap onc
  expect((await clients.doctorA.rpc('speech_commit',{oid})).data.state).toBe('saved');const saved=await admin.from('speech_operations').select('duration_ms,byte_count,audio_sha256,raw_provider_response').eq('id',oid).single();expect(saved.error).toBeNull();expect(saved.data).toMatchObject({duration_ms:1000,byte_count:32044,audio_sha256:'b'.repeat(64),raw_provider_response:receipt.raw});
  const usage=await admin.from('speech_allowances').select('used_requests,used_audio_ms').eq('authorization_ref',ref).single();expect(usage.error).toBeNull();expect(usage.data).toEqual({used_requests:1,used_audio_ms:60000});
 });
+
+it('checkpoints real provider finals through caller Auth, preserves corrections and never duplicates the stop receipt',async()=>{
+ const cid=await encounter(),c=command(cid),ref='checkpoint-'+randomUUID(),sha='c'.repeat(64);
+ expect((await admin.from('speech_allowances').insert({authorization_ref:ref,actor_id:fixture.actors.doctorA.appId,consultation_id:cid,mode:'live',enabled:true,ends_at:new Date(Date.now()+3600000).toISOString(),max_requests:1,max_audio_ms:60000})).error).toBeNull();
+ const a=await clients.doctorA.rpc('speech_admit',{k:c.key,cid,sid:c.segment,seq:0,expected:0,sha,duration:60000,bytes:1920044});expect(a.error).toBeNull();const oid=a.data;
+ expect((await admin.rpc('speech_reserve',{oid,budget_ref:ref,sha,duration:60000,execution_mode:'live'})).data).toBe(true);expect((await admin.rpc('speech_stream_mark',{oid})).data).toBe(true);
+ const stage={oid,span_ms:0,transcript:'Dose is 5 mg.',raw:{synthetic:true,is_final:true}};
+ expect((await clients.doctorA.rpc('speech_stream_stage',stage)).error?.code).toBe('42501');expect((await admin.rpc('speech_stream_stage',stage)).data).toBe(true);
+ expect((await clients.patientA.rpc('speech_stream_checkpoint',{oid,span_ms:0})).error?.message).toBe('NOT_FOUND');expect((await clients.doctorB.rpc('speech_stream_checkpoint',{oid,span_ms:0})).error?.message).toBe('NOT_FOUND');
+ const first=await clients.doctorA.rpc('speech_stream_checkpoint',{oid,span_ms:0});expect(first.error).toBeNull();expect(first.data.revision).toBe(1);
+ expect((await clients.doctorA.rpc('speech_stream_checkpoint',{oid,span_ms:0})).data.id).toBe(first.data.id);
+ expect((await admin.rpc('speech_stream_stage',{...stage,transcript:'10 mg'})).error?.message).toBe('FINAL_SPAN_CHANGED');
+ expect((await admin.rpc('speech_stream_stage',{...stage,span_ms:2000,transcript:'Sorry, the dose is 10 mg, not 5 mg.'})).data).toBe(true);
+ const second=await clients.doctorA.rpc('speech_stream_checkpoint',{oid,span_ms:2000});expect(second.error).toBeNull();expect(second.data.revision).toBe(2);
+ const interimSaved=await clients.doctorA.from('clinical_segments').select('text').eq('consultation_id',cid).order('sequence');expect(interimSaved.error).toBeNull();expect(interimSaved.data?.map(x=>x.text)).toEqual(['Dose is 5 mg.','Sorry, the dose is 10 mg, not 5 mg.']);
+ expect((await admin.rpc('speech_stream_receipt',{oid,sha:'d'.repeat(64),pcm_bytes:96000,transcript:'Dose is 5 mg. Sorry, the dose is 10 mg, not 5 mg.',request_id:'synthetic-checkpoints',raw:{transport:'streaming',finalResults:[stage.raw]}})).data).toBe(true);
+ expect((await clients.doctorA.rpc('speech_commit',{oid})).data).toMatchObject({state:'saved',revision:2});expect((await clients.doctorA.rpc('speech_commit',{oid})).data.state).toBe('saved');
+ expect((await clients.doctorA.from('clinical_segments').select('id').eq('consultation_id',cid)).data).toHaveLength(2);
+});

@@ -1,3 +1,7 @@
+// Active review rules reuse the original explicit-evidence/unknown principles.
+// The historical full-schema/ICD/confidence instructions below remain archived;
+// sending both schemas caused contradictory instructions and bloated live output.
+export const REVIEW_EXTRACTION_RULES = `Extract review-only clinical changes from an Indian Hindi/English consultation. Only extract explicitly stated evidence. Never infer a diagnosis, new prescription, dose, unit or missing detail. Preserve negation, chronology, allergies, numbers and unknowns. A patient's later explicit correction supersedes the earlier value in a review candidate; retain both source statements. Never overwrite a clinician edit or approve a record. Return concise JSON only.`;
 // Preserved verbatim from CliniQ d2fadb62 src/app/api/extract/route.ts.
 export const EXTRACTION_SYSTEM_PROMPT = `You are a clinical NLP engine for an Indian EMR system. Extract structured medical data from doctor-patient consultation transcripts.
 

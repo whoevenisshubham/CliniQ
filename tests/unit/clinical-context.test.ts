@@ -55,3 +55,11 @@ it('a source-backed dose correction replaces the prior value in a review candida
  const p=validateExtraction(proposal,{baseRevision:0,throughSegmentId:segment,sources:[source(text)],draft});expect(p.operations[0].value).toEqual([{...med,dose:'10 mg'}]);expect(draft.medications[0].dose).toBe('5 mg');
  expect(()=>validateExtraction({...proposal,operations:[{...proposal.operations[0],value:[{...med,dose:'5 mg',frequency:'twice daily'}]}]},{baseRevision:0,throughSegmentId:segment,sources:[source(text)],draft})).toThrow();
 });
+
+it('rejects the representative Hindi negative and existing-medication mistakes independently of output truncation',()=>{
+ const text='पिछले तीन दिनों से हल्का चक्कर है, Fever और सांस फूलने की शिकायत नहीं है. Current medication metformin five hundred mg दिन में दो बार है.';
+ const input={baseRevision:0,throughSegmentId:segment,sources:[source(text,'unknown')],draft:emptySnapshot()};
+ expect(()=>validateExtraction({operations:[{op:'set_fact',path:'symptoms',value:['Fever'],note:'Source quote: '+text.split('. ')[0]+'.',evidence_segment_ids:[segment]}]},input)).toThrow();
+ const med={id:'00000000-0000-4000-8000-000000000072',name:'metformin',dose:'five hundred mg',frequency:'दिन में दो बार',duration:null,route:null,instructions:null,unknownFields:['duration','route']};
+ expect(()=>validateExtraction({operations:[{op:'set_fact',path:'medications',value:[med],note:'Source quote: Current medication metformin five hundred mg दिन में दो बार है.',evidence_segment_ids:[segment]}]},input)).toThrow('MEDICATION_CONTEXT_REVIEW_REQUIRED');
+});
