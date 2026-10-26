@@ -47,3 +47,11 @@ it('extracts a supported whole sentence without unrelated paragraph negations co
  const p=validateExtraction({operations:[{op:'set_fact',path:'chief_complaint',value:'Dizziness for three days.',note:'Source quote: Dizziness for three days.',evidence_segment_ids:[segment]}]},{baseRevision:0,throughSegmentId:segment,sources:[source(text)],draft:emptySnapshot()});expect(p.operations).toHaveLength(1);
  for(const quote of ['fever','metformin 500 mg'])expect(()=>validateExtraction({operations:[{op:'set_fact',path:'chief_complaint',value:quote,note:'Source quote: '+quote,evidence_segment_ids:[segment]}]},{baseRevision:0,throughSegmentId:segment,sources:[source(text)],draft:emptySnapshot()})).toThrow('SOURCE_QUOTE_FIDELITY');
 });
+
+it('a source-backed dose correction replaces the prior value in a review candidate without erasing inherited fields',()=>{
+ const med={id:'00000000-0000-4000-8000-000000000082',name:'Synthetic medicine',dose:'5 mg',frequency:'once daily',duration:null,route:'oral',instructions:null,unknownFields:['duration'] as ('duration')[]};
+ const draft={...emptySnapshot(),medications:[med]},text='Actually the dose is 10 mg, not 5 mg.';
+ const proposal={operations:[{op:'update_fact',path:'medications',value:[{...med,dose:'10 mg'}],note:'Source quote: '+text,evidence_segment_ids:[segment]}]};
+ const p=validateExtraction(proposal,{baseRevision:0,throughSegmentId:segment,sources:[source(text)],draft});expect(p.operations[0].value).toEqual([{...med,dose:'10 mg'}]);expect(draft.medications[0].dose).toBe('5 mg');
+ expect(()=>validateExtraction({...proposal,operations:[{...proposal.operations[0],value:[{...med,dose:'5 mg',frequency:'twice daily'}]}]},{baseRevision:0,throughSegmentId:segment,sources:[source(text)],draft})).toThrow();
+});
