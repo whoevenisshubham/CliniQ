@@ -12,7 +12,7 @@ it('capture reports microphone denial and abort during permission never retains 
     });
     vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: async () => { throw new DOMException('Denied', 'NotAllowedError'); } } });
     await captureClip({ signal: new AbortController().signal, onError, onClip });
-    expect(onError).toHaveBeenCalledWith('MICROPHONE_DENIED');
+    expect(onError).toHaveBeenCalledWith('MICROPHONE_ACCESS_NOT_ALLOWED');
     expect(onClip).not.toHaveBeenCalled();
     let resolve!: (x: unknown) => void;
     vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: () => new Promise(r => { resolve = r; }) } });
@@ -33,3 +33,11 @@ it('uncertain/retracted facts stay review tasks and cannot silently erase clinic
 it('print export escapes hostile notes while retaining negation, decimals and exact units', () => { const html = approvedReport({ id: 'test', reviewed_at: '2026-10-23', source_revision: 1, snapshot: { ...emptySnapshot(), chief_complaint: '<img src=x onerror=alert(1)> & no fever', vitals: [{ name: 'temperature', value: 98.6, unit: '°F', observedAt: null }] } }); expect(html).not.toContain('<img'); expect(html).toContain('&lt;img'); expect(html).toContain('98.6 °F'); expect(html).toContain('no fever'); expect(html).not.toContain('<script'); });
 
 it('accepts exactly sixty seconds with validated 44-byte overhead and rejects extra samples/container padding', () => { const bytes=encodeWav(new Float32Array(16000*60),16000); expect(bytes.length).toBe(1920044); expect(validateWav(bytes).durationMs).toBe(60000); expect(()=>validateWav(new Uint8Array([...bytes,0,0]))).toThrow(); const forged=new Uint8Array(bytes); new DataView(forged.buffer).setUint32(40,1920002,true); expect(()=>validateWav(forged)).toThrow(); });
+
+it('does not call a Web Audio start failure microphone permission denial; closes the granted stream',async()=>{
+ const stop=vi.fn(),close=vi.fn(async()=>{}),onError=vi.fn(),onClip=vi.fn();
+ vi.stubGlobal('navigator',{mediaDevices:{getUserMedia:async()=>({getTracks:()=>[{stop}]})}});
+ vi.stubGlobal('AudioContext',class{sampleRate=48000;close=close;resume=async()=>{throw new DOMException('Audio start not allowed','NotAllowedError');};});
+ await captureClip({signal:new AbortController().signal,onError,onClip,windowMs:60000});
+ expect(onError).toHaveBeenCalledWith('AUDIO_START_NOT_ALLOWED');expect(onClip).not.toHaveBeenCalled();expect(stop).toHaveBeenCalledOnce();expect(close).toHaveBeenCalledOnce();
+});

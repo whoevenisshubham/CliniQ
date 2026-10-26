@@ -12,6 +12,7 @@ export async function captureClip(options: {
     const windowMs = options.windowMs ?? 15000;
     if (windowMs < 1000 || windowMs > MAX_SPEECH_MS)
         throw new Error('INVALID_CAPTURE_WINDOW');
+    let stage: 'microphone-access' | 'audio-start' | 'audio-processing' = 'microphone-access';
     let stream: MediaStream | null = null, context: AudioContext | null = null, source: MediaStreamAudioSourceNode | null = null, processor: ScriptProcessorNode | null = null, gain: GainNode | null = null;
     let frames: Float32Array[] = [], length = 0, closed = false, timer: ReturnType<typeof setTimeout> | undefined;
     const stop = () => { if (closed)
@@ -30,6 +31,7 @@ export async function captureClip(options: {
             stream.getTracks().forEach(t => t.stop());
             return { stop };
         }
+        stage = 'audio-start';
         context = new AudioContext();
         if (context.sampleRate < 16000 || context.sampleRate > 192000)
             throw new Error('CAPTURE_RATE_UNSUPPORTED');
@@ -38,6 +40,7 @@ export async function captureClip(options: {
             stop();
             return { stop };
         }
+        stage = 'audio-processing';
         source = context.createMediaStreamSource(stream);
         processor = context.createScriptProcessor(4096, 1, 1);
         gain = context.createGain();
@@ -76,7 +79,7 @@ export async function captureClip(options: {
     }
     catch (e) {
         stop();
-        options.onError(e instanceof DOMException && e.name === 'NotAllowedError' ? 'MICROPHONE_DENIED' : e instanceof Error ? e.message : 'CAPTURE_FAILED');
+        options.onError(e instanceof DOMException && e.name === 'NotAllowedError' ? (stage === 'microphone-access' ? 'MICROPHONE_ACCESS_NOT_ALLOWED' : stage === 'audio-start' ? 'AUDIO_START_NOT_ALLOWED' : 'AUDIO_PROCESSING_NOT_ALLOWED') : e instanceof Error ? e.message : 'CAPTURE_FAILED');
         return { stop };
     }
 }
