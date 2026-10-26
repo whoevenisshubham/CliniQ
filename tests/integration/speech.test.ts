@@ -86,3 +86,13 @@ it('prepared live-mode reservation binds exact audio scope and pacing while tran
  state.transport=offlineDeepgramTransport(ref,send);expect((await(await call({...next,key:randomUUID(),segment:randomUUID()})).json()).data.state).toBe('unavailable');expect(send).toHaveBeenCalledOnce();
  expect((await clients.patientA.rpc('speech_reserve',{oid:randomUUID(),budget_ref:ref,sha:'0'.repeat(64),duration:1000,execution_mode:'live'})).error?.code).toBe('42501');
 });
+
+it('saves sixty seconds once with raw output distinct from clinical text',async()=>{
+ const cid=await encounter(),c=command(cid),audio=encodeWav(new Float32Array(16000*60),16000),raw=reply();
+ await allowance(cid,1);expect((await admin.from('speech_allowances').update({max_audio_ms:60000}).eq('authorization_ref',authRef).eq('consultation_id',cid)).error).toBeNull();
+ const send=vi.fn(async()=>raw);state.transport=offlineDeepgramTransport(authRef,send);
+ expect((await(await call(c,audio)).json()).data.state).toBe('saved');
+ expect((await(await call(c,audio)).json()).data.state).toBe('saved');expect(send).toHaveBeenCalledOnce();
+ const saved=await admin.from('speech_operations').select('duration_ms,byte_count,raw_provider_response,response_text').eq('consultation_id',cid).single();expect(saved.error).toBeNull();expect(saved.data).toMatchObject({duration_ms:60000,byte_count:1920044,raw_provider_response:raw,response_text:text});
+ const budget=await admin.from('speech_allowances').select('used_requests,used_audio_ms').eq('authorization_ref',authRef).eq('consultation_id',cid).single();expect(budget.error).toBeNull();expect(budget.data).toEqual({used_requests:1,used_audio_ms:60000});
+});

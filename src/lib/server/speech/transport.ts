@@ -2,7 +2,7 @@ import {MEDICAL_KEYWORDS} from '@/lib/clinical/medical-hints';
 export const retainedSpeech={provider:'deepgram',model:'nova-2',language:'hi'} as const;
 export const targetedSpeech={provider:'deepgram',model:'nova-3-medical',language:'multi'} as const;
 export function speechConfiguration(){return process.env.AI_SPEECH_MODEL===targetedSpeech.model&&process.env.AI_SPEECH_LANGUAGE===targetedSpeech.language?targetedSpeech:null;}
-export type SpeechReply={text:string;final:boolean;providerRequestId?:string};
+export type SpeechReply={text:string;final:boolean;providerRequestId?:string;raw?:unknown};
 export class SpeechOutputError extends Error{}
 export class SpeechUnavailableError extends Error{}
 export type SpeechTransport={mode:'disabled'|'offline_fixture'|'live';authorizationRef:string;transcribe:(audio:Uint8Array,signal:AbortSignal)=>Promise<SpeechReply>};
@@ -37,6 +37,6 @@ export function deepgramTransport(mode:'offline_fixture'|'live',authorizationRef
  const r=raw as {is_final?:unknown;results?:{channels?:{alternatives?:{transcript?:unknown}[]}[]};metadata?:{request_id?:unknown}};
  const text=r.results?.channels?.[0]?.alternatives?.[0]?.transcript;
  if(r.is_final===false||typeof text!=='string'||!text.trim()||text.length>8000)throw new SpeechOutputError('INVALID_FINAL_TRANSCRIPT');
- return{text:text.trim(),final:true,providerRequestId:typeof r.metadata?.request_id==='string'?r.metadata.request_id.slice(0,200):undefined};
+ return{text:text.trim(),final:true,raw,providerRequestId:typeof r.metadata?.request_id==='string'?r.metadata.request_id.slice(0,200):undefined};
  }};
 }

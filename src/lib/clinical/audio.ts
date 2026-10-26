@@ -1,7 +1,12 @@
+export const MAX_SPEECH_MS = 60000;
+export const MAX_SPEECH_PCM_BYTES = 1920000;
+// Only the canonical 44-byte PCM container emitted below is admitted.
+export const SPEECH_WAV_OVERHEAD = 44;
+export const MAX_SPEECH_WAV_BYTES = MAX_SPEECH_PCM_BYTES + SPEECH_WAV_OVERHEAD;
 // PCM conversion/downsampling adapted from MediFlow 45fbfb853338d5236f2c34eb83e771ac4e9307ca
 // src/hooks/useSTT.ts (Sujit Jaju and contributors). No provider transport.
 export function downsample(input: Float32Array, inputRate: number) {
-    if (!Number.isFinite(inputRate) || inputRate < 16000 || inputRate > 192000 || input.length > inputRate * 30 || !input.length)
+    if (!Number.isFinite(inputRate) || inputRate < 16000 || inputRate > 192000 || input.length > inputRate * MAX_SPEECH_MS / 1000 || !input.length)
         throw new Error("INVALID_AUDIO");
     if (input.some(x => !Number.isFinite(x)))
         throw new Error("INVALID_AUDIO");
@@ -45,13 +50,13 @@ export function encodeWav(input: Float32Array, inputRate: number) {
     return bytes;
 }
 export function validateWav(bytes: Uint8Array) {
-    if (bytes.length < 46 || bytes.length > 1024 * 1024 || bytes.length % 2)
+    if (bytes.length < 46 || bytes.length > MAX_SPEECH_WAV_BYTES || bytes.length % 2)
         throw new Error('INVALID_WAV');
     const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), text = (o: number, n: number) => new TextDecoder().decode(bytes.slice(o, o + n));
     if (text(0, 4) !== 'RIFF' || text(8, 4) !== 'WAVE' || text(12, 4) !== 'fmt ' || text(36, 4) !== 'data' || v.getUint32(4, true) !== bytes.length - 8 || v.getUint32(16, true) !== 16 || v.getUint16(20, true) !== 1 || v.getUint16(22, true) !== 1 || v.getUint32(24, true) !== 16000 || v.getUint32(28, true) !== 32000 || v.getUint16(32, true) !== 2 || v.getUint16(34, true) !== 16 || v.getUint32(40, true) !== bytes.length - 44)
         throw new Error('INVALID_WAV');
     const durationMs = (bytes.length - 44) / 32;
-    if (durationMs <= 0 || durationMs > 30000)
+    if (durationMs <= 0 || durationMs > MAX_SPEECH_MS)
         throw new Error('AUDIO_DURATION_LIMIT');
     return { durationMs, sampleRate: 16000, channels: 1, bytes: bytes.length };
 }

@@ -1,4 +1,4 @@
-import { encodeWav } from './audio';
+import { encodeWav, MAX_SPEECH_MS } from './audio';
 // Capture lifecycle/PCM processing adapted from MediFlow useSTT 45fbfb85 and
 // CliniQ useMedicalScribe d2fadb62. This bounded local adapter has no transport,
 // keys or automatic provider/model selection. Start only after a user action.
@@ -9,7 +9,7 @@ export async function captureClip(options: {
     windowMs?: number;
 }) {
     const windowMs = options.windowMs ?? 15000;
-    if (windowMs < 1000 || windowMs > 30000)
+    if (windowMs < 1000 || windowMs > MAX_SPEECH_MS)
         throw new Error('INVALID_CAPTURE_WINDOW');
     let stream: MediaStream | null = null, context: AudioContext | null = null, source: MediaStreamAudioSourceNode | null = null, processor: ScriptProcessorNode | null = null, gain: GainNode | null = null;
     let frames: Float32Array[] = [], length = 0, closed = false, timer: ReturnType<typeof setTimeout> | undefined;

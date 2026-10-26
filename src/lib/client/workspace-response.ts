@@ -1,3 +1,4 @@
+import {MAX_SPEECH_MS} from '@/lib/clinical/audio';
 // Small endpoint-specific guards for the envelopes the repaired clients consume.
 // A malformed 2xx is an unknown outcome, never a confirmed failed mutation.
 export const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -90,7 +91,7 @@ export function evidenceResponse(body:unknown,path:string,mutation=false){
 const speechStates=['admitted','transmitting','responded','saved','outcome_unknown','stale','cancelled','unavailable','rejected','exhausted','failed'];
 export function speechResponse(body:unknown,kind:'availability'|'status'|'save'){
  if(!object(body)||!object(body.data))return false;const d=body.data;
- if(kind==='availability')return typeof d.available==='boolean'&&['disabled','offline_fixture','live'].includes(String(d.mode))&&(d.maxClipMs===undefined||Number.isSafeInteger(d.maxClipMs)&&Number(d.maxClipMs)>=1000&&Number(d.maxClipMs)<=15000);
+ if(kind==='availability')return typeof d.available==='boolean'&&['disabled','offline_fixture','live'].includes(String(d.mode))&&(d.maxClipMs===undefined||Number.isSafeInteger(d.maxClipMs)&&Number(d.maxClipMs)>=1000&&Number(d.maxClipMs)<=MAX_SPEECH_MS);
  if(kind==='status')return text(d.id)&&speechStates.includes(String(d.status));
  return speechStates.includes(String(d.state))&&text(d.operationId)&&(d.state!=='saved'||text(d.segmentId)&&text(d.consultationId)&&revision(d.revision));
 }

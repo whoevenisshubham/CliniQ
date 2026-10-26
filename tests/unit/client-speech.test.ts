@@ -39,3 +39,12 @@ it('malformed successful preflight cannot enable capture beyond the supported bo
  vi.stubGlobal('fetch',vi.fn(async()=>result({available:true,mode:'live',maxClipMs:900000})));
  await act(async()=>root.render(createElement(SpeechCapture,{consultationId:'encounter-one',revision:0,sequence:0,disabled:false,fixture:false,onBusy:vi.fn(),onSaved:vi.fn(),onAccessLost:vi.fn()})));expect(button('Capture 15-second clip').disabled).toBe(true);expect(captureClip).not.toHaveBeenCalled();
 });
+
+it('uses a sixty-second durable allowance without creating a second audio send',async()=>{
+ const sent:RequestInit[]=[];
+ vi.stubGlobal('fetch',vi.fn((_url:string,init?:RequestInit)=>{if(init?.method){sent.push(init);return Promise.resolve(result({state:'outcome_unknown',operationId:'one'}));}return Promise.resolve(result({available:true,mode:'live',maxClipMs:60000}));}));
+ await act(async()=>root.render(createElement(SpeechCapture,{consultationId:'encounter-one',revision:0,sequence:0,disabled:false,fixture:false,onBusy:vi.fn(),onSaved:vi.fn(),onAccessLost:vi.fn()})));
+ await click('Capture 60-second clip');
+ expect(vi.mocked(captureClip).mock.calls.at(-1)![0].windowMs).toBe(60000);
+ expect(sent).toHaveLength(1);expect(button('Capture 60-second clip').disabled).toBe(true);
+});

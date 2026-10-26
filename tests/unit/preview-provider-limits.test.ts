@@ -14,3 +14,5 @@ it('model and language must move together while the legacy injected adapter reta
  await deepgramTransport('offline_fixture','synthetic',send,retainedSpeech).transcribe(new Uint8Array([1]),new AbortController().signal);
  const url=new URL(send.mock.calls[0][0].url);expect(url.searchParams.get('model')).toBe('nova-2');expect(url.searchParams.get('language')).toBe('hi');expect(url.searchParams.getAll('keywords')).toContain('paracetamol:5');
 });
+
+it('keeps raw provider output separate from the normalized transcript',async()=>{const raw={metadata:{request_id:'synthetic'},results:{channels:[{alternatives:[{transcript:'  No fever.  ',confidence:0.9}]}]}};const reply=await deepgramTransport('offline_fixture','synthetic',async()=>raw,retainedSpeech).transcribe(new Uint8Array([1]),new AbortController().signal);expect(reply.text).toBe('No fever.');expect(reply.raw).toEqual(raw);});
