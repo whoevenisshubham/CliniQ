@@ -62,6 +62,11 @@ export async function clinicalList(client: SupabaseClient) {
         check(r.error);
     return { visits: visits.data, patients: patients.data, care: care.data, role: p.role };
 }
+// Lightweight authenticated focus check; private context is fetched only after a change.
+export async function clinicalRevision(client:SupabaseClient,encounterId:string){
+ const p=await resolvePrincipal(client);id(encounterId);if(p.role!=='doctor')throw new HttpError(403,'PROVIDER_REQUIRED','A treating clinician is required.');
+ const r=await client.from('consultations').select('id,revision,status').eq('id',encounterId).maybeSingle();check(r.error);if(!r.data)throw new HttpError(404,'NOT_FOUND','Consultation unavailable.');return r.data;
+}
 export async function clinicalDetail(client: SupabaseClient, encounterId: string) {
     const p = await resolvePrincipal(client);
     id(encounterId);

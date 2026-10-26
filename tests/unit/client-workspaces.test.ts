@@ -130,3 +130,12 @@ it('missing chief complaint directs focus to findings before approval without su
  const posts:RequestInit[]=[];vi.stubGlobal('fetch',vi.fn((url:string,init?:RequestInit)=>{if(init?.method)posts.push(init);return Promise.resolve(result(url.endsWith('/speech')?{available:false,mode:'disabled'}:clinical));}));
  await render(createElement(ConsultationReview,{actorId:'actor-one',provider:true,initialId:'encounter-one'}));await click('Review saved draft');expect(document.querySelector('[role="dialog"]')).toBeNull();expect(host.textContent).toContain('Your saved transcript and draft are retained');expect(document.activeElement).toBe(host.querySelector('textarea[aria-describedby="chief-complaint-guidance"]'));expect(posts).toHaveLength(0);
 });
+
+it('confirmed findings save updates from its receipt instead of refetching private context',async()=>{
+ let detailReads=0;vi.stubGlobal('fetch',vi.fn((url:string,init?:RequestInit)=>{if(init?.method)return Promise.resolve(result({consultationId:'encounter-one',revision:1,status:'active'}));if(url.endsWith('/speech'))return Promise.resolve(result({available:false,mode:'disabled'}));detailReads++;return Promise.resolve(result(clinical));}));
+ await render(createElement(ConsultationReview,{actorId:'actor-one',provider:true,initialId:'encounter-one'}));const field=host.querySelector<HTMLTextAreaElement>('textarea[aria-describedby="chief-complaint-guidance"]')!;await change(field,'Saved source complaint');await click('Save findings');expect(field.value).toBe('Saved source complaint');expect(detailReads).toBe(1);expect(host.textContent).toContain('revision 1');
+});
+it('focus checks only the current revision when the encounter has not changed',async()=>{
+ let full=0,heads=0;vi.stubGlobal('fetch',vi.fn((url:string)=>{if(url.includes('revisionOnly=true')){heads++;return Promise.resolve(result({id:'encounter-one',revision:0,status:'active'}));}if(url.endsWith('/speech'))return Promise.resolve(result({available:false,mode:'disabled'}));full++;return Promise.resolve(result(clinical));}));
+ await render(createElement(ConsultationReview,{actorId:'actor-one',provider:true,initialId:'encounter-one'}));await act(async()=>window.dispatchEvent(new Event('focus')));expect(heads).toBe(1);expect(full).toBe(1);
+});

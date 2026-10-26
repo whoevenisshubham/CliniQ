@@ -124,7 +124,16 @@ export function validateExtraction(raw: unknown, input: {
     for (const op of proposal.operations) {
         if (op.op === 'mark_uncertain' || op.op === 'retract_fact')
             continue;
-        const evidence = input.sources.filter(s => op.evidence_segment_ids.includes(s.segmentId!)).map(s => s.text).join(' ');
+        const fullEvidence = input.sources.filter(s => op.evidence_segment_ids.includes(s.segmentId!)).map(s => s.text).join(' ');
+        let evidence=fullEvidence;
+        if(op.note?.startsWith('Source quote: ')){
+            const quote=op.note.slice(14).trim();
+            // Quotes must contain whole contiguous source sentences. A clipped word
+            // such as 'fever' from 'No fever' must never bypass contextual checks.
+            const units=fullEvidence.split(/(?<=[.!?।])\s+|[\r\n]+/u).map(s=>s.trim()).filter(Boolean);
+            let supported=false;for(let i=0;i<units.length;i++)for(let end=i+1;end<=units.length;end++)if(contextText(units.slice(i,end).join(' '))===contextText(quote))supported=true;
+            if(!quote||!supported)throw new Error('SOURCE_QUOTE_FIDELITY');evidence=quote;
+        }
         const values: string[] = [];
         const walk = (v: unknown, key = '') => { if (typeof v === 'string' && !['id'].includes(key))
             values.push(v);
@@ -147,7 +156,7 @@ export function validateExtraction(raw: unknown, input: {
             const units=evidence.split(/(?<=[.!?।])\s+|\r?\n+/u).filter(s=>/^(?:assessment|diagnosis|impression|निदान)\s*:/iu.test(s.trim())).map(s=>s.replace(/^(?:assessment|diagnosis|impression|निदान)\s*:\s*/iu,''));
             if(values.some(v=>!units.some(s=>contextText(v)===contextText(s))))throw new Error('ASSESSMENT_CONTEXT_REQUIRED');
         }
-        if(op.path==='medications'&&qualifiedContext.test(evidence))throw new Error('MEDICATION_CONTEXT_REVIEW_REQUIRED');
+        if(op.path==='medications'&&(/\b(?:current\s+medication|currently\s+taking|already\s+taking|regular\s+medication|existing\s+medication)\b|पहले से|अभी ले/iu.test(evidence)||qualifiedContext.test(evidence)))throw new Error('MEDICATION_CONTEXT_REVIEW_REQUIRED');
         if(op.path!=='medications'&&op.path!=='diagnosis'&&qualifiedContext.test(evidence)&&values.some(v=>!completeContext(v,evidence)))throw new Error('CONTEXT_FIDELITY');
     }
     return proposal;

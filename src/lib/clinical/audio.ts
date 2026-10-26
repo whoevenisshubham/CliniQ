@@ -60,3 +60,16 @@ export function validateWav(bytes: Uint8Array) {
         throw new Error('AUDIO_DURATION_LIMIT');
     return { durationMs, sampleRate: 16000, channels: 1, bytes: bytes.length };
 }
+
+// Stateful resampling keeps 44.1kHz frame boundaries from accumulating extra audio.
+export class PcmStreamEncoder {
+ private consumed=0;private produced=0;private sum=0;private count=0;
+ constructor(private readonly inputRate:number){if(!Number.isFinite(inputRate)||inputRate<16000||inputRate>192000)throw Error('INVALID_AUDIO');}
+ encode(frame:Float32Array){
+  const values:number[]=[];const ratio=this.inputRate/16000;
+  for(const sample of frame){if(!Number.isFinite(sample))throw Error('INVALID_AUDIO');this.sum+=sample;this.count++;this.consumed++;
+   if(this.consumed>=Math.round((this.produced+1)*ratio)){const s=Math.max(-1,Math.min(1,Math.fround(this.sum/this.count)));values.push(s<0?s*32768:s*32767);this.produced++;this.sum=0;this.count=0;}
+  }
+  const out=new Uint8Array(values.length*2),view=new DataView(out.buffer);values.forEach((v,i)=>view.setInt16(i*2,v,true));return out;
+ }
+}

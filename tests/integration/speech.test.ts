@@ -96,3 +96,15 @@ it('saves sixty seconds once with raw output distinct from clinical text',async(
  const saved=await admin.from('speech_operations').select('duration_ms,byte_count,raw_provider_response,response_text').eq('consultation_id',cid).single();expect(saved.error).toBeNull();expect(saved.data).toMatchObject({duration_ms:60000,byte_count:1920044,raw_provider_response:raw,response_text:text});
  const budget=await admin.from('speech_allowances').select('used_requests,used_audio_ms').eq('authorization_ref',authRef).eq('consultation_id',cid).single();expect(budget.error).toBeNull();expect(budget.data).toEqual({used_requests:1,used_audio_ms:60000});
 });
+
+it('stream receipt preserves actual duration/hash, charges full reserved cap once and is service-only',async()=>{
+ const cid=await encounter(),c=command(cid),ref='stream-'+randomUUID(),sha='a'.repeat(64);
+ expect((await admin.from('speech_allowances').insert({authorization_ref:ref,actor_id:fixture.actors.doctorA.appId,consultation_id:cid,mode:'live',enabled:true,ends_at:new Date(Date.now()+3600000).toISOString(),max_requests:1,max_audio_ms:60000})).error).toBeNull();
+ const admitted=await clients.doctorA.rpc('speech_admit',{k:c.key,cid,sid:c.segment,seq:0,expected:0,sha,duration:60000,bytes:1920044});expect(admitted.error).toBeNull();const oid=admitted.data;
+ expect((await admin.rpc('speech_reserve',{oid,budget_ref:ref,sha,duration:60000,execution_mode:'live'})).data).toBe(true);
+ expect((await clients.doctorA.rpc('speech_stream_mark',{oid})).error?.code).toBe('42501');expect((await admin.rpc('speech_stream_mark',{oid})).data).toBe(true);expect((await admin.rpc('speech_stream_mark',{oid})).data).toBe(false);
+ const receipt={oid,sha:'b'.repeat(64),pcm_bytes:32000,transcript:text,request_id:'synthetic-stream',raw:{transport:'streaming',finalResults:[reply()]}};
+ expect((await clients.doctorA.rpc('speech_stream_receipt',receipt)).error?.code).toBe('42501');expect((await admin.rpc('speech_stream_receipt',receipt)).data).toBe(true);expect((await admin.rpc('speech_stream_receipt',receipt)).data).toBe(false);
+ expect((await clients.doctorA.rpc('speech_commit',{oid})).data.state).toBe('saved');const saved=await admin.from('speech_operations').select('duration_ms,byte_count,audio_sha256,raw_provider_response').eq('id',oid).single();expect(saved.error).toBeNull();expect(saved.data).toMatchObject({duration_ms:1000,byte_count:32044,audio_sha256:'b'.repeat(64),raw_provider_response:receipt.raw});
+ const usage=await admin.from('speech_allowances').select('used_requests,used_audio_ms').eq('authorization_ref',ref).single();expect(usage.error).toBeNull();expect(usage.data).toEqual({used_requests:1,used_audio_ms:60000});
+});

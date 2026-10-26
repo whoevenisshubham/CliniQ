@@ -41,3 +41,9 @@ it('rejects an exact but irrelevant excerpt for a specifically different measure
  expect(()=>validateAnswer(answer(s.text,s),[s],[],'What HbA1c value is written?')).toThrow('QUESTION_RELEVANCE');
  expect(validateAnswer(answer(s.text,s),[s],[],'What haemoglobin value does this report show?').answer).toBe(s.text);
 });
+
+it('extracts a supported whole sentence without unrelated paragraph negations contaminating every field',()=>{
+ const text='Dizziness for three days. No fever. Current medication metformin 500 mg.';
+ const p=validateExtraction({operations:[{op:'set_fact',path:'chief_complaint',value:'Dizziness for three days.',note:'Source quote: Dizziness for three days.',evidence_segment_ids:[segment]}]},{baseRevision:0,throughSegmentId:segment,sources:[source(text)],draft:emptySnapshot()});expect(p.operations).toHaveLength(1);
+ for(const quote of ['fever','metformin 500 mg'])expect(()=>validateExtraction({operations:[{op:'set_fact',path:'chief_complaint',value:quote,note:'Source quote: '+quote,evidence_segment_ids:[segment]}]},{baseRevision:0,throughSegmentId:segment,sources:[source(text)],draft:emptySnapshot()})).toThrow('SOURCE_QUOTE_FIDELITY');
+});

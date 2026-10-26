@@ -1,15 +1,17 @@
 "use client";
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {MAX_SPEECH_MS,validateWav} from '@/lib/clinical/audio';
+import {LiveSpeechCapture} from './LiveSpeechCapture';
 import {captureClip} from '@/lib/clinical/capture';
 import {accessDenied,readJsonResponse} from '@/lib/client/http-response';
 import {speechResponse} from '@/lib/client/workspace-response';
 import {speechPhase} from '@/lib/client/speech-state';
 
-export type SpeechTiming={sendToResultMs:number;stopToSavedMs:number|null};
+export type SpeechTiming={kind?:'batch';sendToResultMs:number;stopToSavedMs:number|null}|{kind:'stream';interimMs?:number;stopToSavedMs:number|null};
 type Pending={key:string;segmentId:string;revision:number;sequence:number;generation:number};
 export function SpeechCapture({consultationId,revision,sequence,disabled,fixture,onBusy,onSaved,onAccessLost}:{consultationId:string;revision:number;sequence:number;disabled:boolean;fixture:boolean;onBusy:(busy:boolean)=>void;onSaved:(timing?:SpeechTiming)=>void;onAccessLost:(e:unknown)=>void}){
  const [available,setAvailable]=useState(false),[state,setState]=useState('Speech unavailable'),[active,setActive]=useState(false),[retained,setRetained]=useState(false);
+ const [streaming,setStreaming]=useState(false);
  const [checking,setChecking]=useState(false);
  const [timing,setTiming]=useState<{sendToResultMs:number;stopToSavedMs:number|null}|null>(null);
  const measured=useRef<SpeechTiming|undefined>(undefined);
@@ -25,7 +27,7 @@ export function SpeechCapture({consultationId,revision,sequence,disabled,fixture
  useEffect(()=>{
   live.current=true;const n=generation.current,abort=new AbortController();
   if(!fixture)void fetch(path,{cache:'no-store',signal:AbortSignal.any([abort.signal,AbortSignal.timeout(30000)])})
-   .then(r=>readJsonResponse(r,b=>speechResponse(b,'availability'))).then(b=>{if(live.current&&generation.current===n){setAvailable(b.data.available===true);if(Number.isInteger(b.data.maxClipMs)&&b.data.maxClipMs>=1000&&b.data.maxClipMs<=MAX_SPEECH_MS)setMaxClipMs(b.data.maxClipMs);setState(b.data.available?(b.data.mode==='live'?'Speech transport configured · allowance checked before send':'Synthetic offline transport · no live speech'):'Speech unavailable · continue with typed transcript');}})
+   .then(r=>readJsonResponse(r,b=>speechResponse(b,'availability'))).then(b=>{if(live.current&&generation.current===n){setAvailable(b.data.available===true);setStreaming(b.data.streaming===true);if(Number.isInteger(b.data.maxClipMs)&&b.data.maxClipMs>=1000&&b.data.maxClipMs<=MAX_SPEECH_MS)setMaxClipMs(b.data.maxClipMs);setState(b.data.available?(b.data.mode==='live'?'Speech transport configured · allowance checked before send':'Synthetic offline transport · no live speech'):'Speech unavailable · continue with typed transcript');}})
    .catch(e=>{if(live.current&&generation.current===n){if(accessDenied(e))callbacks.current.onAccessLost(e);else setState('Speech status unavailable · typed transcript remains available');}});
   return()=>{live.current=false;abort.abort();invalidate();};
  },[path,fixture,invalidate]);
@@ -63,5 +65,5 @@ export function SpeechCapture({consultationId,revision,sequence,disabled,fixture
    const b=await readJsonResponse(r,b=>speechResponse(b,save?'save':'status'));apply(op,save?b.data.state:b.data.status);
   }catch(e){fail(e,op.generation);}finally{finish(op.generation);}
  };
- return <section className="speech-capture" aria-label="Speech capture"><p role="status">{state}</p>{timing&&<p role="status">Batch send to saved result: {timing.sendToResultMs} ms. Capture end to saved transcript: {timing.stopToSavedMs??'not measured'} ms. Includes upload and durable save; no streaming interim measurement.</p>}<div className="clinical-inline"><button className="quiet-button" disabled={disabled||active||!!pending.current} onClick={()=>void checkMicrophone()}>Check microphone locally</button><button className="quiet-button" disabled={disabled||active||!available||!!pending.current} onClick={()=>void start()}>Capture {Math.ceil(maxClipMs/1000)}-second clip</button>{active&&!checking&&!pending.current&&<button className="quiet-button" onClick={()=>finishCapture.current?.()}>Finish and send recording</button>}{active&&<button className="quiet-button" onClick={()=>{controller.current?.abort();setChecking(false);setState('Capture stopped. Check saved status if transmission had started.');if(!pending.current)finish(generation.current);}}>Stop capture</button>}{pending.current&&<button className="quiet-button" disabled={active} onClick={()=>void inspect()}>Check saved clip</button>}{pending.current&&retained&&!active&&<button className="quiet-button" disabled={disabled} onClick={()=>void inspect(true)}>Save retained final response</button>}</div><small>Only final results are saved. Audio stays in request memory; recovery never uploads it again. An unresolved operation keeps new capture paused.</small></section>;
+ return <section className="speech-capture" aria-label="Speech capture">{streaming&&<LiveSpeechCapture cid={consultationId} revision={revision} sequence={sequence} disabled={disabled||active||!!pending.current} onBusy={onBusy} onAccessLost={onAccessLost} onSaved={v=>onSaved({kind:'stream',interimMs:v.interimMs,stopToSavedMs:v.stopToSavedMs??null})}/> }<p role="status">{state}</p>{timing&&<p role="status">Batch send to saved result: {timing.sendToResultMs} ms. Capture end to saved transcript: {timing.stopToSavedMs??'not measured'} ms. Includes upload and durable save; no streaming interim measurement.</p>}<div className="clinical-inline"><button className="quiet-button" disabled={disabled||active||!!pending.current} onClick={()=>void checkMicrophone()}>Check microphone locally</button><button className="quiet-button" disabled={disabled||active||!available||!!pending.current} onClick={()=>void start()}>Capture {Math.ceil(maxClipMs/1000)}-second clip</button>{active&&!checking&&!pending.current&&<button className="quiet-button" onClick={()=>finishCapture.current?.()}>Finish and send recording</button>}{active&&<button className="quiet-button" onClick={()=>{controller.current?.abort();setChecking(false);setState('Capture stopped. Check saved status if transmission had started.');if(!pending.current)finish(generation.current);}}>Stop capture</button>}{pending.current&&<button className="quiet-button" disabled={active} onClick={()=>void inspect()}>Check saved clip</button>}{pending.current&&retained&&!active&&<button className="quiet-button" disabled={disabled} onClick={()=>void inspect(true)}>Save retained final response</button>}</div><small>Only final results are saved. Audio stays in request memory; recovery never uploads it again. An unresolved operation keeps new capture paused.</small></section>;
 }

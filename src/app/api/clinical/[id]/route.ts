@@ -1,5 +1,5 @@
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-import { clinicalDetail } from "@/lib/server/clinical/service";
+import { clinicalDetail,clinicalRevision } from "@/lib/server/clinical/service";
 import { errorResponse, privateJson } from "@/lib/server/http";
 export async function GET(_request: Request, ctx: {
     params: Promise<{
@@ -7,7 +7,7 @@ export async function GET(_request: Request, ctx: {
     }>;
 }) {
     try {
-        return privateJson({ data: await clinicalDetail(await getSupabaseServerClient(), (await ctx.params).id) });
+        return privateJson({ data: await (new URL(_request.url).searchParams.get('revisionOnly')==='true'?clinicalRevision:clinicalDetail)(await getSupabaseServerClient(), (await ctx.params).id) });
     }
     catch (e) {
         return errorResponse(e);

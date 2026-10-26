@@ -1,4 +1,4 @@
-import { encodeWav, MAX_SPEECH_MS } from './audio';
+import { encodeWav, MAX_SPEECH_MS, PcmStreamEncoder } from './audio';
 // Capture lifecycle/PCM processing adapted from MediFlow useSTT 45fbfb85 and
 // CliniQ useMedicalScribe d2fadb62. This bounded local adapter has no transport,
 // keys or automatic provider/model selection. Start only after a user action.
@@ -8,6 +8,7 @@ export async function captureClip(options: {
     onError: (code: string) => void;
     windowMs?: number;
     onCaptureEnd?: () => void;
+    onFrame?: (pcm:Uint8Array) => void;
 }) {
     const windowMs = options.windowMs ?? 15000;
     if (windowMs < 1000 || windowMs > MAX_SPEECH_MS)
@@ -45,6 +46,7 @@ export async function captureClip(options: {
         processor = context.createScriptProcessor(4096, 1, 1);
         gain = context.createGain();
         gain.gain.value = 0;
+        const pcmEncoder = new PcmStreamEncoder(context.sampleRate);
         const maxSamples = Math.floor(context.sampleRate * windowMs / 1000);
         const finish = () => { if (closed)
             return; try {
@@ -67,6 +69,7 @@ export async function captureClip(options: {
         } };
         processor.onaudioprocess = event => { if (closed)
             return; const frame = event.inputBuffer.getChannelData(0).slice(0, maxSamples - length); if (frame.length) {
+            options.onFrame?.(pcmEncoder.encode(frame));
             frames.push(frame);
             length += frame.length;
         } if (length >= maxSamples)

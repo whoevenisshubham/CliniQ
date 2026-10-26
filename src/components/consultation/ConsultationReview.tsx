@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
 import { RecordLayout } from "../documents/DocumentSurface";
+import {ClinicalExtraction} from './ClinicalExtraction';
 import {SpeechCapture,type SpeechTiming} from './SpeechCapture';
 import { emptySnapshot, type ClinicalSnapshot, type Medication, type SavedSegment } from "@/lib/contracts/clinical";
 import {accessDenied,readJsonResponse} from '@/lib/client/http-response';
@@ -118,6 +119,7 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
     } | null>(null), epoch = useRef(0), dirtyRef = useRef(false);
     dirtyRef.current = dirty;
     const mounted = useRef(true),denied=useRef(false),reads=useRef<AbortController|null>(null),mutationLock=useRef(false);
+    const focusChecking=useRef(false);
     const reviewButtonRef = useRef<HTMLButtonElement>(null);
     const chiefComplaintRef = useRef<HTMLTextAreaElement>(null);
     const transcriptRef = useRef(transcript);
@@ -171,8 +173,14 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
     useEffect(() => { mounted.current = true; void loadRef.current(selected); return () => { mounted.current = false;invalidate(); }; }, [selected, actorId,invalidate]);
     useEffect(() => {
         const focus = () => {
-            if (!busy && !pending.current)
-                void loadRef.current(selected);
+            if(busy||captureBusy||pending.current||focusChecking.current||fixture)return;
+            if(!selected){void loadRef.current(null);return;}
+            focusChecking.current=true;const token=epoch.current;
+            void fetch('/api/clinical/'+selected+'?revisionOnly=true',{cache:'no-store',signal:AbortSignal.timeout(15000)})
+             .then(r=>readJsonResponse(r,v=>{const d=(v as {data?:{revision?:unknown;status?:unknown}})?.data;return !!d&&Number.isSafeInteger(d.revision)&&typeof d.status==='string';}))
+             .then(b=>{if(mounted.current&&epoch.current===token&&(b.data.revision!==detail?.visit.revision||b.data.status!==detail?.visit.status))void loadRef.current(selected);})
+             .catch(e=>{if(mounted.current&&epoch.current===token)hideAccess(e);})
+             .finally(()=>{focusChecking.current=false;});
         };
         const before = (e: BeforeUnloadEvent) => {
             if (dirtyRef.current || transcriptRef.current.trim() || pending.current) {
@@ -183,12 +191,12 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
         window.addEventListener("focus", focus);
         window.addEventListener("beforeunload", before);
         return () => { window.removeEventListener("focus", focus); window.removeEventListener("beforeunload", before); };
-    }, [selected, busy]);
+    }, [selected, busy,captureBusy,fixture,detail?.visit.revision,detail?.visit.status,hideAccess]);
     function edit(next: ClinicalSnapshot) { setSnapshot(next); setDirty(true); setStatus("unsaved"); setConfirmed(false); }
     async function commit(command: unknown, retry = false, path = "/api/clinical") {
         if (!mounted.current||denied.current||mutationLock.current||busy || pending.current && !retry)
             return;
-        mutationLock.current=true;const token=epoch.current;
+        mutationLock.current=true;reads.current?.abort();const token=++epoch.current;
         setBusy(true);
         setError("");
         setNotice('');
@@ -214,7 +222,12 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
                 window.history.replaceState(null, "", `/consultations?id=${result.consultationId}`);
                 setSelected(result.consultationId);
             }
-            else
+            else if((operation.command as {action?:string}).action==='save'&&detail&&Number.isSafeInteger(result.revision)){
+                // The authoritative receipt confirms this exact validated snapshot.
+                // Do not repeat all context/history queries after every findings save.
+                const saved=(operation.command as {snapshot:ClinicalSnapshot}).snapshot;
+                setSnapshot(saved);setDetail({...detail,visit:{...detail.visit,revision:result.revision},draft:{...detail.draft,snapshot:saved,revision:result.revision}});setStatus('saved');
+            }else
                 await loadRef.current(selected, true);
         }
         catch (e) {
@@ -277,7 +290,7 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
     <section className="consultation-editor clinical-workbench" aria-label="Clinical findings"><div className="transcript-column">
      <div className="clinical-section-heading"><span className="section-number">01</span><div><h2>Transcript</h2><p>Saved final segments · speaker labels are explicit or unknown</p></div></div>
      <ol className="clinical-transcript">{detail.segments.map(s => <li key={s.id} id={`segment-${s.id}`} tabIndex={-1}><span>{s.speaker} · {s.language} · {s.source_type}{s.speech_provenance?.mode==='offline_fixture'?' · synthetic offline output':''}</span><p>{s.text}</p></li>)}</ol>{!detail.segments.length && <p className="clinical-muted">No transcript segments saved.</p>}
-     {speechTiming?.cid===detail.visit.id&&<p role="status">Batch send to saved result: {speechTiming.sendToResultMs} ms. Capture end to saved transcript: {speechTiming.stopToSavedMs??'not measured'} ms. Includes upload and durable save; no streaming interim measurement.</p>}
+     {speechTiming?.cid===detail.visit.id&&<p role="status">{speechTiming.kind==='stream'?<>Capture start to first interim: {speechTiming.interimMs??'not measured'} ms. Stop to saved transcript: </>:<>Batch send to saved result: {speechTiming.sendToResultMs} ms. Capture end to saved transcript: </>} {speechTiming.stopToSavedMs??'not measured'} ms. {speechTiming.kind==='stream'?'Speech-onset timing is not established.':'Includes upload and durable save; no streaming interim measurement.'}</p>}
      {active&&<SpeechCapture key={detail.visit.id+':'+detail.visit.revision} consultationId={detail.visit.id} revision={detail.visit.revision} sequence={detail.segments.length} disabled={locked||dirty||!!transcript.trim()} fixture={!!fixture} onBusy={setCaptureBusy} onAccessLost={hideAccess} onSaved={timing=>{if(timing)setSpeechTiming({...timing,cid:detail.visit.id});setCaptureBusy(false);void loadRef.current(detail.visit.id,true);}}/>}
      {active && <form onSubmit={e => {
                     e.preventDefault();
@@ -290,6 +303,7 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
       <label className="clinical-field">Typed final transcript segment<textarea required rows={4} maxLength={8000} value={transcript} disabled={locked} onChange={e => setTranscript(e.target.value)}/></label><div className="clinical-inline"><label>Speaker<select value={speaker} disabled={locked} onChange={e => setSpeaker(e.target.value as SavedSegment['speaker'])}><option value="unknown">Unknown</option><option value="patient">Patient (labelled)</option><option value="clinician">Clinician (labelled)</option></select></label><label>Language<select value={language} disabled={locked} onChange={e => setLanguage(e.target.value as SavedSegment['language'])}>{['unknown', 'en', 'hi', 'Hinglish'].map(x => <option key={x}>{x}</option>)}</select></label><button className="quiet-button" disabled={locked || dirty || !transcript.trim()}>Save final segment</button></div>
      </form>}
      </div><div className="findings-column"><div className="clinical-section-heading"><span className="section-number">02</span><div><h2>Clinician findings</h2><p>Manual observations · no automatic carry-forward or generated diagnosis</p></div></div>
+     {active&&detail.segments.length>0&&<ClinicalExtraction key={detail.visit.id+':extract:'+detail.visit.revision} cid={detail.visit.id} revision={detail.visit.revision} disabled={locked||dirty||!!transcript.trim()||!!fixture} onAccessLost={hideAccess} onSaved={()=>void loadRef.current(detail.visit.id,true)}/>}
      {detail.proposals?.length ? <section className="clinical-proposals" aria-label="Source-bound suggestions"><h3>Source-bound suggestions</h3>{detail.proposals.map(p => <article key={p.id}><p className="eyebrow">{p.result_kind === 'offline_fixture' ? 'Synthetic offline proposal · no live AI' : 'Generated proposal · clinician review required'}</p><p>{p.base_revision !== detail.visit.revision && p.state !== 'accepted' ? 'Stale · a clinician edit takes precedence' : p.state} · base revision {p.base_revision}</p>{p.operations.map((op, i) => <div key={i}><strong>{op.path} · {op.op}</strong><p>{op.value === undefined ? op.note ?? 'Review uncertainty; no automatic deletion' : JSON.stringify(op.value)}</p>{op.evidence_segment_ids.map(id => <a className="text-link" href={'#segment-' + id} key={id}>Transcript source {id.slice(0, 8)} ↗ </a>)}</div>)}<details><summary>Retained source statements</summary>{p.source_snapshot.map(s => <blockquote key={s.id}><p>{s.text}</p><small>{s.speaker} · {s.language}</small></blockquote>)}</details>{active && ['review_required', 'stale'].includes(p.state) && <div className="clinical-inline"><button className="quiet-button" disabled={locked || dirty || !!transcript.trim() || p.base_revision !== detail.visit.revision} onClick={() => void commit({ decision: 'accept', expectedRevision: detail.visit.revision }, false, '/api/clinical/proposals/' + p.id)}>Use reviewed suggestion in draft</button><button className="quiet-button" disabled={locked || dirty || !!transcript.trim()} onClick={() => void commit({ decision: 'reject', expectedRevision: detail.visit.revision }, false, '/api/clinical/proposals/' + p.id)}>Dismiss suggestion</button></div>}</article>)}</section> : null}
      {labelled("chief_complaint", "Chief complaint")}<p id="chief-complaint-guidance">Required for approval. Transcript and incomplete findings can be saved as a draft; speech capture does not automatically fill these fields.</p>{([['symptoms', 'Reported symptoms'], ['diagnosis', 'Clinician assessment'], ['lab_tests_ordered', 'Tests ordered']] as const).map(([name, label]) => <label className="clinical-field" key={name}>{label} · one item per line<textarea rows={3} disabled={!active || locked} value={snapshot[name].join('\n')} onChange={e => edit({ ...snapshot, [name]: e.target.value.split('\n') })}/></label>)}
      {labelled("physical_examination", "Physical examination")}
