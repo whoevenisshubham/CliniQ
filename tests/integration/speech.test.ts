@@ -3,12 +3,12 @@ import {createClient,type SupabaseClient} from '@supabase/supabase-js';
 import {createServerClient} from '@supabase/ssr';
 import {readFileSync} from 'node:fs';
 import {randomUUID,createHash} from 'node:crypto';
-import {localConfiguration,root} from '../../scripts/local-supabase.mjs';
+import {localConfiguration,root,sql} from '../../scripts/local-supabase.mjs';
 import {encodeWav} from '@/lib/clinical/audio';
 import {GET,POST} from '@/app/api/clinical/[id]/speech/route';
 import {speechResponse} from '@/lib/client/workspace-response';
 import {GET as clinicalDetail} from '@/app/api/clinical/[id]/route';
-import {offlineDeepgramTransport,type SpeechTransport,type SpeechReply} from '@/lib/server/speech/transport';
+import {offlineDeepgramTransport,deepgramTransport,targetedSpeech,type SpeechTransport,type SpeechReply} from '@/lib/server/speech/transport';
 const state=vi.hoisted(()=>({jar:null as null|{getAll:()=>{name:string;value:string}[];set:(n:string,v:string)=>void;delete:(n:string)=>void},transport:null as import('@/lib/server/speech/transport').SpeechTransport|null}));
 vi.mock('next/headers',()=>({cookies:async()=>state.jar}));
 vi.mock('@/lib/server/speech/transport',async original=>{const actual=await original<typeof import('@/lib/server/speech/transport')>();return{...actual,speechTransport:()=>state.transport??actual.speechTransport()};});
@@ -75,8 +75,10 @@ it('global concurrency and abort after the send marker never trigger an automati
 it('care revocation during a response prevents final publication and future private reads',async()=>{const cid=await encounter(),c=command(cid);await allowance(cid);const filter=()=>admin.from('care_relationships').update({revoked_at:new Date().toISOString()}).eq('patient_id',fixture.ids.patientA).eq('provider_id',fixture.actors.doctorA.appId).eq('scope','clinical');state.transport=offlineDeepgramTransport(authRef,async()=>{expect((await filter()).error).toBeNull();return reply();});try{expect((await call(c)).status).toBe(404);state.jar=jars.doctorA;expect((await GET(new Request(origin+'?operation='+c.key),{params:Promise.resolve({id:cid})})).status).toBe(404);expect((await admin.from('clinical_segments').select('id').eq('consultation_id',cid)).data).toEqual([]);}finally{expect((await admin.from('care_relationships').update({revoked_at:null}).eq('patient_id',fixture.ids.patientA).eq('provider_id',fixture.actors.doctorA.appId).eq('scope','clinical')).error).toBeNull();}});
 it('prepared live-mode reservation binds exact audio scope and pacing while transport remains a zero-network double',async()=>{
  const missing=await encounter();state.transport={...offlineDeepgramTransport('not-provisioned',async()=>reply()),mode:'live'};state.jar=jars.doctorA;const noAllowance=await GET(new Request(origin),{params:Promise.resolve({id:missing})});expect((await noAllowance.json()).data.available).toBe(false);
- const cid=await encounter(),c=command(cid),ref='isolated-live-wire-'+randomUUID();expect((await admin.from('speech_allowances').insert({authorization_ref:ref,actor_id:fixture.actors.doctorA.appId,consultation_id:cid,mode:'live',enabled:true,ends_at:new Date(Date.now()+3600000).toISOString(),max_requests:2,max_audio_ms:3000,min_interval_seconds:60})).error).toBeNull();
- const send=vi.fn(async()=>{const reservation=await admin.from('speech_allowances').select('used_requests,used_audio_ms').eq('authorization_ref',ref).single();expect(reservation.error).toBeNull();expect(reservation.data).toEqual({used_requests:1,used_audio_ms:1000});return reply();});state.transport={...offlineDeepgramTransport(ref,send),mode:'live'};
+ sql(readFileSync(root+'/docs/rollout/nova3-model-binding.sql','utf8'));
+ vi.stubEnv('AI_SPEECH_MODEL','nova-3-medical');vi.stubEnv('AI_SPEECH_LANGUAGE','multi');
+ const cid=await encounter(),c=command(cid),ref='isolated-live-wire-'+randomUUID();expect((await admin.from('speech_allowances').insert({authorization_ref:ref,actor_id:fixture.actors.doctorA.appId,consultation_id:cid,mode:'live',model:'nova-3-medical',requested_language:'multi',enabled:true,ends_at:new Date(Date.now()+3600000).toISOString(),max_requests:2,max_audio_ms:3000,min_interval_seconds:60})).error).toBeNull();
+ const send=vi.fn(async()=>{const reservation=await admin.from('speech_allowances').select('used_requests,used_audio_ms').eq('authorization_ref',ref).single();expect(reservation.error).toBeNull();expect(reservation.data).toEqual({used_requests:1,used_audio_ms:1000});return reply();});state.transport=deepgramTransport('live',ref,send,targetedSpeech);
  state.jar=jars.doctorA;const beforeCapture=await GET(new Request(origin),{params:Promise.resolve({id:cid})});expect((await beforeCapture.json()).data).toMatchObject({available:true,mode:'live',maxClipMs:3000});expect(send).not.toHaveBeenCalled();
  expect((await(await call(c)).json()).data.state).toBe('saved');expect((await(await recover(c)).json()).data.state).toBe('saved');expect(send).toHaveBeenCalledOnce();
  const paced=await GET(new Request(origin),{params:Promise.resolve({id:cid})});expect((await paced.json()).data.available).toBe(false);expect(send).toHaveBeenCalledOnce();
