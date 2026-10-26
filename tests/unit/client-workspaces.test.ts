@@ -103,7 +103,7 @@ it('clinical save recovers an unreadable commit through operation lookup without
 });
 
 it('an unreadable approval remains recoverable inside its dialog and cannot replace the retained review',async()=>{
- let posts=0;vi.stubGlobal('fetch',vi.fn((url:string,init?:RequestInit)=>{if(url.endsWith('/speech'))return Promise.resolve(result({available:false,mode:'disabled'}));if(url.includes('/operations/'))return Promise.resolve(result({consultationId:'encounter-one',revision:0,status:'completed'}));if(init?.method){posts++;return Promise.resolve(new Response('',{status:200}));}return Promise.resolve(result(clinical));}));
+ let posts=0;vi.stubGlobal('fetch',vi.fn((url:string,init?:RequestInit)=>{if(url.endsWith('/speech'))return Promise.resolve(result({available:false,mode:'disabled'}));if(url.includes('/operations/'))return Promise.resolve(result({consultationId:'encounter-one',revision:0,status:'completed'}));if(init?.method){posts++;return Promise.resolve(new Response('',{status:200}));}return Promise.resolve(result({...clinical,draft:{...clinical.draft,snapshot:{...clinical.draft.snapshot,chief_complaint:'Saved synthetic complaint'}}}));}));
  await render(createElement(ConsultationReview,{actorId:'actor-one',provider:true,initialId:'encounter-one'}));await click('Review saved draft');
  const dialog=document.querySelector('[role="dialog"]')!;await act(async()=>dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());await click('Approve record');
  expect(dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')!.disabled).toBe(true);expect(button('Reconcile this approval').disabled).toBe(false);await click('Reconcile this approval');expect(posts).toBe(1);expect(document.querySelector('[role="dialog"]')).toBeNull();expect(host.textContent).toContain('Saved to the clinical record.');
@@ -124,4 +124,9 @@ for(const c of [
 ])it(`${c.name}: HTML access denial hides private state after a successful read`,async()=>{
  let denied=false;vi.stubGlobal('fetch',vi.fn(()=>Promise.resolve(denied?new Response('<html>private diagnostic</html>',{status:403}):result(c.data))));
  await render(c.node());expect(host.textContent).toContain(c.marker);denied=true;await click(c.refresh);expect(host.textContent).not.toContain(c.marker);expect(host.textContent).not.toContain('private diagnostic');
+});
+
+it('missing chief complaint directs focus to findings before approval without submitting or discarding the saved draft',async()=>{
+ const posts:RequestInit[]=[];vi.stubGlobal('fetch',vi.fn((url:string,init?:RequestInit)=>{if(init?.method)posts.push(init);return Promise.resolve(result(url.endsWith('/speech')?{available:false,mode:'disabled'}:clinical));}));
+ await render(createElement(ConsultationReview,{actorId:'actor-one',provider:true,initialId:'encounter-one'}));await click('Review saved draft');expect(document.querySelector('[role="dialog"]')).toBeNull();expect(host.textContent).toContain('Your saved transcript and draft are retained');expect(document.activeElement).toBe(host.querySelector('textarea[aria-describedby="chief-complaint-guidance"]'));expect(posts).toHaveLength(0);
 });
