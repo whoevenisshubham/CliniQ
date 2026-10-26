@@ -1,6 +1,6 @@
 "use client";
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {MAX_SPEECH_MS} from '@/lib/clinical/audio';
+import {MAX_SPEECH_MS,validateWav} from '@/lib/clinical/audio';
 import {captureClip} from '@/lib/clinical/capture';
 import {accessDenied,readJsonResponse} from '@/lib/client/http-response';
 import {speechResponse} from '@/lib/client/workspace-response';
@@ -10,6 +10,7 @@ export type SpeechTiming={sendToResultMs:number;stopToSavedMs:number|null};
 type Pending={key:string;segmentId:string;revision:number;sequence:number;generation:number};
 export function SpeechCapture({consultationId,revision,sequence,disabled,fixture,onBusy,onSaved,onAccessLost}:{consultationId:string;revision:number;sequence:number;disabled:boolean;fixture:boolean;onBusy:(busy:boolean)=>void;onSaved:(timing?:SpeechTiming)=>void;onAccessLost:(e:unknown)=>void}){
  const [available,setAvailable]=useState(false),[state,setState]=useState('Speech unavailable'),[active,setActive]=useState(false),[retained,setRetained]=useState(false);
+ const [checking,setChecking]=useState(false);
  const [timing,setTiming]=useState<{sendToResultMs:number;stopToSavedMs:number|null}|null>(null);
  const measured=useRef<SpeechTiming|undefined>(undefined);
  const captureEnd=useRef<number|null>(null),finishCapture=useRef<(()=>void)|undefined>(undefined);
@@ -47,6 +48,12 @@ export function SpeechCapture({consultationId,revision,sequence,disabled,fixture
   const handle=await captureClip({signal:c.signal,windowMs:maxClipMs,onCaptureEnd:()=>{captureEnd.current=performance.now();},onError:code=>{if(current(n)){setState('Capture unavailable: '+code);finish(n);}},onClip:bytes=>{if(!current(n))return;const op={key:crypto.randomUUID(),segmentId:crypto.randomUUID(),revision,sequence,generation:n};pending.current=op;finishCapture.current=undefined;void upload(op,bytes,c.signal);}});
   finishCapture.current=handle?.finish;
  };
+ // Uses the same capture adapter, but deliberately has no upload/transport path.
+ const checkMicrophone=async()=>{
+  if(disabled||locked.current||active||pending.current)return;
+  const n=generation.current,c=new AbortController();controller.current=c;locked.current=true;setActive(true);setChecking(true);setState('Checking microphone locally for 2 seconds. Nothing is uploaded.');onBusy(true);
+  await captureClip({signal:c.signal,windowMs:2000,onError:code=>{if(current(n)){setChecking(false);setState('Local microphone check: '+code+'. No audio uploaded.');finish(n);}},onClip:bytes=>{if(!current(n))return;setChecking(false);try{const wav=validateWav(bytes);setState('Microphone check passed: '+Math.round(wav.durationMs)+' ms captured locally. No audio uploaded.');}catch{setState('Local microphone check: INVALID_CAPTURED_WAV. No audio uploaded.');}finish(n);}});
+ };
  const inspect=async(save=false)=>{
   const op=pending.current;if(!op||locked.current||!current(op.generation))return;
   locked.current=true;setActive(true);onBusy(true);const c=new AbortController();controller.current=c;
@@ -56,5 +63,5 @@ export function SpeechCapture({consultationId,revision,sequence,disabled,fixture
    const b=await readJsonResponse(r,b=>speechResponse(b,save?'save':'status'));apply(op,save?b.data.state:b.data.status);
   }catch(e){fail(e,op.generation);}finally{finish(op.generation);}
  };
- return <section className="speech-capture" aria-label="Speech capture"><p role="status">{state}</p>{timing&&<p role="status">Batch send to saved result: {timing.sendToResultMs} ms. Capture end to saved transcript: {timing.stopToSavedMs??'not measured'} ms. Includes upload and durable save; no streaming interim measurement.</p>}<div className="clinical-inline"><button className="quiet-button" disabled={disabled||active||!available||!!pending.current} onClick={()=>void start()}>Capture {Math.ceil(maxClipMs/1000)}-second clip</button>{active&&!pending.current&&<button className="quiet-button" onClick={()=>finishCapture.current?.()}>Finish and send recording</button>}{active&&<button className="quiet-button" onClick={()=>{controller.current?.abort();setState('Capture stopped. Check saved status if transmission had started.');if(!pending.current)finish(generation.current);}}>Stop capture</button>}{pending.current&&<button className="quiet-button" disabled={active} onClick={()=>void inspect()}>Check saved clip</button>}{pending.current&&retained&&!active&&<button className="quiet-button" disabled={disabled} onClick={()=>void inspect(true)}>Save retained final response</button>}</div><small>Only final results are saved. Audio stays in request memory; recovery never uploads it again. An unresolved operation keeps new capture paused.</small></section>;
+ return <section className="speech-capture" aria-label="Speech capture"><p role="status">{state}</p>{timing&&<p role="status">Batch send to saved result: {timing.sendToResultMs} ms. Capture end to saved transcript: {timing.stopToSavedMs??'not measured'} ms. Includes upload and durable save; no streaming interim measurement.</p>}<div className="clinical-inline"><button className="quiet-button" disabled={disabled||active||!!pending.current} onClick={()=>void checkMicrophone()}>Check microphone locally</button><button className="quiet-button" disabled={disabled||active||!available||!!pending.current} onClick={()=>void start()}>Capture {Math.ceil(maxClipMs/1000)}-second clip</button>{active&&!checking&&!pending.current&&<button className="quiet-button" onClick={()=>finishCapture.current?.()}>Finish and send recording</button>}{active&&<button className="quiet-button" onClick={()=>{controller.current?.abort();setChecking(false);setState('Capture stopped. Check saved status if transmission had started.');if(!pending.current)finish(generation.current);}}>Stop capture</button>}{pending.current&&<button className="quiet-button" disabled={active} onClick={()=>void inspect()}>Check saved clip</button>}{pending.current&&retained&&!active&&<button className="quiet-button" disabled={disabled} onClick={()=>void inspect(true)}>Save retained final response</button>}</div><small>Only final results are saved. Audio stays in request memory; recovery never uploads it again. An unresolved operation keeps new capture paused.</small></section>;
 }

@@ -54,3 +54,9 @@ it('shows batch durable-response timing only after an acknowledged saved result'
  await act(async()=>root.render(createElement(SpeechCapture,{consultationId:'encounter-one',revision:0,sequence:0,disabled:false,fixture:false,onBusy:vi.fn(),onSaved:vi.fn(),onAccessLost:vi.fn()})));
  await click('Capture 60-second clip');expect(host.textContent).toContain('Batch send to saved result:');expect(host.textContent).toContain('no streaming interim measurement');
 });
+
+it('local microphone diagnostic never uploads audio even when live speech is disabled',async()=>{
+ const fetcher=vi.fn(async()=>result({available:false,mode:'disabled'}));vi.stubGlobal('fetch',fetcher);
+ await act(async()=>root.render(createElement(SpeechCapture,{consultationId:'encounter-one',revision:0,sequence:0,disabled:false,fixture:false,onBusy:vi.fn(),onSaved:vi.fn(),onAccessLost:vi.fn()})));
+ await click('Check microphone locally');expect(captureClip).toHaveBeenLastCalledWith(expect.objectContaining({windowMs:2000}));expect(fetcher).toHaveBeenCalledTimes(1);expect(host.textContent).toContain('No audio uploaded.');
+});
