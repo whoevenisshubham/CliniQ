@@ -97,6 +97,7 @@ export function speechResponse(body:unknown,kind:'availability'|'status'|'save')
 
 export function documentResponse(body:unknown,path:string,mutation=false){
  if(!object(body))return false;
+ if(path.endsWith('/recover'))return object(body.data)&&['idle','succeeded','stale','failed','recovery_degraded','recovery_blocked','retry_queued','unavailable','text_ready','needs_transcription','empty','encrypted','unsupported','review_required','not_admitted','cancelled','outcome_unknown'].includes(String(body.data.status));
  if(mutation)return text(body.document_id)&&(path==='/api/documents'||path.endsWith('/versions')?text(body.version_id):revision(body.revision)&&text(body.action));
  if(path==='/api/documents')return rows(body.documents,v=>fields(v,['id','title','status'])&&revision(v.revision)&&nullable(v.current_version_id,text));
  if(path==='/api/documents/providers')return rows(body.providers,v=>fields(v,['provider_id','workspace_id','name','workspace_name']));

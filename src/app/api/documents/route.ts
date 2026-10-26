@@ -10,6 +10,7 @@ import {
 import { listDocuments, uploadDocument } from "@/lib/server/documents/service";
 import { multipartUpload } from "@/lib/server/documents/upload-request";
 import { dispatchDocumentWork } from "@/lib/server/jobs/dispatch";
+export const runtime='nodejs';export const maxDuration=120;
 export async function GET() {
   try {
     return privateJson({
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
       getSupabaseAdminClient(),
       await multipartUpload(request),
     );
-    await dispatchDocumentWork();
+    await dispatchDocumentWork({documentId:result.document_id});
     return privateJson(result, 201);
   } catch (e) {
     return errorResponse(e);

@@ -20,3 +20,7 @@ Public UI flags are only `NEXT_PUBLIC_OCR_ENABLED=false` and `NEXT_PUBLIC_GOOGLE
 Smallest owner action on return: verify exact intended zero-spend model capability/limits and documented accounting; do not send keys in chat. Then review the prepared upgrade/finite-call proposal before any optional enablement.
 
 Remaining gates: hosted optional upgrade/worker/authenticated acceptance, live quality, real OIDC, natural expiry/browser failure, actual200% zoom/true phone, remaining browser controls, and the recorded appointment/canonical-refresh execution rejections. Doubles/isolated CI/visual fixtures do not close them. No release or V2-complete claim.
+# Vercel continuation
+
+The current deployment target, owner-supplied model access/limits, constructed accounting profile, targeted multilingual speech pairing and bounded unconsumed proposal are documented in [Vercel Preview execution](vercel-preview.md). The checklist below records the earlier Netlify preparation and must not be used to overwrite the owner's newer Vercel setup. All inference remains disabled.
+

@@ -6,7 +6,8 @@ import {resolvePrincipal} from '../auth/context';
 import {HttpError} from '../http';
 import {id} from '../documents/service';
 import {validateWav} from '@/lib/clinical/audio';
-import {speechTransport,SpeechOutputError,SpeechUnavailableError} from './transport';
+import {speechTransport,speechConfiguration,SpeechOutputError,SpeechUnavailableError} from './transport';
+async function modelSchema(client:SupabaseClient){try{const r=await client.rpc('optional_capabilities');return !r.error&&r.data?.speech_model_binding===1;}catch{return false;}}
 function check(error:{code:string;message:string}|null){if(!error)return;const codes:Record<string,number>={AUTH_REQUIRED:401,NOT_FOUND:404,SYNTHETIC_ONLY:403,IDEMPOTENCY_CONFLICT:409,REVISION_CONFLICT:409,OPERATION_LIMIT:429,INVALID_AUDIO:422,RESULT_UNAVAILABLE:409};throw new HttpError(codes[error.message]??(['23514','22P02','23505'].includes(error.code)?422:503),codes[error.message]?error.message:'SPEECH_UNAVAILABLE','Speech processing is unavailable or conflicts with the saved encounter. Your existing record is unchanged.');}
 export async function speechContext(client:SupabaseClient,cid:string){const p=await resolvePrincipal(client);id(cid);if(p.role!=='doctor')throw new HttpError(403,'PROVIDER_REQUIRED','A treating clinician is required.');const c=await client.from('consultations').select('id,status,revision').eq('id',cid).maybeSingle();check(c.error);if(!c.data)throw new HttpError(404,'NOT_FOUND','Consultation unavailable.');return c.data;}
 export async function speechView(client:SupabaseClient,cid:string,key:string){await speechContext(client,cid);id(key);const r=await client.from('speech_operations').select('id,status,response,error_code,segment_id,mode,created_at').eq('consultation_id',cid).eq('operation_key',key).maybeSingle();check(r.error);if(!r.data)throw new HttpError(404,'NOT_FOUND','Speech operation unavailable.');return r.data;}
@@ -15,9 +16,9 @@ export async function speechView(client:SupabaseClient,cid:string,key:string){aw
 export async function recoverSpeech(client:SupabaseClient,cid:string,key:string){const op=await speechView(client,cid,key);if(op.status==='saved')return op.response;if(op.status!=='responded')return{state:op.status,operationId:op.id};const r=await client.rpc('speech_commit',{oid:op.id});check(r.error);return r.data;}
 export async function speechAvailability(client:SupabaseClient,admin:()=>SupabaseClient,cid:string){
  await speechContext(client,cid);const transport=speechTransport(),mode=transport.mode;
- if(mode==='disabled'||mode==='live'&&!await optionalSchema(client,'speech'))return{available:false,mode,reason:'Speech is disabled. Continue with typed transcript.'};
+ if(mode==='disabled'||mode==='live'&&(!await optionalSchema(client,'speech')||!await modelSchema(client)))return{available:false,mode,reason:'Speech is disabled. Continue with typed transcript.'};
  const actor=await resolvePrincipal(client),now=Date.now();const allowance=await admin().from('speech_allowances').select('mode,model,requested_language,max_requests,used_requests,max_audio_ms,used_audio_ms,next_send_at').eq('authorization_ref',transport.authorizationRef).eq('actor_id',actor.id).eq('consultation_id',cid).eq('mode',mode).eq('enabled',true).lte('starts_at',new Date(now).toISOString()).gt('ends_at',new Date(now).toISOString()).maybeSingle();check(allowance.error);
- const a=allowance.data;if(!a||a.model!=='nova-2'||a.requested_language!=='hi'||a.used_requests>=a.max_requests||a.max_audio_ms-a.used_audio_ms<1000)return{available:false,mode,reason:'No matching audio allowance remains. Continue with typed transcript.'};
+ const a=allowance.data,configuration=mode==='live'?speechConfiguration():{model:'nova-2',language:'hi'};if(!a||!configuration||a.model!==configuration.model||a.requested_language!==configuration.language||a.used_requests>=a.max_requests||a.max_audio_ms-a.used_audio_ms<1000)return{available:false,mode,reason:'No matching audio allowance remains. Continue with typed transcript.'};
  if(mode==='live'&&Date.parse(a.next_send_at)>now)return{available:false,mode,reason:'Speech is waiting for its allowed send time. Typed transcript remains available.'};
  return{available:true,mode,maxClipMs:Math.min(15000,a.max_audio_ms-a.used_audio_ms),reason:'Exact audio allowance is checked again before transmission.'};
 }
@@ -26,7 +27,7 @@ export async function transcribeClip(client:SupabaseClient,admin:SupabaseClient,
  await speechContext(client,input.cid);id(input.key);id(input.segmentId);
  if(!Number.isInteger(input.sequence)||input.sequence<0||input.sequence>999||!Number.isInteger(input.expectedRevision)||input.expectedRevision<0)throw new HttpError(400,'INVALID_COMMAND','Check the saved transcript position.');
  let wav;try{wav=validateWav(input.bytes);}catch{throw new HttpError(422,'INVALID_AUDIO','Only a complete16kHz mono PCM WAV clip up to30 seconds is supported.');}
- if(speechTransport().mode==='live'&&!await optionalSchema(client,'speech'))return{state:'unavailable'};
+ if(speechTransport().mode==='live'&&(!await optionalSchema(client,'speech')||!await modelSchema(client)))return{state:'unavailable'};
  const sha=createHash('sha256').update(input.bytes).digest('hex'),duration=Math.ceil(wav.durationMs);
  const admission=await client.rpc('speech_admit',{k:input.key,cid:input.cid,sid:input.segmentId,seq:input.sequence,expected:input.expectedRevision,sha,duration,bytes:input.bytes.length});check(admission.error);const oid=admission.data as string;
  const view=()=>speechView(client,input.cid,input.key);
@@ -34,6 +35,7 @@ export async function transcribeClip(client:SupabaseClient,admin:SupabaseClient,
  const transport=speechTransport();const result=async(state:string,text?:string,requestId?:string)=>{const r=await admin.rpc('speech_result',{oid,next_state:state,transcript:text??null,request_id:requestId??null});check(r.error);return r.data as boolean;};
  if(transport.mode==='disabled'){await result('unavailable');return{state:'unavailable',operationId:oid};}
  if(input.signal.aborted){await result('cancelled');return{state:'cancelled',operationId:oid};}
+ if(transport.mode==='live'){const binding=await admin.rpc('speech_bind_target',{oid,budget_ref:transport.authorizationRef});check(binding.error);if(!binding.data)return{state:'unavailable',operationId:oid};}
  const reservation=await admin.rpc('speech_reserve',{oid,budget_ref:transport.authorizationRef,sha,duration,...(transport.mode==='live'?{execution_mode:'live'}:{})});check(reservation.error);if(!reservation.data){const current=await view();return current.status==='saved'?current.response:{state:current.status,operationId:oid};}
  const signal=AbortSignal.any([input.signal,AbortSignal.timeout(45000)]);let reply;
  try{reply=await Promise.race([transport.transcribe(input.bytes,signal),new Promise<never>((_,reject)=>{if(signal.aborted)reject(new Error('CANCELLED'));else signal.addEventListener('abort',()=>reject(new Error('SPEECH_OUTCOME_UNKNOWN')),{once:true});})]);}

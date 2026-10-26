@@ -4,6 +4,7 @@ import { runAIJob } from '@/lib/server/ai/runner';
 import { providerConfiguration } from '@/lib/server/ai/provider';
 import { dispatchDocumentWork } from '@/lib/server/jobs/dispatch';
 import { errorResponse, privateJson, readJson, requireSameOrigin } from '@/lib/server/http';
+export const runtime='nodejs';export const maxDuration=120;
 export async function GET(_r: Request, ctx: {
     params: Promise<{
         id: string;
@@ -27,7 +28,7 @@ export async function POST(request: Request, ctx: {
         if (!providerConfiguration().enabled)
             await runAIJob(getSupabaseAdminClient(), jobId);
         else
-            await dispatchDocumentWork();
+            await dispatchDocumentWork({jobId});
         return privateJson({ data: { jobId, status: 'queued', pollAfterMs: 2000 } }, 202);
     }
     catch (e) {

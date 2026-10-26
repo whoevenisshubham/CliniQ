@@ -49,7 +49,7 @@ export async function runAIJob(admin: SupabaseClient, jobId?: string, offline?: 
     // UTF-8 bytes are a conservative input-token bound; context/template overhead
     // is included. Account-specific limits must fit before a live allowance exists.
     const inputBound = Buffer.byteLength(JSON.stringify(messages), 'utf8') + 256;
-    if (inputBound > 50000)
+    if (inputBound > 50000 || !offline&&config.model==='openai/gpt-oss-20b'&&inputBound+maxOutput>8000)
         return evidence('INSUFFICIENT_EVIDENCE');
     const reserve = await admin.rpc('ai_reserve', { jid: job.id, f: job.fence, execution_mode: offline ? 'offline_fixture' : 'live', model_name: offline?.model ?? config.model, input_bound: inputBound, output_bound: maxOutput, budget_ref: offline?.authorizationRef ?? config.authorizationRef });
     check(reserve.error);

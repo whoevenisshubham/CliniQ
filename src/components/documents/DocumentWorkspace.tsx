@@ -38,7 +38,7 @@ async function serverApi(path: string, init?: RequestInit) {
   const response = await fetch(path, {
     ...init,
     cache: "no-store",
-    signal: init?.signal ?? AbortSignal.timeout(45000),
+    signal: init?.signal ?? AbortSignal.timeout(110000),
   });
   return readJsonResponse(response,b=>documentResponse(b,path,!!init?.method));
 }
@@ -342,6 +342,7 @@ export function DocumentWorkspace({
               </button>
               {!provider && (
                 <>
+                  {!fixture&&['queued','parsing'].includes(version?.extraction_status??'')&&<button className="secondary-button" disabled={busy||uncertain||ocrDirty} onClick={async()=>{if(mutationLock.current)return;mutationLock.current=true;setBusy(true);setError('');try{await api(`/api/documents/${selected}/recover`,{method:'POST'});await refresh();setNotice('A bounded processing attempt finished. Reload or return later if a lease is still active.');}catch(e){hideAccessFailure(e);setError((e as Error).message);}finally{mutationLock.current=false;if(live.current)setBusy(false);}}}>{busy?'Processing saved document…':'Resume saved processing'}</button>}
                   {version?.extraction_status === "failed" && (
                     <button
                       className="secondary-button"

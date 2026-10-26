@@ -31,7 +31,7 @@ export function requestBound(profile:OCRAccounting,prompt:string,pages:number[],
  const textBytes=Buffer.byteLength(prompt,'utf8')+Buffer.byteLength(pageInstruction(pages),'utf8');
  const imageTokens=dimensions.reduce((n,d)=>n+(p.image.kind==='fixed'?p.image.tokens:p.image.base+Math.ceil(d.width/p.image.width)*Math.ceil(d.height/p.image.height)*p.image.tokens),0);
  const input=textBytes+p.framingTokens+imageTokens,output=p.outputTokens;
- if(!Number.isSafeInteger(input)||input>p.maxInputTokens||input+output>p.contextTokens)throw Error('OCR_REQUEST_LIMIT');
+ if(!Number.isSafeInteger(input)||input>p.maxInputTokens||input+output>p.contextTokens||p.model==='qwen/qwen3.8-27b'&&input+output>8000)throw Error('OCR_REQUEST_LIMIT');
  return{profile:p,pages,dimensions:dimensions.map(d=>({width:d.width,height:d.height})),promptSha256:createHash('sha256').update(prompt+'\n'+pageInstruction(pages)).digest('hex'),textBytes,imageTokens,input,output};
 }
 export function validUsage(usage:unknown,bound:OCRBound):{input:number;output:number}|null{

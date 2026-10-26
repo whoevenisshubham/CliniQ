@@ -1,6 +1,7 @@
 import {getSupabaseServerClient,getSupabaseAdminClient} from '@/lib/supabase-server';
 import {speechContext,speechView,readAudio,transcribeClip,recoverSpeech,speechAvailability} from '@/lib/server/speech/service';
 import {errorResponse,HttpError,privateJson,requireSameOrigin,readJson} from '@/lib/server/http';
+export const runtime='nodejs';export const maxDuration=120;
 export async function GET(request:Request,{params}:{params:Promise<{id:string}>}){try{const cid=(await params).id,client=await getSupabaseServerClient();const key=new URL(request.url).searchParams.get('operation');return privateJson({data:key?await speechView(client,cid,key):await speechAvailability(client,getSupabaseAdminClient,cid)});}catch(e){return errorResponse(e);}}
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){try{requireSameOrigin(request);const cid=(await params).id,client=await getSupabaseServerClient();await speechContext(client,cid);
  if(request.headers.get('content-type')?.split(';')[0].trim()==='application/json'){

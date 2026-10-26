@@ -5,7 +5,7 @@
   "scripts": {
     "prebuild": "node scripts/write-build-identity.mjs",
     "dev": "next dev --webpack",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit --incremental false",

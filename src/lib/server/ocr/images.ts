@@ -11,7 +11,7 @@ export function renderOCRImages(bytes:Uint8Array,mime:string,pages:number[],sign
  if(active){if(waiting)return Promise.reject(Error('IMAGE_BUSY'));return new Promise((resolve,reject)=>{const cleanup=()=>{clearTimeout(timer);signal?.removeEventListener('abort',cancel);};const cancel=()=>{if(waiting===entry)waiting=null;cleanup();reject(Error('CANCELLED'));};const entry={start:()=>{cleanup();if(signal?.aborted){release();reject(Error('CANCELLED'));}else resolve(start());},cancel};const timer=setTimeout(()=>{if(waiting===entry)waiting=null;cleanup();reject(Error('IMAGE_BUSY'));},20000);waiting=entry;signal?.addEventListener('abort',cancel,{once:true});});}
  active=true;return start();
  function start(){return new Promise<OCRImage[]>((resolve,reject)=>{
-  let worker:Worker;try{worker=new Worker(path.join(process.cwd(),'scripts/ocr-image-worker.mjs'),{workerData:{bytes,mime,pages},resourceLimits:{maxOldGenerationSizeMb:256,maxYoungGenerationSizeMb:32}});}catch{release();reject(Error('IMAGE_UNAVAILABLE'));return;}
+  let worker:Worker;try{worker=new Worker(path.resolve(process.cwd(),'scripts','ocr-image-worker.mjs'),{workerData:{bytes,mime,pages},resourceLimits:{maxOldGenerationSizeMb:256,maxYoungGenerationSizeMb:32}});}catch{release();reject(Error('IMAGE_UNAVAILABLE'));return;}
   let done=false;
   const finish=(error?:Error,result?:OCRImage[])=>{if(done)return;done=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);
    // Do not release the process raster slot while native work is still alive.

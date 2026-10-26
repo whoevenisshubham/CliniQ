@@ -18,7 +18,7 @@ export function parseDocument(
 ): Promise<ParseResult> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(
-      path.join(process.cwd(), "scripts/document-parser-worker.mjs"),
+      path.resolve(process.cwd(), "scripts", "document-parser-worker.mjs"),
       {
         workerData: { bytes, mime },
         resourceLimits: {

@@ -46,6 +46,7 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
       - run: node scripts/verify-worker-package.mjs
+      - run: node scripts/check-vercel-traces.mjs
       - run: node scripts/prepare-optional-rollout.mjs
       - uses: actions/upload-artifact@v4
         with:

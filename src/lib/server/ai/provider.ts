@@ -28,6 +28,7 @@ export async function executeLive(input: {
     if (!c.enabled || c.authorizationRef !== input.authorizationRef || c.model !== input.model || !input.attemptId)
         throw new Error('PROVIDER_DISABLED');
     if(input.signal.aborted)throw new ProviderFailure('OUTCOME_UNKNOWN',false);
+    if(c.model==='openai/gpt-oss-20b'&&(!Number.isSafeInteger(input.maxOutput)||input.maxOutput<1||input.maxOutput>3000||Buffer.byteLength(JSON.stringify(input.messages),'utf8')+256+input.maxOutput>8000))throw new Error('PROVIDER_REQUEST_LIMIT');
     const client = new Groq({ apiKey: process.env.GROQ_API_KEY, maxRetries: 0, timeout: 45000 });
     let result;
     try {

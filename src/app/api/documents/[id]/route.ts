@@ -8,6 +8,7 @@ import {
 } from "@/lib/server/http";
 import { documentDetail, changeDocument } from "@/lib/server/documents/service";
 import { dispatchDocumentWork } from "@/lib/server/jobs/dispatch";
+export const runtime='nodejs';export const maxDuration=120;
 export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
@@ -37,7 +38,7 @@ export async function POST(
       (await context.params).id,
       body as Record<string, unknown>,
     );
-    await dispatchDocumentWork();
+    await dispatchDocumentWork({documentId:(await context.params).id});
     return privateJson(result);
   } catch (e) {
     return errorResponse(e);
