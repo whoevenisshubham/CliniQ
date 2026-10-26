@@ -7,7 +7,11 @@ import {errorResponse,privateJson,requireSameOrigin,readJson,HttpError} from '@/
 import {id} from '@/lib/server/documents/service';
 export const runtime='nodejs';export const maxDuration=120;
 export async function GET(_request:Request,{params}:{params:Promise<{id:string}>}){
- try{const client=await getSupabaseServerClient();await speechContext(client,(await params).id);return privateJson({data:{available:providerConfiguration().enabled}});}catch(e){return errorResponse(e);}
+ try{
+ const client=await getSupabaseServerClient(),visit=await speechContext(client,(await params).id),config=providerConfiguration();let available=false;
+ if(config.enabled){const r=await getSupabaseAdminClient().from('provider_budgets').select('requests,max_requests,input_tokens,max_input,output_tokens,max_output').eq('authorization_ref',config.authorizationRef).eq('mode','live').eq('kind','extract_emr').eq('model',config.model).eq('enabled',true).contains('allowed_actors',[visit.actorId]).gt('ends_at',new Date().toISOString()).maybeSingle();const b=r.data;available=!r.error&&!!b&&b.requests<b.max_requests&&b.input_tokens<b.max_input&&b.max_output-b.output_tokens>=3000;}
+ return privateJson({data:{available}});
+ }catch(e){return errorResponse(e);}
 }
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
  try{

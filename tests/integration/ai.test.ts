@@ -541,3 +541,12 @@ it('rejects a malformed structured extraction before it can become a saved clini
     expect((await clients.doctor.from('clinical_drafts').select('snapshot').eq('consultation_id', encounter).single()).data).toEqual(before.data);
 });
 
+
+it('raw provider receipts are service-only, bounded, immutable and separate from reviewed results',async()=>{
+ const document=await upload('patient'),thread=await createThread(clients.patient,randomUUID(),null),j=await admit('haemoglobin',[document.id],'patient',thread),ref='raw-receipt-'+randomUUID();await allowance(ref,['patient'],['answer_question'],{requests:1});
+ const claim=await admin.rpc('ai_claim',{p_id:j});expect(claim.error).toBeNull();const f=claim.data[0].fence;
+ const reservation=await admin.rpc('ai_reserve',{jid:j,f,execution_mode:'offline_fixture',model_name:HISTORICAL_TEXT_MODEL,input_bound:100,output_bound:100,budget_ref:ref});expect(reservation.error).toBeNull();const aid=reservation.data;expect(aid).toBeTruthy();
+ expect((await clients.patient.rpc('ai_retain_raw',{aid,raw:'synthetic raw response'})).error?.code).toBe('42501');expect((await admin.rpc('ai_retain_raw',{aid,raw:'x'.repeat(65537)})).error).not.toBeNull();
+ expect((await admin.rpc('ai_retain_raw',{aid,raw:'synthetic raw response'})).data).toBe(true);expect((await admin.rpc('ai_retain_raw',{aid,raw:'replacement'})).data).toBe(false);
+ const saved=await admin.from('provider_attempts').select('raw_response').eq('id',aid).single();expect(saved.error).toBeNull();expect(saved.data.raw_response).toBe('synthetic raw response');expect((await clients.patient.from('provider_attempts').select('raw_response')).error?.code).toBe('42501');expect((await admin.rpc('ai_unknown',{jid:j,f})).error).toBeNull();
+});

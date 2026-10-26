@@ -47,6 +47,7 @@ export async function runAIJob(admin: SupabaseClient, jobId?: string, offline?: 
         return evidence('PROVIDER_DISABLED');
     const pinnedSegment=process.env.LIVE_AI_SOURCE_SEGMENT_ID;
     if(!offline&&job.kind==='extract_emr'&&pinnedSegment&&(input.sources.length!==1||input.sources[0].segmentId!==pinnedSegment))return evidence('SOURCE_SCOPE_CHANGED');
+    if(!offline){const capability=await admin.rpc('ai_raw_capability');if(capability.error||capability.data!==1)return evidence('PROVIDER_DISABLED');}
     const messages = messagesFor(job.kind, input), maxOutput = 3000;
     // UTF-8 bytes are a conservative input-token bound; context/template overhead
     // is included. Account-specific limits must fit before a live allowance exists.
@@ -80,6 +81,7 @@ export async function runAIJob(admin: SupabaseClient, jobId?: string, offline?: 
     }
     let result: unknown, state = 'succeeded';
     try {
+        if(!offline){const receipt=await admin.rpc('ai_retain_raw',{aid:attemptId,raw:reply.text});check(receipt.error);if(receipt.data!==true)throw new Error('RAW_RECEIPT_NOT_RETAINED');}
         const raw = parseOutput(reply.text, reply.finishReason);
         result = job.kind === 'extract_emr' ? { operations: validateExtraction(raw, input).operations } : validateAnswer(raw, input.sources, corpus.entries,input.question);
     }
