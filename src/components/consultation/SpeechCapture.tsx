@@ -6,10 +6,12 @@ import {accessDenied,readJsonResponse} from '@/lib/client/http-response';
 import {speechResponse} from '@/lib/client/workspace-response';
 import {speechPhase} from '@/lib/client/speech-state';
 
+export type SpeechTiming={sendToResultMs:number;stopToSavedMs:number|null};
 type Pending={key:string;segmentId:string;revision:number;sequence:number;generation:number};
-export function SpeechCapture({consultationId,revision,sequence,disabled,fixture,onBusy,onSaved,onAccessLost}:{consultationId:string;revision:number;sequence:number;disabled:boolean;fixture:boolean;onBusy:(busy:boolean)=>void;onSaved:()=>void;onAccessLost:(e:unknown)=>void}){
+export function SpeechCapture({consultationId,revision,sequence,disabled,fixture,onBusy,onSaved,onAccessLost}:{consultationId:string;revision:number;sequence:number;disabled:boolean;fixture:boolean;onBusy:(busy:boolean)=>void;onSaved:(timing?:SpeechTiming)=>void;onAccessLost:(e:unknown)=>void}){
  const [available,setAvailable]=useState(false),[state,setState]=useState('Speech unavailable'),[active,setActive]=useState(false),[retained,setRetained]=useState(false);
  const [timing,setTiming]=useState<{sendToResultMs:number;stopToSavedMs:number|null}|null>(null);
+ const measured=useRef<SpeechTiming|undefined>(undefined);
  const captureEnd=useRef<number|null>(null),finishCapture=useRef<(()=>void)|undefined>(undefined);
  const [maxClipMs,setMaxClipMs]=useState(15000);
  const controller=useRef<AbortController|null>(null),pending=useRef<Pending|null>(null),live=useRef(true),generation=useRef(0),locked=useRef(false);
@@ -29,19 +31,19 @@ export function SpeechCapture({consultationId,revision,sequence,disabled,fixture
  const apply=(op:Pending,status:string)=>{
   if(!current(op.generation)||pending.current!==op)return;
   const phase=speechPhase(status);setRetained(phase==='retained');
-  if(phase==='saved'){pending.current=null;setState('Final transcript saved');finish(op.generation);onSaved();return;}
+  if(phase==='saved'){pending.current=null;setState('Final transcript saved');finish(op.generation);onSaved(measured.current);return;}
   if(phase==='terminal'){pending.current=null;setState('Speech operation ended: '+status+'. No new transcript was published by this attempt.');}
   else setState(phase==='retained'?'Final response retained. Complete its save without retranscribing.':phase==='pending'?'Speech operation is still pending. Check saved status.':'Speech outcome is unknown. This operation will not be sent again.');
  };
  const upload=async(op:Pending,bytes:Uint8Array,signal:AbortSignal)=>{
   const sentAt=performance.now();
-  try{setState('Saving final clip…');const r=await fetch(path,{method:'POST',signal:AbortSignal.any([signal,AbortSignal.timeout(90000)]),headers:{'content-type':'audio/wav','idempotency-key':op.key,'x-segment-id':op.segmentId,'x-sequence':String(op.sequence),'x-expected-revision':String(op.revision)},body:new Uint8Array(bytes).buffer});const b=await readJsonResponse(r,b=>speechResponse(b,'save'));if(current(op.generation)&&b.data.state==='saved'){const now=performance.now();setTiming({sendToResultMs:Math.round(now-sentAt),stopToSavedMs:captureEnd.current===null?null:Math.round(now-captureEnd.current)});}apply(op,b.data.state);}
+  try{setState('Saving final clip…');const r=await fetch(path,{method:'POST',signal:AbortSignal.any([signal,AbortSignal.timeout(90000)]),headers:{'content-type':'audio/wav','idempotency-key':op.key,'x-segment-id':op.segmentId,'x-sequence':String(op.sequence),'x-expected-revision':String(op.revision)},body:new Uint8Array(bytes).buffer});const b=await readJsonResponse(r,b=>speechResponse(b,'save'));if(current(op.generation)&&b.data.state==='saved'){const now=performance.now();measured.current={sendToResultMs:Math.round(now-sentAt),stopToSavedMs:captureEnd.current===null?null:Math.round(now-captureEnd.current)};setTiming(measured.current);}apply(op,b.data.state);}
   catch(e){fail(e,op.generation);}finally{finish(op.generation);}
  };
  const start=async()=>{
   if(disabled||locked.current||active||!available||pending.current)return;
   const n=generation.current,c=new AbortController();controller.current=c;locked.current=true;setActive(true);setRetained(false);setState('Capturing up to '+Math.ceil(maxClipMs/1000)+' seconds…');onBusy(true);
-  setTiming(null);captureEnd.current=null;
+  setTiming(null);measured.current=undefined;captureEnd.current=null;
   const handle=await captureClip({signal:c.signal,windowMs:maxClipMs,onCaptureEnd:()=>{captureEnd.current=performance.now();},onError:code=>{if(current(n)){setState('Capture unavailable: '+code);finish(n);}},onClip:bytes=>{if(!current(n))return;const op={key:crypto.randomUUID(),segmentId:crypto.randomUUID(),revision,sequence,generation:n};pending.current=op;finishCapture.current=undefined;void upload(op,bytes,c.signal);}});
   finishCapture.current=handle?.finish;
  };

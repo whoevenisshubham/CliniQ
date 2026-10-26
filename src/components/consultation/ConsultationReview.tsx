@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
 import { RecordLayout } from "../documents/DocumentSurface";
-import {SpeechCapture} from './SpeechCapture';
+import {SpeechCapture,type SpeechTiming} from './SpeechCapture';
 import { emptySnapshot, type ClinicalSnapshot, type Medication, type SavedSegment } from "@/lib/contracts/clinical";
 import {accessDenied,readJsonResponse} from '@/lib/client/http-response';
 import {clinicalResponse} from '@/lib/client/workspace-response';
@@ -108,6 +108,7 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
     const [patientChoice, setPatientChoice] = useState("");
     const [contextOpen, setContextOpen] = useState(false);
     const [captureBusy,setCaptureBusy]=useState(false);
+    const [speechTiming,setSpeechTiming]=useState<(SpeechTiming & {cid:string})|null>(null);
     const [accessLost,setAccessLost]=useState(false),[notice,setNotice]=useState('');
 
     const pending = useRef<{
@@ -120,7 +121,7 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
     const reviewButtonRef = useRef<HTMLButtonElement>(null);
     const transcriptRef = useRef(transcript);
     transcriptRef.current = transcript;
-    const hideAccess=useCallback((e:unknown)=>{if(!accessDenied(e))return;denied.current=true;++epoch.current;reads.current?.abort();pending.current=null;dirtyRef.current=false;setListing(null);setDetail(null);setSnapshot(emptySnapshot());setTranscript('');setPatientChoice('');setReview(false);setReasons({});setConfirmed(false);setDirty(false);setNotice('');setAccessLost(true);},[]);
+    const hideAccess=useCallback((e:unknown)=>{if(!accessDenied(e))return;denied.current=true;++epoch.current;reads.current?.abort();pending.current=null;dirtyRef.current=false;setListing(null);setDetail(null);setSnapshot(emptySnapshot());setTranscript('');setPatientChoice('');setReview(false);setReasons({});setConfirmed(false);setDirty(false);setNotice('');setSpeechTiming(null);setAccessLost(true);},[]);
     const load = useCallback(async (id: string | null, replace = false) => {
         if(denied.current)return;
         const token = ++epoch.current;
@@ -275,7 +276,8 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
     <section className="consultation-editor clinical-workbench" aria-label="Clinical findings"><div className="transcript-column">
      <div className="clinical-section-heading"><span className="section-number">01</span><div><h2>Transcript</h2><p>Saved final segments · speaker labels are explicit or unknown</p></div></div>
      <ol className="clinical-transcript">{detail.segments.map(s => <li key={s.id} id={`segment-${s.id}`} tabIndex={-1}><span>{s.speaker} · {s.language} · {s.source_type}{s.speech_provenance?.mode==='offline_fixture'?' · synthetic offline output':''}</span><p>{s.text}</p></li>)}</ol>{!detail.segments.length && <p className="clinical-muted">No transcript segments saved.</p>}
-     {active&&<SpeechCapture key={detail.visit.id+':'+detail.visit.revision} consultationId={detail.visit.id} revision={detail.visit.revision} sequence={detail.segments.length} disabled={locked||dirty||!!transcript.trim()} fixture={!!fixture} onBusy={setCaptureBusy} onAccessLost={hideAccess} onSaved={()=>{setCaptureBusy(false);void loadRef.current(detail.visit.id,true);}}/>}
+     {speechTiming?.cid===detail.visit.id&&<p role="status">Batch send to saved result: {speechTiming.sendToResultMs} ms. Capture end to saved transcript: {speechTiming.stopToSavedMs??'not measured'} ms. Includes upload and durable save; no streaming interim measurement.</p>}
+     {active&&<SpeechCapture key={detail.visit.id+':'+detail.visit.revision} consultationId={detail.visit.id} revision={detail.visit.revision} sequence={detail.segments.length} disabled={locked||dirty||!!transcript.trim()} fixture={!!fixture} onBusy={setCaptureBusy} onAccessLost={hideAccess} onSaved={timing=>{if(timing)setSpeechTiming({...timing,cid:detail.visit.id});setCaptureBusy(false);void loadRef.current(detail.visit.id,true);}}/>}
      {active && <form onSubmit={e => {
                     e.preventDefault();
                     if (dirty) {
