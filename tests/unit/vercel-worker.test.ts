@@ -26,3 +26,10 @@ it('worker secret is mandatory, exact and bounded; no caller-selected or chunked
  expect((await POST(new Request('https://preview/api',{method:'POST',headers}))).status).toBe(200);
  expect(runtime.execute).toHaveBeenCalledWith({synthetic:true},{reconcile:true});
 });
+it('accepts the zero-byte stream supplied by hosted Next and bounds an unfinished body before claims',async()=>{
+ vi.stubEnv('DOCUMENT_DISPATCH_SECRET','a'.repeat(40));const headers={'x-document-dispatch':'a'.repeat(40)};
+ runtime.execute.mockResolvedValueOnce({status:'idle',degraded:false});
+ const empty=new Request('https://preview/api',{method:'POST',headers,body:new ReadableStream({start(controller){controller.close();}}),duplex:'half'} as RequestInit);
+ expect((await POST(empty)).status).toBe(200);expect(runtime.execute).toHaveBeenCalledOnce();runtime.execute.mockClear();
+ vi.useFakeTimers();try{const unfinished=new Request('https://preview/api',{method:'POST',headers,body:new ReadableStream(),duplex:'half'} as RequestInit);const pending=POST(unfinished);await vi.advanceTimersByTimeAsync(2001);expect((await pending).status).toBe(408);expect(runtime.execute).not.toHaveBeenCalled();}finally{vi.useRealTimers();}
+});
