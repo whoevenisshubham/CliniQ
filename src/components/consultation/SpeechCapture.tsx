@@ -9,6 +9,8 @@ import {speechPhase} from '@/lib/client/speech-state';
 type Pending={key:string;segmentId:string;revision:number;sequence:number;generation:number};
 export function SpeechCapture({consultationId,revision,sequence,disabled,fixture,onBusy,onSaved,onAccessLost}:{consultationId:string;revision:number;sequence:number;disabled:boolean;fixture:boolean;onBusy:(busy:boolean)=>void;onSaved:()=>void;onAccessLost:(e:unknown)=>void}){
  const [available,setAvailable]=useState(false),[state,setState]=useState('Speech unavailable'),[active,setActive]=useState(false),[retained,setRetained]=useState(false);
+ const [timing,setTiming]=useState<{sendToResultMs:number;stopToSavedMs:number|null}|null>(null);
+ const captureEnd=useRef<number|null>(null),finishCapture=useRef<(()=>void)|undefined>(undefined);
  const [maxClipMs,setMaxClipMs]=useState(15000);
  const controller=useRef<AbortController|null>(null),pending=useRef<Pending|null>(null),live=useRef(true),generation=useRef(0),locked=useRef(false);
  const callbacks=useRef({onAccessLost});callbacks.current={onAccessLost};
@@ -32,13 +34,16 @@ export function SpeechCapture({consultationId,revision,sequence,disabled,fixture
   else setState(phase==='retained'?'Final response retained. Complete its save without retranscribing.':phase==='pending'?'Speech operation is still pending. Check saved status.':'Speech outcome is unknown. This operation will not be sent again.');
  };
  const upload=async(op:Pending,bytes:Uint8Array,signal:AbortSignal)=>{
-  try{setState('Saving final clip…');const r=await fetch(path,{method:'POST',signal:AbortSignal.any([signal,AbortSignal.timeout(90000)]),headers:{'content-type':'audio/wav','idempotency-key':op.key,'x-segment-id':op.segmentId,'x-sequence':String(op.sequence),'x-expected-revision':String(op.revision)},body:new Uint8Array(bytes).buffer});const b=await readJsonResponse(r,b=>speechResponse(b,'save'));apply(op,b.data.state);}
+  const sentAt=performance.now();
+  try{setState('Saving final clip…');const r=await fetch(path,{method:'POST',signal:AbortSignal.any([signal,AbortSignal.timeout(90000)]),headers:{'content-type':'audio/wav','idempotency-key':op.key,'x-segment-id':op.segmentId,'x-sequence':String(op.sequence),'x-expected-revision':String(op.revision)},body:new Uint8Array(bytes).buffer});const b=await readJsonResponse(r,b=>speechResponse(b,'save'));if(current(op.generation)&&b.data.state==='saved'){const now=performance.now();setTiming({sendToResultMs:Math.round(now-sentAt),stopToSavedMs:captureEnd.current===null?null:Math.round(now-captureEnd.current)});}apply(op,b.data.state);}
   catch(e){fail(e,op.generation);}finally{finish(op.generation);}
  };
  const start=async()=>{
   if(disabled||locked.current||active||!available||pending.current)return;
   const n=generation.current,c=new AbortController();controller.current=c;locked.current=true;setActive(true);setRetained(false);setState('Capturing up to '+Math.ceil(maxClipMs/1000)+' seconds…');onBusy(true);
-  await captureClip({signal:c.signal,windowMs:maxClipMs,onError:code=>{if(current(n)){setState('Capture unavailable: '+code);finish(n);}},onClip:bytes=>{if(!current(n))return;const op={key:crypto.randomUUID(),segmentId:crypto.randomUUID(),revision,sequence,generation:n};pending.current=op;void upload(op,bytes,c.signal);}});
+  setTiming(null);captureEnd.current=null;
+  const handle=await captureClip({signal:c.signal,windowMs:maxClipMs,onCaptureEnd:()=>{captureEnd.current=performance.now();},onError:code=>{if(current(n)){setState('Capture unavailable: '+code);finish(n);}},onClip:bytes=>{if(!current(n))return;const op={key:crypto.randomUUID(),segmentId:crypto.randomUUID(),revision,sequence,generation:n};pending.current=op;finishCapture.current=undefined;void upload(op,bytes,c.signal);}});
+  finishCapture.current=handle?.finish;
  };
  const inspect=async(save=false)=>{
   const op=pending.current;if(!op||locked.current||!current(op.generation))return;
@@ -49,5 +54,5 @@ export function SpeechCapture({consultationId,revision,sequence,disabled,fixture
    const b=await readJsonResponse(r,b=>speechResponse(b,save?'save':'status'));apply(op,save?b.data.state:b.data.status);
   }catch(e){fail(e,op.generation);}finally{finish(op.generation);}
  };
- return <section className="speech-capture" aria-label="Speech capture"><p role="status">{state}</p><div className="clinical-inline"><button className="quiet-button" disabled={disabled||active||!available||!!pending.current} onClick={()=>void start()}>Capture {Math.ceil(maxClipMs/1000)}-second clip</button>{active&&<button className="quiet-button" onClick={()=>{controller.current?.abort();setState('Capture stopped. Check saved status if transmission had started.');if(!pending.current)finish(generation.current);}}>Stop capture</button>}{pending.current&&<button className="quiet-button" disabled={active} onClick={()=>void inspect()}>Check saved clip</button>}{pending.current&&retained&&!active&&<button className="quiet-button" disabled={disabled} onClick={()=>void inspect(true)}>Save retained final response</button>}</div><small>Only final results are saved. Audio stays in request memory; recovery never uploads it again. An unresolved operation keeps new capture paused.</small></section>;
+ return <section className="speech-capture" aria-label="Speech capture"><p role="status">{state}</p>{timing&&<p role="status">Batch send to saved result: {timing.sendToResultMs} ms. Capture end to saved transcript: {timing.stopToSavedMs??'not measured'} ms. Includes upload and durable save; no streaming interim measurement.</p>}<div className="clinical-inline"><button className="quiet-button" disabled={disabled||active||!available||!!pending.current} onClick={()=>void start()}>Capture {Math.ceil(maxClipMs/1000)}-second clip</button>{active&&!pending.current&&<button className="quiet-button" onClick={()=>finishCapture.current?.()}>Finish and send recording</button>}{active&&<button className="quiet-button" onClick={()=>{controller.current?.abort();setState('Capture stopped. Check saved status if transmission had started.');if(!pending.current)finish(generation.current);}}>Stop capture</button>}{pending.current&&<button className="quiet-button" disabled={active} onClick={()=>void inspect()}>Check saved clip</button>}{pending.current&&retained&&!active&&<button className="quiet-button" disabled={disabled} onClick={()=>void inspect(true)}>Save retained final response</button>}</div><small>Only final results are saved. Audio stays in request memory; recovery never uploads it again. An unresolved operation keeps new capture paused.</small></section>;
 }

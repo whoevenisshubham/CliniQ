@@ -48,3 +48,9 @@ it('uses a sixty-second durable allowance without creating a second audio send',
  expect(vi.mocked(captureClip).mock.calls.at(-1)![0].windowMs).toBe(60000);
  expect(sent).toHaveLength(1);expect(button('Capture 60-second clip').disabled).toBe(true);
 });
+
+it('shows batch durable-response timing only after an acknowledged saved result',async()=>{
+ vi.stubGlobal('fetch',vi.fn((_url:string,init?:RequestInit)=>Promise.resolve(result(init?.method?{state:'saved',operationId:'one',segmentId:'segment-one',consultationId:'encounter-one',revision:1}:{available:true,mode:'live',maxClipMs:60000}))));
+ await act(async()=>root.render(createElement(SpeechCapture,{consultationId:'encounter-one',revision:0,sequence:0,disabled:false,fixture:false,onBusy:vi.fn(),onSaved:vi.fn(),onAccessLost:vi.fn()})));
+ await click('Capture 60-second clip');expect(host.textContent).toContain('Batch send to saved result:');expect(host.textContent).toContain('no streaming interim measurement');
+});

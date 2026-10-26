@@ -7,6 +7,7 @@ export async function captureClip(options: {
     onClip: (wav: Uint8Array) => void;
     onError: (code: string) => void;
     windowMs?: number;
+    onCaptureEnd?: () => void;
 }) {
     const windowMs = options.windowMs ?? 15000;
     if (windowMs < 1000 || windowMs > MAX_SPEECH_MS)
@@ -46,6 +47,7 @@ export async function captureClip(options: {
             return; try {
             if (!length)
                 throw new Error('CAPTURE_EMPTY');
+            options.onCaptureEnd?.();
             const samples = new Float32Array(length);
             let offset = 0;
             for (const frame of frames) {
