@@ -20,7 +20,11 @@ Groq text uses the configured `openai/gpt-oss-20b`; grounded prompts, JSON-objec
 
 Speech prepares `nova-3-medical` **together with** `AI_SPEECH_LANGUAGE=multi`. Nova3 uses plain `keyterm` hints; retained Nova2/hi injected adapters keep their original keyword behavior. The current transport is bounded recorded PCM WAV over one server HTTP request, not a persistent serverless WebSocket. Existing client capture/segment/final transcript/review behavior is retained. No automatic retry, model fallback or original winning-runtime claim is introduced.
 
-The two reviewed migrations preserve historical Nova2/hi constraints. Therefore the new speech adapter deliberately fails closed until a separately reviewed model-pair extension is applied. The forward SQL is prepared at `rollout/nova3-model-binding.sql`, outside automatic migrations; it is **not hosted applied** or live acceptance. It preserves historical rows and requires an exact live allowance before service-only binding. Do not merely change allowance labels to activate it.
+The reviewed model-pair extension at `rollout/nova3-model-binding.sql` was applied to the isolated preview on 26 October under the owner's integration assignment. All 225 rows across 49 tables, existing policies and the provisioning journal were identical before/after. It retains Nova2/hi and adds the exact Nova3-medical/multi pair. Binding remains service-only and requires an exact live allowance; no allowance was created and speech remains disabled. This is schema preparation, not live acceptance.
+
+Native source-page previews are private bounded reads and now work independently of the live OCR flag. Authentication, document/version access, byte integrity and authorization after rendering still apply. This lets manual source review and hosted native-asset checks run while provider admission remains closed. Native rendering retains its 15-second deadline, one active worker/one waiter, dimension and output-byte bounds.
+
+Google sign-in completed at the stable origin with an explicit new patient mapping and no workspace memberships or documents. Reload retained the session; logout returned to sign-in and `/api/me` denied access. This successful attempt supersedes the earlier expired-state attempt; existing histories were not merged by email.
 
 ## Bounded future provider acceptance proposal — unconsumed
 
