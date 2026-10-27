@@ -6,6 +6,7 @@ import {SpeechStreamText} from '@/lib/clinical/speech-stream';
 import {MEDICAL_KEYWORDS} from '@/lib/clinical/medical-hints';
 import {speechConfiguration} from './transport';
 import {incrementalExtraction} from './incremental';
+import {closeConsultationDemo} from './demo';
 
 // All upstream bytes and credentials remain in this authenticated function instance.
 // Reconnects create no implicit reservation and never resume/replay audio.
@@ -16,8 +17,8 @@ export async function relaySpeech(socket:WebSocket,client:SupabaseClient,admin:S
  let timer:ReturnType<typeof setTimeout>|undefined,accessTimer:ReturnType<typeof setInterval>|undefined,drain:ReturnType<typeof setTimeout>|undefined;
  const send=(v:unknown)=>{if(socket.readyState===WebSocket.OPEN)socket.send(JSON.stringify(v));};
  const clear=()=>{if(timer)clearTimeout(timer);if(accessTimer)clearInterval(accessTimer);if(drain)clearTimeout(drain);};
- const extraction=incrementalExtraction(client,admin,command.cid,send);
- const fail=async(code:string)=>{if(ended)return;ended=true;extraction.stop();clear();upstream?.terminate();if(oid){try{await admin.rpc('speech_result',{oid,next_state:'outcome_unknown',transcript:null,request_id:requestId??null});}catch{}}send({type:'error',code});socket.close(1011,'Speech stopped; no automatic resend');};
+ const extraction=incrementalExtraction(client,admin,command.cid,event=>{send(event);const e=event as{type?:string;state?:string};if(e.type==='emr_status'&&!['preparing','waiting_for_allowed_time'].includes(e.state??''))void closeConsultationDemo(admin,command.cid,command.ref).then(confirmed=>{if(confirmed!==null)send({type:'demo_closed',confirmed});});});
+ const fail=async(code:string)=>{if(ended)return;ended=true;extraction.stop();clear();upstream?.terminate();if(oid){try{await admin.rpc('speech_result',{oid,next_state:'outcome_unknown',transcript:null,request_id:requestId??null});}catch{}}const closed=await closeConsultationDemo(admin,command.cid,command.ref);if(closed!==null)send({type:'demo_closed',confirmed:closed});send({type:'error',code});socket.close(1011,'Speech stopped; no automatic resend');};
  socket.on('error',()=>{void fail('CONNECTION_LOST');});
  socket.on('close',()=>{if(!ended)void fail('CLIENT_DISCONNECTED');});
  // Installed before any DB await: early audio cannot disappear or queue unboundedly.
@@ -85,7 +86,7 @@ export async function relaySpeech(socket:WebSocket,client:SupabaseClient,admin:S
    if(receipt.error||receipt.data!==true){await fail('RECEIPT_NOT_SAVED');return;}
    const saved=await client.rpc('speech_commit',{oid});if(saved.error||saved.data?.state!=='saved'){await fail('TRANSCRIPT_NOT_COMMITTED');return;}
    send({type:'transcript_saved',...saved.data,audioMs:total/32});await extraction.finish();
-   if(ended)return;ended=true;send({type:'saved',...saved.data,audioMs:total/32});socket.close(1000,'Transcript saved');
+   if(ended)return;const closed=await closeConsultationDemo(admin,command.cid,command.ref);if(closed!==null)send({type:'demo_closed',confirmed:closed});ended=true;send({type:'saved',...saved.data,audioMs:total/32});socket.close(1000,'Transcript saved');
   })().catch(()=>fail('SAVE_OUTCOME_UNKNOWN'));});
   let checking=false;
   accessTimer=setInterval(()=>{if(checking||ended)return;checking=true;void checkpointQueue.then(()=>client.from('consultations').select('id,revision,status').eq('id',command.cid).maybeSingle()).then(r=>{if(r.error||!r.data)void fail('ACCESS_CHANGED');else if(r.data.status!=='active'||r.data.revision!==revision)void fail('REVISION_CHANGED');}).finally(()=>{checking=false;});},5000);
