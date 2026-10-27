@@ -462,7 +462,7 @@ it.each(cases)('versioned offline evaluation $id ($expected_state)', async (c) =
             }
             const j = await admitAI(clients.doctor, randomUUID(), providerThread, { kind: 'extract_emr', question: 'Extract draft facts.' });
             const snap = await admin.from('document_jobs').select('input_snapshot').eq('id', j).single();expect(snap.error).toBeNull();
-            expect(snap.data!.input_snapshot.sources.length).toBe(c.id === 'E14' ? 1 : 3);
+            expect(snap.data!.input_snapshot.newSourceIds.length).toBe(c.id === 'E14' ? 1 : 3);expect(snap.data!.input_snapshot.sources.length).toBeGreaterThanOrEqual(snap.data!.input_snapshot.newSourceIds.length);
             await expect(admitAI(clients.doctor, randomUUID(), providerThread, { kind: 'extract_emr', question: 'Concurrent extraction.' })).rejects.toMatchObject({code:'EXTRACTION_PENDING'});
 
             if (c.id === 'E14') {

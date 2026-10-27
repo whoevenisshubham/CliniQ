@@ -6,7 +6,7 @@ The retained journey is speech → saved source → structured review candidate 
 
 The actual raw Groq responses already labelled denied fever as positive and current medicines as prescriptions, before normalization. The old single snapshot contract had a positive-only symptoms array and a medications field that finalization converts into prescriptions. Existing medicine history had no first-class destination. The review UI called that prescription field “Medication review”. These ambiguities encouraged the wrong mapping; a closed JSON shape by itself cannot correct it. The first request also exhausted 3,000 output tokens; the second finished in 840 but failed clinical validation. Neither was applied.
 
-The trace is `clinical_admit`/`ai_admit` saved source → `runner.ts` messages → `format.ts` wire schema → retained `provider_attempts.raw_response` → `clinical-meaning.ts` source/polarity validation → `clinical_proposals` → explicit review in `ConsultationReview`. Original prompt/adapters and legacy normalization remain available; no model switch was made.
+The trace is `clinical_mutate`/`ai_admit` saved source → `runner.ts` messages → `format.ts` wire schema → retained `provider_attempts.raw_response` → `clinical-meaning.ts` source/polarity validation → `clinical_proposals` → explicit review in `ConsultationReview`. Original prompt/adapters and legacy normalization remain available; no model switch was made.
 
 ## Repairs
 
