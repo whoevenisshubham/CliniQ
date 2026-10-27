@@ -31,13 +31,13 @@ export function sourcePolarity(claim:string,quote:string):'present'|'absent'|'un
 }
 type Fact={k:'complaint'|'symptom'|'medicine'|'prescription'|'assessment'|'measurement'|'history'|'allergy'|'prescribing'|'uncertain';t:string;p:'present'|'absent'|'uncertain';s:number[];q:string;c:number[];m:null|{n:string;d:string|null;f:string|null;du:string|null;r:string|null;i:string|null};v:null|{n:string;x:number;u:string}};
 const stable=(s:string)=>{const h=createHash('sha256').update(s).digest('hex');return `${h.slice(0,8)}-${h.slice(8,12)}-4${h.slice(13,16)}-8${h.slice(17,20)}-${h.slice(20,32)}`;};
-export function normalizeClinicalFacts(raw:unknown,input:{sources:Evidence[];baseRevision:number;throughSegmentId:string;draft?:unknown}){
+export function normalizeClinicalFacts(raw:unknown,input:{sources:Evidence[];baseRevision:number;throughSegmentId:string;draft?:unknown;newSourceIds?:string[]}){
  const value=raw as{facts:Fact[]};if(!value||Object.keys(value).join()!=='facts'||!Array.isArray(value.facts)||value.facts.length>16)throw Error('OUTPUT_SCHEMA');
  const context=emptyContext(),operations:ClinicalProposal['operations']=[],snapshot=structuredClone(input.draft??emptySnapshot());validateClinicalSnapshot(snapshot);
  const facts=value.facts.map(f=>{
-  if(!f||Object.keys(f).sort().join()!=='c,k,m,p,q,s,t,v'||!['complaint','symptom','medicine','prescription','assessment','measurement','history','allergy','prescribing','uncertain'].includes(f.k)||!['present','absent','uncertain'].includes(f.p)||typeof f.t!=='string'||!f.t.trim()||f.t.length>500||typeof f.q!=='string'||f.q.length>1000||!Array.isArray(f.s)||!f.s.length||f.s.length>4||!Array.isArray(f.c)||f.c.length>4)throw Error('OUTPUT_SCHEMA');
+  if(!f||Object.keys(f).sort().join()!=='c,k,m,p,q,s,t,v'||!['complaint','symptom','medicine','prescription','assessment','measurement','history','allergy','prescribing','uncertain'].includes(f.k)||!['present','absent','uncertain'].includes(f.p)||typeof f.t!=='string'||!f.t.trim()||f.t.length>500||typeof f.q!=='string'||f.q.length>486||!Array.isArray(f.s)||!f.s.length||f.s.length>4||!Array.isArray(f.c)||f.c.length>4)throw Error('OUTPUT_SCHEMA');
   const pick=(i:number)=>{if(!Number.isSafeInteger(i)||i<0||i>=input.sources.length)throw Error('INVALID_CITATION');return input.sources[i];};
-  const sources=f.s.map(pick),prior=[...new Map([...f.c.map(pick),...sources.flatMap(s=>s.correctsSegmentId?input.sources.filter(p=>p.segmentId===s.correctsSegmentId):[])].map(s=>[s.segmentId,s])).values()],quote=sources.map(s=>s.text).join(' ');
+  const sources=f.s.map(pick);if(input.newSourceIds&&!sources.some(s=>input.newSourceIds!.includes(s.segmentId!)))throw Error('UNCHANGED_SOURCE_REPEATED');const prior=[...new Map([...f.c.map(pick),...sources.flatMap(s=>s.correctsSegmentId?input.sources.filter(p=>p.segmentId===s.correctsSegmentId):[])].map(s=>[s.segmentId,s])).values()],quote=sources.map(s=>s.text).join(' ');
   if(!sources.every(s=>s.sourceType==='transcript'&&s.segmentId)||!fullQuote(f.q,quote))throw Error('SOURCE_QUOTE_FIDELITY');
   if(!supports(f.t,f.q))throw Error('UNSUPPORTED_PARAPHRASE');
   const polarity=sourcePolarity(f.t,f.q);
@@ -78,7 +78,7 @@ export function normalizeClinicalFacts(raw:unknown,input:{sources:Evidence[];bas
  if(present.length||corrected.length){const preserved=snapshot.symptoms.filter(t=>!corrected.some(a=>sameAssertionSubject({kind:'symptom',text:t,medication:null},a)&&input.sources.some(s=>a.corrects_source_ids.includes(s.segmentId!)&&supports(t,s.text))));operations.push({op:'set_fact',path:'symptoms',value:[...new Set([...preserved,...present.map(f=>f.text)])],evidence_segment_ids:[...new Set(context.symptoms.flatMap(f=>[...f.source_ids,...f.corrects_source_ids]))],note:'Explicit source assertions; earlier correction history retained'});}
  const prescriptions=operations.filter(o=>o.path==='medications');if(prescriptions.length){
   const merged=new Map(snapshot.medications.map(m=>[normalizeClinicalWording(m.name),m]));
-  for(const op of prescriptions)for(const m of op.value as Medication[])merged.set(normalizeClinicalWording(m.name),m);
+  for(const op of prescriptions)for(const m of op.value as Medication[])merged.set(normalizeClinicalWording(m.name),{...m,id:merged.get(normalizeClinicalWording(m.name))?.id??m.id});
   for(let i=operations.length-1;i>=0;i--)if(operations[i].path==='medications')operations.splice(i,1);
   operations.push({op:'set_fact',path:'medications',value:[...merged.values()],evidence_segment_ids:[...new Set(prescriptions.flatMap(o=>o.evidence_segment_ids))],note:'Explicit new clinician prescriptions; unrelated reviewed prescriptions retained'});
  }

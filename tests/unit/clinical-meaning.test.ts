@@ -39,6 +39,7 @@ it('spoken dose correction retains earlier source and does not accept the explic
  const old='Current medication SourceMedicine 5 mg once daily.',q='Actually the SourceMedicine dose is ten mg, not five mg.';
  const f=fact('medicine','dose 10 mg',q,'present',{s:[1],c:[0],m:{n:'SourceMedicine',d:'10 mg',f:'once daily',du:null,r:null,i:null}});
  const r=normalizeClinicalFacts({facts:[f]},input([source(old),source(q,later,1)]));expect(r.context.medication_history[0].corrects_source_ids).toEqual([sid]);expect(r.context.medication_history[0].medication?.dose).toBe('10 mg');
+ expect(()=>normalizeClinicalFacts({facts:[fact('medicine','SourceMedicine 5 mg',old,'present',{m:{n:'SourceMedicine',d:'5 mg',f:'once daily',du:null,r:null,i:null}})]},{...input([source(old),source(q,later,1)]),newSourceIds:[later]})).toThrow('UNCHANGED_SOURCE_REPEATED');
  expect(()=>normalizeClinicalFacts({facts:[{...f,m:{n:'SourceMedicine',d:'5 mg',f:'once daily',du:null,r:null,i:null}}]},input([source(old),source(q,later,1)]))).toThrow('MEDICATION_FIDELITY');expect(normalizeClinicalWording('one hundred thirty-eight')).toBe('138');
  const ambiguous='Actually the dose is ten mg, not five mg.';expect(()=>normalizeClinicalFacts({facts:[{...f,q:ambiguous}]},input([source(old),source(ambiguous,later,1)]))).toThrow('AMBIGUOUS_MEDICATION_CORRECTION');
 });
