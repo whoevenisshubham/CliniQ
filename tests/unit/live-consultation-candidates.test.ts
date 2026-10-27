@@ -6,12 +6,12 @@ import {LiveSpeechCapture} from '@/components/consultation/LiveSpeechCapture';
 vi.mock('@/lib/clinical/capture',()=>({captureClip:vi.fn()}));
 it('retains initial and later candidates, preserves raw speech, and never offers an automatic second stream',async()=>{
  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);
- let socket:{onmessage?:(e:{data:string})=>void;close:()=>void};
- class FakeSocket{static OPEN=1;readyState=1;onmessage?:(e:{data:string})=>void;constructor(){socket=this;}close(){}send(){}}
+ const sockets:{onmessage?:(e:{data:string})=>void;close:()=>void}[]=[];
+ class FakeSocket{static OPEN=1;readyState=1;onmessage?:(e:{data:string})=>void;constructor(){sockets.push(this);}close(){}send(){}}
  vi.stubGlobal('WebSocket',FakeSocket);const host=document.createElement('div');document.body.append(host);const root=createRoot(host),saved=vi.fn();
  try{await act(async()=>root.render(createElement(LiveSpeechCapture,{cid:'visit',revision:0,sequence:0,disabled:false,onBusy:vi.fn(),onSaved:saved,onAccessLost:vi.fn()})));
  const start=host.querySelector('button')!;await act(async()=>start.click());
- const emit=async(data:unknown)=>act(async()=>socket.onmessage?.({data:JSON.stringify(data)}));
+ const emit=async(data:unknown)=>act(async()=>sockets[0].onmessage?.({data:JSON.stringify(data)}));
  await emit({type:'final',text:'Original statement. Actually, a later correction.'});
  await emit({type:'emr_proposal',proposal:{id:'initial',base_revision:1,operations:[{op:'set_fact',path:'chief_complaint',value:'Initial complaint'}]},elapsedMs:100});
  await emit({type:'emr_proposal',proposal:{id:'later',base_revision:2,operations:[{op:'update_fact',path:'chief_complaint',value:'Corrected complaint'}]},elapsedMs:200});

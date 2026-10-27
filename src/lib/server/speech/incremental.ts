@@ -31,7 +31,7 @@ export function incrementalExtraction(client:SupabaseClient,admin:SupabaseClient
     if(!['succeeded','recovered'].includes(r.status)){
      // A paced/refused admission must not become an unattended later send.
      if(r.status==='not_admitted')await cancelQueued(jid);
-     halted=true;emit({type:'emr_status',state:r.status});return;
+     halted=true;emit({type:'emr_status',state:r.status,reason:'reason'in r&&typeof r.reason==='string'&&/^[A-Z_]+$/.test(r.reason)?r.reason:undefined});return;
     }
     const job=await client.from('document_jobs').select('result').eq('id',jid).single();
     const id=job.data?.result?.proposalId;
