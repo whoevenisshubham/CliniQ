@@ -2,6 +2,7 @@
 import Groq from 'groq-sdk';
 import type { ProviderReply } from '@/lib/contracts/ai';
 import { ProviderFailure } from './failure';
+import {providerResponseFormat,providerInputBound} from './format';
 export const HISTORICAL_TEXT_MODEL = 'llama-3.3-70b-versatile';
 export function classifyProviderFailure(status?:number){
     if(status===401||status===403)return new ProviderFailure('PROVIDER_AUTHENTICATION',true);
@@ -14,6 +15,7 @@ export function providerConfiguration() { return { enabled: process.env.AI_ENABL
 // Actual sends are reached only by the shared runner after an exact durable
 // allowance reservation. Missing/default configuration performs no SDK call.
 export async function executeLive(input: {
+    kind?:string;
     messages: {
         role: 'system' | 'user';
         content: string;
@@ -28,11 +30,11 @@ export async function executeLive(input: {
     if (!c.enabled || c.authorizationRef !== input.authorizationRef || c.model !== input.model || !input.attemptId)
         throw new Error('PROVIDER_DISABLED');
     if(input.signal.aborted)throw new ProviderFailure('OUTCOME_UNKNOWN',false);
-    if(c.model==='openai/gpt-oss-20b'&&(!Number.isSafeInteger(input.maxOutput)||input.maxOutput<1||input.maxOutput>3000||Buffer.byteLength(JSON.stringify(input.messages),'utf8')+256+input.maxOutput>8000))throw new Error('PROVIDER_REQUEST_LIMIT');
+    if(c.model==='openai/gpt-oss-20b'&&(!Number.isSafeInteger(input.maxOutput)||input.maxOutput<1||input.maxOutput>3000||providerInputBound(input.messages,input.kind,c.model)+input.maxOutput>8000))throw new Error('PROVIDER_REQUEST_LIMIT');
     const client = new Groq({ apiKey: process.env.GROQ_API_KEY, maxRetries: 0, timeout: 45000 });
     let result;
     try {
-        result = await client.chat.completions.create({ model: c.model, messages: input.messages, response_format: { type: 'json_object' }, ...(c.model==='openai/gpt-oss-20b'?{reasoning_effort:'low' as const,include_reasoning:false}:{}), temperature: 0.1, max_completion_tokens: input.maxOutput }, { signal: input.signal });
+        result = await client.chat.completions.create({ model: c.model, messages: input.messages, response_format: providerResponseFormat(input.kind,c.model), ...(c.model==='openai/gpt-oss-20b'?{reasoning_effort:'low' as const,include_reasoning:false}:{}), temperature: 0.1, max_completion_tokens: input.maxOutput }, { signal: input.signal });
     }
     catch (e) {
         throw classifyProviderFailure(e instanceof Groq.APIError?e.status:undefined);
