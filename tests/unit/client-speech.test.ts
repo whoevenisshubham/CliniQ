@@ -60,3 +60,12 @@ it('local microphone diagnostic never uploads audio even when live speech is dis
  await act(async()=>root.render(createElement(SpeechCapture,{consultationId:'encounter-one',revision:0,sequence:0,disabled:false,fixture:false,onBusy:vi.fn(),onSaved:vi.fn(),onAccessLost:vi.fn()})));
  await click('Check microphone locally');expect(captureClip).toHaveBeenLastCalledWith(expect.objectContaining({windowMs:2000}));expect(fetcher).toHaveBeenCalledTimes(1);expect(host.textContent).toContain('No audio uploaded.');
 });
+
+it('the hosted connection probe exchanges a masked-size synthetic frame without microphone or audio HTTP',async()=>{
+ const sockets:{onmessage?:(e:{data:string})=>void;send:(v:string)=>void}[]=[];const sent:string[]=[];
+ class FakeSocket{onmessage?:(e:{data:string})=>void;constructor(url:string){expect(url).toContain('/speech/live?probe=1');sockets.push(this);}send(v:string){sent.push(v);}close(){}}
+ vi.stubGlobal('WebSocket',FakeSocket);const fetcher=vi.fn(async()=>result({available:false,mode:'disabled'}));vi.stubGlobal('fetch',fetcher);
+ await act(async()=>root.render(createElement(SpeechCapture,{consultationId:'encounter-one',revision:0,sequence:0,disabled:false,fixture:false,onBusy:vi.fn(),onSaved:vi.fn(),onAccessLost:vi.fn()})));
+ await click('Check live connection (no audio)');await act(async()=>sockets[0].onmessage?.({data:JSON.stringify({type:'transport_ready',providerCalls:0})}));expect(JSON.parse(sent[0])).toEqual({type:'transport_probe',payload:'x'.repeat(96)});
+ await act(async()=>sockets[0].onmessage?.({data:JSON.stringify({type:'transport_received',providerCalls:0})}));expect(host.textContent).toContain('masked frame received');expect(captureClip).not.toHaveBeenCalled();expect(fetcher).toHaveBeenCalledTimes(1);
+});

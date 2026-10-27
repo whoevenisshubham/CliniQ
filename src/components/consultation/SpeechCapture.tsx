@@ -12,14 +12,15 @@ type Pending={key:string;segmentId:string;revision:number;sequence:number;genera
 export function SpeechCapture({consultationId,revision,sequence,disabled,fixture,onBusy,onSaved,onAccessLost}:{consultationId:string;revision:number;sequence:number;disabled:boolean;fixture:boolean;onBusy:(busy:boolean)=>void;onSaved:(timing?:SpeechTiming)=>void;onAccessLost:(e:unknown)=>void}){
  const [available,setAvailable]=useState(false),[state,setState]=useState('Speech unavailable'),[active,setActive]=useState(false),[retained,setRetained]=useState(false);
  const [streaming,setStreaming]=useState(false),[microphoneReady,setMicrophoneReady]=useState(false);
- const [checking,setChecking]=useState(false);
+ const [checking,setChecking]=useState(false),[connectionChecking,setConnectionChecking]=useState(false);
+ const probeSocket=useRef<WebSocket|null>(null);
  const [timing,setTiming]=useState<{sendToResultMs:number;stopToSavedMs:number|null}|null>(null);
  const measured=useRef<SpeechTiming|undefined>(undefined);
  const captureEnd=useRef<number|null>(null),finishCapture=useRef<(()=>void)|undefined>(undefined);
  const [maxClipMs,setMaxClipMs]=useState(15000);
  const controller=useRef<AbortController|null>(null),pending=useRef<Pending|null>(null),live=useRef(true),generation=useRef(0),locked=useRef(false);
  const callbacks=useRef({onAccessLost});callbacks.current={onAccessLost};
- const invalidate=useCallback(()=>{++generation.current;controller.current?.abort();pending.current=null;},[]);
+ const invalidate=useCallback(()=>{++generation.current;controller.current?.abort();probeSocket.current?.close();pending.current=null;},[]);
  const path='/api/clinical/'+consultationId+'/speech';
  const current=(n:number)=>live.current&&generation.current===n;
  const finish=(n:number)=>{if(current(n)){setActive(false);onBusy(false);}locked.current=false;};
@@ -51,6 +52,19 @@ export function SpeechCapture({consultationId,revision,sequence,disabled,fixture
   finishCapture.current=handle?.finish;
  };
  // Uses the same capture adapter, but deliberately has no upload/transport path.
+ const checkConnection=()=>{
+  if(disabled||locked.current||active||pending.current)return;
+  locked.current=true;setConnectionChecking(true);setState('Checking hosted live connection · no microphone or provider request…');
+  const ws=new WebSocket((location.protocol==='https:'?'wss:':'ws:')+'//'+location.host+path+'/live?probe=1');probeSocket.current=ws;let passed=false,finished=false;
+  const done=(message:string)=>{if(finished)return;finished=true;clearTimeout(timer);locked.current=false;if(live.current){setConnectionChecking(false);setState(message);}ws.close();};
+  const timer=setTimeout(()=>done('Live connection check timed out. No audio uploaded or provider request.'),10000);
+  ws.onmessage=e=>{let v;try{v=JSON.parse(String(e.data));}catch{done('Invalid connection-check response.');return;}
+   if(v.type==='transport_ready')ws.send(JSON.stringify({type:'transport_probe',payload:'x'.repeat(96)}));
+   else if(v.type==='transport_received'&&v.providerCalls===0){passed=true;done('Live connection check passed · masked frame received. No audio uploaded or provider request.');}
+  };
+  ws.onerror=()=>done('Live connection check failed. No audio uploaded or provider request.');
+  ws.onclose=e=>{if(!passed)done('Live connection closed ('+e.code+'). No audio uploaded or provider request.');};
+ };
  const checkMicrophone=async()=>{
   if(disabled||locked.current||active||pending.current)return;
   const n=generation.current,c=new AbortController();controller.current=c;locked.current=true;setActive(true);setChecking(true);setMicrophoneReady(false);setState('Checking microphone locally for 2 seconds. Nothing is uploaded.');onBusy(true);
@@ -65,5 +79,5 @@ export function SpeechCapture({consultationId,revision,sequence,disabled,fixture
    const b=await readJsonResponse(r,b=>speechResponse(b,save?'save':'status'));apply(op,save?b.data.state:b.data.status);
   }catch(e){fail(e,op.generation);}finally{finish(op.generation);}
  };
- return <section className="speech-capture" aria-label="Speech capture">{streaming&&!microphoneReady&&<p>First check the microphone locally. This opens no provider session and uploads nothing.</p>}{streaming&&<LiveSpeechCapture cid={consultationId} revision={revision} sequence={sequence} disabled={disabled||active||!available||!microphoneReady||!!pending.current} onBusy={onBusy} onAccessLost={onAccessLost} onSaved={v=>onSaved({...v,kind:'stream',stopToSavedMs:v.stopToSavedMs??null})}/> }<p role="status">{state}</p>{timing&&<p role="status">Batch send to saved result: {timing.sendToResultMs} ms. Capture end to saved transcript: {timing.stopToSavedMs??'not measured'} ms. Includes upload and durable save; no streaming interim measurement.</p>}<div className="clinical-inline"><button className="quiet-button" disabled={disabled||active||!!pending.current} onClick={()=>void checkMicrophone()}>Check microphone locally</button>{!streaming&&<button className="quiet-button" disabled={disabled||active||!available||!!pending.current} onClick={()=>void start()}>Capture {Math.ceil(maxClipMs/1000)}-second clip</button>}{active&&!checking&&!pending.current&&<button className="quiet-button" onClick={()=>finishCapture.current?.()}>Finish and send recording</button>}{active&&<button className="quiet-button" onClick={()=>{controller.current?.abort();setChecking(false);setState('Capture stopped. Check saved status if transmission had started.');if(!pending.current)finish(generation.current);}}>Stop capture</button>}{pending.current&&<button className="quiet-button" disabled={active} onClick={()=>void inspect()}>Check saved clip</button>}{pending.current&&retained&&!active&&<button className="quiet-button" disabled={disabled} onClick={()=>void inspect(true)}>Save retained final response</button>}</div><small>Only final results are saved. Audio stays in request memory; recovery never uploads it again. An unresolved operation keeps new capture paused.</small></section>;
+ return <section className="speech-capture" aria-label="Speech capture">{streaming&&!microphoneReady&&<p>First check the microphone locally. This opens no provider session and uploads nothing.</p>}{streaming&&<LiveSpeechCapture cid={consultationId} revision={revision} sequence={sequence} disabled={disabled||active||!available||!microphoneReady||!!pending.current} onBusy={onBusy} onAccessLost={onAccessLost} onSaved={v=>onSaved({...v,kind:'stream',stopToSavedMs:v.stopToSavedMs??null})}/> }<p role="status">{state}</p>{timing&&<p role="status">Batch send to saved result: {timing.sendToResultMs} ms. Capture end to saved transcript: {timing.stopToSavedMs??'not measured'} ms. Includes upload and durable save; no streaming interim measurement.</p>}<div className="clinical-inline"><button className="quiet-button" disabled={disabled||active||connectionChecking||!!pending.current} onClick={checkConnection}>Check live connection (no audio)</button><button className="quiet-button" disabled={disabled||active||connectionChecking||!!pending.current} onClick={()=>void checkMicrophone()}>Check microphone locally</button>{!streaming&&<button className="quiet-button" disabled={disabled||active||!available||!!pending.current} onClick={()=>void start()}>Capture {Math.ceil(maxClipMs/1000)}-second clip</button>}{active&&!checking&&!pending.current&&<button className="quiet-button" onClick={()=>finishCapture.current?.()}>Finish and send recording</button>}{active&&<button className="quiet-button" onClick={()=>{controller.current?.abort();setChecking(false);setState('Capture stopped. Check saved status if transmission had started.');if(!pending.current)finish(generation.current);}}>Stop capture</button>}{pending.current&&<button className="quiet-button" disabled={active} onClick={()=>void inspect()}>Check saved clip</button>}{pending.current&&retained&&!active&&<button className="quiet-button" disabled={disabled} onClick={()=>void inspect(true)}>Save retained final response</button>}</div><small>Only final results are saved. Audio stays in request memory; recovery never uploads it again. An unresolved operation keeps new capture paused.</small></section>;
 }

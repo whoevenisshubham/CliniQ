@@ -11,7 +11,13 @@ export async function GET(request:Request,{params}:{params:Promise<{id:string}>}
   const client=await getSupabaseServerClient(),cid=(await params).id,admin=getSupabaseAdminClient();
   if(new URL(request.url).searchParams.get('probe')==='1'){
    await speechContext(client,cid);
-   return upgradeWebSocket(socket=>{socket.send(JSON.stringify({type:'transport_ready',providerCalls:0}));socket.close(1000,'Transport probe complete');},{maxPayload:1024});
+   return upgradeWebSocket(socket=>{
+    const timer=setTimeout(()=>socket.close(1000,'Probe expired'),5000);socket.once('close',()=>clearTimeout(timer));socket.on('error',()=>clearTimeout(timer));
+    socket.once('message',(data,isBinary)=>{
+     if(isBinary||data.toString()!==JSON.stringify({type:'transport_probe',payload:'x'.repeat(96)})){socket.close(1008,'Invalid probe');return;}
+     socket.send(JSON.stringify({type:'transport_received',providerCalls:0}));socket.close(1000,'Masked-frame probe complete');
+    });socket.send(JSON.stringify({type:'transport_ready',providerCalls:0}));
+   },{maxPayload:512});
   }
   const availability=await speechAvailability(client,()=>admin,cid);
   const capability=await client.rpc('speech_stream_capability');
