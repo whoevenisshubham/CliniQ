@@ -15,6 +15,8 @@ export type Evidence = {
     segmentId?: string;
     sequence?: number;
     speaker?: string;
+    captureType?:'speech'|'typed';
+    correctsSegmentId?:string|null;
     contentSha256?: string;
 };
 export type GroundedAnswer = {

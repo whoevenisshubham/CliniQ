@@ -17,6 +17,7 @@ function check(error: PostgrestError | null) {
         ENCOUNTER_CLOSED: [409, "This encounter is closed. Approved records cannot be edited."],
         LEGACY_RECONCILIATION_REQUIRED: [409, "This historical encounter requires explicit reconciliation."],
         REVIEW_REQUIRED: [422, "Review the current saved draft and confirm it before finalizing."],
+        CONTEXT_REVIEW_REQUIRED:[422,"Review uncertain source statements and reconcile the no-new-prescription statement before approving."],
         MEDICATION_REVIEW_REQUIRED: [422, "Complete medication fields or explicitly record unknown values with a reason."],
         INVALID_SNAPSHOT: [422, "Check the bounded clinical fields."], INVALID_MEDICATION: [422, "Check the medication fields."],
         INVALID_VITALS: [422, "Check measurement values and explicit units."], INVALID_SEGMENT: [422, "Check transcript sequence and text bounds."],
@@ -46,7 +47,7 @@ export async function mutateClinical(client: SupabaseClient, key: string, comman
 export async function clinicalList(client: SupabaseClient) {
     const p = await resolvePrincipal(client);
     if (p.role === "patient") {
-        const [r, rx] = await Promise.all([client.from("emr_versions").select("id,consultation_id,version_no,reviewed_at,snapshot,content_sha256,source_revision,amended_from_id").order("reviewed_at", { ascending: false }).limit(50), client.from("prescriptions").select("id,approved_emr_version_id,medication_name,dosage,frequency,duration,route,instructions,unknown_fields").order("created_at", { ascending: false }).limit(200)]);
+        const [r, rx] = await Promise.all([client.from("emr_versions").select("*").order("reviewed_at", { ascending: false }).limit(50), client.from("prescriptions").select("id,approved_emr_version_id,medication_name,dosage,frequency,duration,route,instructions,unknown_fields").order("created_at", { ascending: false }).limit(200)]);
         check(r.error);
         check(rx.error);
         return { approved: r.data, prescriptions: rx.data, role: p.role };
@@ -78,13 +79,13 @@ export async function clinicalDetail(client: SupabaseClient, encounterId: string
         throw new HttpError(404, "NOT_FOUND", "Consultation unavailable.");
     const [draft, segments, patient, approved, documents, history, prescriptions, proposals] = await Promise.all([
         client.from("clinical_drafts").select("*").eq("consultation_id", encounterId).maybeSingle(),
-        client.from("clinical_segments").select("id,sequence,text,speaker,language,start_ms,end_ms,source_type,speech_provenance").eq("consultation_id", encounterId).order("sequence").limit(1000),
+        client.from("clinical_segments").select("*").eq("consultation_id", encounterId).order("sequence").limit(1000),
         client.from("patients").select("id,name,allergies").eq("id", visit.data.patient_id).maybeSingle(),
-        client.from("emr_versions").select("id,consultation_id,snapshot,reviewed_at,version_no,source_revision,field_provenance,amended_from_id").eq("consultation_id", encounterId).order("version_no"),
+        client.from("emr_versions").select("*").eq("consultation_id", encounterId).order("version_no"),
         client.from("documents").select("id,title,current_version_id,created_at").eq("patient_id", visit.data.patient_id).eq("status", "ready").limit(20),
-        client.from("emr_versions").select("id,consultation_id,snapshot,reviewed_at,amended_from_id,consultations!emr_versions_consultation_id_fkey!inner(patient_id)").eq("consultations.patient_id", visit.data.patient_id).order("reviewed_at", { ascending: false }).limit(5),
+        client.from("emr_versions").select("*,consultations!emr_versions_consultation_id_fkey!inner(patient_id)").eq("consultations.patient_id", visit.data.patient_id).order("reviewed_at", { ascending: false }).limit(5),
         client.from("prescriptions").select("id,approved_emr_version_id,medication_name,dosage,frequency,duration,route,instructions,status,prescribed_at").eq("patient_id", visit.data.patient_id).order("prescribed_at", { ascending: false }).limit(50),
-        client.from("clinical_proposals").select("id,base_revision,operations,source_snapshot,result_kind,state,created_at").eq("consultation_id", encounterId).order("created_at", { ascending: false }).limit(100),
+        client.from("clinical_proposals").select("*").eq("consultation_id", encounterId).order("created_at", { ascending: false }).limit(100),
     ]);
     for (const r of [draft, segments, patient, approved, documents, history, prescriptions, proposals])
         check(r.error);

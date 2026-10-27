@@ -1,4 +1,6 @@
 import {MAX_SPEECH_MS} from '@/lib/clinical/audio';
+import {validateContext} from '@/lib/clinical/context';
+const clinicalContext=(v:unknown)=>{if(v===undefined||v&&typeof v==='object'&&!Array.isArray(v)&&!Object.keys(v).length)return true;try{validateContext(v);return true;}catch{return false;}};
 // Small endpoint-specific guards for the envelopes the repaired clients consume.
 // A malformed 2xx is an unknown outcome, never a confirmed failed mutation.
 export const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -62,7 +64,7 @@ const snapshot = (v: unknown) => object(v) && ['chief_complaint','physical_exami
   && ['symptoms','diagnosis','lab_tests_ordered'].every(k=>strings(v[k]))
   && rows(v.medications,m=>fields(m,['id','name']) && ['dose','frequency','duration','route','instructions'].every(k=>nullable(m[k],text)) && strings(m.unknownFields))
   && rows(v.vitals,m=>fields(m,['name','unit']) && nullable(m.value,number) && nullable(m.observedAt,text));
-const approved = (v: Record<string,unknown>) => fields(v,['id','consultation_id','reviewed_at']) && snapshot(v.snapshot);
+const approved = (v: Record<string,unknown>) => fields(v,['id','consultation_id','reviewed_at']) && snapshot(v.snapshot)&&clinicalContext(v.clinical_context);
 export function clinicalResponse(body: unknown, path: string, mutation = false) {
   if(!object(body))return false;const d=body.data;
   if(path.startsWith('/api/clinical/operations/'))return d===null || object(d)&&text(d.consultationId)&&revision(d.revision);
@@ -70,11 +72,11 @@ export function clinicalResponse(body: unknown, path: string, mutation = false) 
   if(mutation)return text(d.consultationId)&&revision(d.revision);
   if(path==='/api/clinical')return text(d.role) && (Array.isArray(d.approved)?rows(d.approved,approved):rows(d.visits,v=>text(v.id)&&text(v.status)&&dated(v.started_at)&&revision(v.revision))&&rows(d.patients,v=>fields(v,['id','name']))&&rows(d.care,v=>fields(v,['patient_id','workspace_id'])));
   return object(d.visit)&&fields(d.visit,['id','patient_id','workspace_id','status'])&&revision(d.visit.revision)
-    &&object(d.draft)&&snapshot(d.draft.snapshot)&&object(d.patient)&&fields(d.patient,['id','name'])&&strings(d.patient.allergies)
+    &&object(d.draft)&&snapshot(d.draft.snapshot)&&clinicalContext(d.draft.clinical_context)&&object(d.patient)&&fields(d.patient,['id','name'])&&strings(d.patient.allergies)
     &&rows(d.segments,v=>fields(v,['id','text','speaker','language','source_type']))&&rows(d.approved,approved)&&rows(d.history,approved)
     &&rows(d.prescriptions,v=>fields(v,['id','medication_name','prescribed_at'])&&nullable(v.dosage,text))
     &&rows(d.documents,v=>fields(v,['id','title','current_version_id','created_at']))
-    &&(d.proposals===undefined||rows(d.proposals,v=>fields(v,['id','result_kind','state'])&&revision(v.base_revision)&&rows(v.operations,o=>fields(o,['op','path'])&&strings(o.evidence_segment_ids))&&rows(v.source_snapshot,s=>fields(s,['id','text','speaker','language']))));
+    &&(d.proposals===undefined||rows(d.proposals,v=>fields(v,['id','result_kind','state'])&&clinicalContext(v.clinical_context)&&revision(v.base_revision)&&rows(v.operations,o=>fields(o,['op','path'])&&strings(o.evidence_segment_ids))&&rows(v.source_snapshot,s=>fields(s,['id','text','speaker','language']))));
 }
 
 const evidence = (v:Record<string,unknown>)=>fields(v,['evidenceId','sourceType','versionId','text']);

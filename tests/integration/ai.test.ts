@@ -17,6 +17,8 @@ import { POST as admitRoute } from '@/app/api/ai/threads/[id]/route';
 import { GET as jobRoute } from '@/app/api/jobs/[id]/route';
 import type { OfflineProvider, Evidence } from '@/lib/contracts/ai';
 import { ProviderFailure } from '@/lib/server/ai/failure';
+import {emptySnapshot} from '@/lib/contracts/clinical';
+import {GET as printClinical} from '@/app/api/clinical/approved/[id]/route';
 const state = vi.hoisted(() => ({ jar: null as null | {
         getAll: () => {
             name: string;
@@ -549,4 +551,41 @@ it('raw provider receipts are service-only, bounded, immutable and separate from
  expect((await clients.patient.rpc('ai_retain_raw',{aid,raw:'synthetic raw response'})).error?.code).toBe('42501');expect((await admin.rpc('ai_retain_raw',{aid,raw:'x'.repeat(65537)})).error).not.toBeNull();
  expect((await admin.rpc('ai_retain_raw',{aid,raw:'synthetic raw response'})).data).toBe(true);expect((await admin.rpc('ai_retain_raw',{aid,raw:'replacement'})).data).toBe(false);
  const saved=await admin.from('provider_attempts').select('raw_response').eq('id',aid).single();expect(saved.error).toBeNull();expect(saved.data!.raw_response).toBe('synthetic raw response');expect((await clients.patient.from('provider_attempts').select('raw_response')).error?.code).toBe('42501');expect((await admin.rpc('ai_unknown',{jid:j,f})).error).toBeNull();
+});
+
+it('reviewed assertion context persists separately from prescriptions and late proposals cannot replace clinician edits',async()=>{
+ const created=await clients.doctor.rpc('clinical_mutate',{k:randomUUID(),command:{action:'create',patientId:actors.patient.patientId,workspaceId:base.ids.workspaceA}});expect(created.error).toBeNull();const cid=created.data.consultationId,firstId=randomUUID();
+ const text='Dizziness for three days. No fever. Current medication SourceMedicine 5 mg. No new medicine prescribed.';
+ expect((await clients.doctor.rpc('clinical_mutate',{k:randomUUID(),command:{action:'transcript',consultationId:cid,expectedRevision:0,segment:{id:firstId,sequence:0,text,speaker:'clinician',language:'en',startMs:null,endMs:null}}})).error).toBeNull();
+ expect((await admin.from('clinical_segments').update({source_type:'speech',speech_provenance:{mode:'offline_fixture'}}).eq('id',firstId)).error).toBeNull();
+ const tid=await createThread(clients.doctor,randomUUID(),cid),ref='semantic-'+randomUUID();
+ expect((await admin.from('provider_allowances').insert({authorization_ref:ref,mode:'offline_fixture',provider:'groq',model:HISTORICAL_TEXT_MODEL,enabled:true,ends_at:new Date(Date.now()+3600000).toISOString(),max_requests:2,max_input:50000,max_output:10000})).error).toBeNull();
+ expect((await admin.from('provider_budgets').insert({authorization_ref:ref,mode:'offline_fixture',provider:'groq',model:HISTORICAL_TEXT_MODEL,kind:'extract_emr',enabled:true,allowed_actors:[actors.doctor.id],ends_at:new Date(Date.now()+3600000).toISOString(),max_requests:2,max_input:50000,max_output:10000})).error).toBeNull();
+ expect((await admin.from('ai_budget_scope').insert({authorization_ref:ref,actor_id:actors.doctor.id,patient_id:actors.patient.patientId,expires_at:new Date(Date.now()+3600000).toISOString()})).error).toBeNull();
+ const fact=(k:string,t:string,q:string,p='present',extra={})=>({k,t,q,p,s:[0],c:[],m:null,v:null,...extra});
+ const reply={facts:[fact('complaint','Dizziness for 3 days','Dizziness for three days.'),fact('symptom','Dizziness','Dizziness for three days.'),fact('symptom','Fever','No fever.','absent'),fact('medicine','SourceMedicine 5 mg','Current medication SourceMedicine 5 mg.','present',{m:{n:'SourceMedicine',d:'5 mg',f:null,du:null,r:null,i:null}}),fact('prescribing','No new medicine prescribed','No new medicine prescribed.','absent')]};
+ const j=await admitAI(clients.doctor,randomUUID(),tid,{kind:'extract_emr',question:'Extract new saved facts.'});
+ const fixture={...double(async()=>({text:JSON.stringify(reply),finishReason:'stop'})),authorizationRef:ref};expect((await runAIJob(admin,j,fixture)).status).toBe('succeeded');
+ const job=await jobView(clients.doctor,admin,j),pid=job.result.proposalId;
+ expect((await clients.doctor.rpc('clinical_apply_proposal',{k:randomUUID(),pid,expected:1,decision:'accept'})).error).toBeNull();
+ const saved=await clients.doctor.from('clinical_drafts').select('snapshot,clinical_context').eq('consultation_id',cid).single();expect(saved.error).toBeNull();expect(saved.data!.snapshot.medications).toEqual([]);expect(saved.data!.snapshot.symptoms).toEqual(['Dizziness']);expect(saved.data!.clinical_context.symptoms.map((a:{polarity:string})=>a.polarity)).toEqual(['present','absent']);expect(saved.data!.clinical_context.medication_history).toHaveLength(1);
+ const laterId=randomUUID(),correction='Actually the SourceMedicine dose is 10 mg, not 5 mg. Actually dizziness for four days.';
+ expect((await clients.doctor.rpc('clinical_mutate',{k:randomUUID(),command:{action:'transcript',consultationId:cid,expectedRevision:2,segment:{id:laterId,sequence:1,text:correction,speaker:'clinician',language:'en',startMs:null,endMs:null}}})).error).toBeNull();
+ const j2=await admitAI(clients.doctor,randomUUID(),tid,{kind:'extract_emr',question:'Extract corrected facts.'});
+ const snap=await admin.from('document_jobs').select('input_snapshot').eq('id',j2).single();expect(snap.error).toBeNull();expect(snap.data!.input_snapshot.sources.map((s:{segmentId:string})=>s.segmentId)).toEqual([firstId,laterId]);
+ const updated={facts:[fact('medicine','SourceMedicine dose 10 mg','Actually the SourceMedicine dose is 10 mg, not 5 mg.','present',{s:[1],c:[0],m:{n:'SourceMedicine',d:'10 mg',f:null,du:null,r:null,i:null}}),fact('complaint','Dizziness for 4 days','Actually dizziness for four days.','present',{s:[1],c:[0]})]};
+ expect((await runAIJob(admin,j2,{...fixture,execute:async()=>({text:JSON.stringify(updated),finishReason:'stop'})})).status).toBe('succeeded');
+ const p2=(await jobView(clients.doctor,admin,j2)).result.proposalId,manual={...emptySnapshot(),chief_complaint:'Clinician-reviewed complaint'};
+ expect((await clients.doctor.rpc('clinical_mutate',{k:randomUUID(),command:{action:'save',consultationId:cid,expectedRevision:3,snapshot:manual}})).error).toBeNull();
+ expect((await clients.doctor.rpc('clinical_apply_proposal',{k:randomUUID(),pid:p2,expected:4,decision:'accept'})).error?.message).toBe('STALE_PROPOSAL');
+ const rebaseKey=randomUUID(),rebased=await clients.doctor.rpc('clinical_rebase_proposal',{k:rebaseKey,pid:p2,expected:4});expect(rebased.error).toBeNull();expect((await clients.doctor.rpc('clinical_rebase_proposal',{k:rebaseKey,pid:p2,expected:4})).data).toEqual(rebased.data);
+ expect((await clients.doctor.rpc('clinical_apply_proposal',{k:randomUUID(),pid:rebased.data.proposalId,expected:4,decision:'accept'})).error).toBeNull();
+ const afterRebase=await clients.doctor.from('clinical_drafts').select('snapshot,clinical_context').eq('consultation_id',cid).single();expect(afterRebase.error).toBeNull();expect(afterRebase.data!.snapshot.chief_complaint).toBe(manual.chief_complaint);expect(afterRebase.data!.clinical_context.medication_history).toHaveLength(2);
+ const reviewKey=randomUUID();expect((await clients.other.rpc('clinical_correct_source',{k:reviewKey,cid,source_id:firstId,corrected_text:'Unrelated correction',expected:5})).error?.message).toBe('NOT_FOUND');
+ const command={k:reviewKey,cid,source_id:firstId,corrected_text:'Clinician-reviewed source wording.',expected:5};expect((await clients.doctor.rpc('clinical_correct_source',command)).error).toBeNull();expect((await clients.doctor.rpc('clinical_correct_source',command)).error).toBeNull();
+ const originals=await clients.doctor.from('clinical_segments').select('id,text,reviewed_correction_of').eq('consultation_id',cid).order('sequence');expect(originals.error).toBeNull();expect(originals.data?.find(s=>s.id===firstId)?.text).toBe(text);expect(originals.data?.filter(s=>s.reviewed_correction_of===firstId)).toHaveLength(1);
+ const final=await clients.doctor.rpc('clinical_mutate',{k:randomUUID(),command:{action:'finalize',consultationId:cid,expectedRevision:6,reviewedDraftRevision:6,confirmed:true,acknowledgements:{}}});expect(final.error).toBeNull();
+ const version=await clients.patient.from('emr_versions').select('clinical_context,snapshot').eq('id',final.data.approvedVersionId).single();expect(version.error).toBeNull();expect(version.data!.clinical_context).toEqual(afterRebase.data!.clinical_context);expect(version.data!.snapshot.chief_complaint).toBe(manual.chief_complaint);expect((await clients.patient.from('prescriptions').select('id').eq('consultation_id',cid)).data).toEqual([]);
+ state.jar=jars.patient;const printed=await printClinical(new Request(origin),{params:Promise.resolve({id:final.data.approvedVersionId})});expect(printed.status).toBe(200);const html=await printed.text();expect(html).toContain('Existing medication history');expect(html).toContain('No fever.');expect(html).toContain('SourceMedicine');expect(html).toContain('New prescriptions');
+ expect((await clients.other.rpc('clinical_print_metadata',{vid:final.data.approvedVersionId})).error?.message).toBe('NOT_FOUND');
 });

@@ -54,7 +54,7 @@ try{
  sql(readFileSync(root+'/scripts/optional-rollout-preflight.sql','utf8'));
  const preparedSnapshot=sql(readFileSync(root+'/scripts/optional-preservation-snapshot.sql','utf8'));
  const before=snapshotRows(),sourceFunction=sql("select 'private.ai_sources_current(public.document_jobs)'::regprocedure::oid"),policies=sql("select md5(string_agg(row_to_json(x)::text,'|' order by row_to_json(x)::text)) from (select * from pg_policies where schemaname='public') x");
- const plan=loadMigrationPlan(root),files=Object.keys(plan.manifest).filter(f=>/20261025000[12]_|20261026000[123]_|202610270001_/.test(f));assert.equal(files.length,6);
+ const plan=loadMigrationPlan(root),files=Object.keys(plan.manifest).filter(f=>/20261025000[12]_|20261026000[123]_|20261027000[12]_/.test(f));assert.equal(files.length,7);
  sql('BEGIN;\n'+files.map(f=>transactionBody(readFileSync(root+'/'+f,'utf8'))).join('\n')+'\nCOMMIT;');
  const after=snapshotRows();assert.deepEqual(after,before,'Optional upgrade changed existing row fields');assert.equal(sql("select 'private.ai_sources_current(public.document_jobs)'::regprocedure::oid"),sourceFunction);assert.equal(sql("select md5(string_agg(row_to_json(x)::text,'|' order by row_to_json(x)::text)) from (select * from pg_policies where schemaname='public') x"),policies);
  assert.equal(sql(readFileSync(root+'/scripts/optional-preservation-snapshot.sql','utf8')),preparedSnapshot,'Prepared read-only digest must preserve existing rows');sql(readFileSync(root+'/scripts/optional-rollout-postflight.sql','utf8'));

@@ -3,7 +3,7 @@ import {getSupabaseServerClient,getSupabaseAdminClient} from '@/lib/supabase-ser
 import {speechAvailability,speechContext} from '@/lib/server/speech/service';
 import {relaySpeech} from '@/lib/server/speech/stream';
 import {errorResponse,HttpError,requireSameOrigin} from '@/lib/server/http';
-export const runtime='nodejs';export const dynamic='force-dynamic';export const maxDuration=120;
+export const runtime='nodejs';export const dynamic='force-dynamic';export const maxDuration=240;
 export async function GET(request:Request,{params}:{params:Promise<{id:string}>}){
  try{
   requireSameOrigin(request);

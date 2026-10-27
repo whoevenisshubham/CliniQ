@@ -12,12 +12,14 @@ export async function GET(_req: Request, ctx: {
         const client = await getSupabaseServerClient();
         await resolvePrincipal(client);
         const versionId = id((await ctx.params).id);
-        const r = await client.from("emr_versions").select("id,reviewed_at,source_revision,snapshot,amended_from_id").eq("id", versionId).maybeSingle();
+        const r = await client.from("emr_versions").select("*").eq("id", versionId).maybeSingle();
         if (r.error)
             throw new HttpError(503, "CLINICAL_UNAVAILABLE", "Approved record unavailable.");
         if (!r.data)
             throw new HttpError(404, "NOT_FOUND", "Approved record unavailable.");
-        const html = approvedReport(r.data);
+        const metadata=await client.rpc('clinical_print_metadata',{vid:versionId});
+        if(metadata.error&&!['PGRST202','42883'].includes(metadata.error.code))throw new HttpError(503,'CLINICAL_UNAVAILABLE','Approved record metadata unavailable.');
+        const html = approvedReport({...r.data,metadata:metadata.error?undefined:metadata.data});
         const recheck = await client.from("emr_versions").select("id").eq("id", versionId).maybeSingle();
         if (recheck.error)
             throw new HttpError(503, "CLINICAL_UNAVAILABLE", "Approved record unavailable.");

@@ -12,6 +12,7 @@ import {incrementalExtraction} from './incremental';
 export async function relaySpeech(socket:WebSocket,client:SupabaseClient,admin:SupabaseClient,command:{cid:string;key:string;segmentId:string;sequence:number;revision:number;capMs:number;ref:string}){
  const text=new SpeechStreamText(),hash=createHash('sha256');let upstream:WebSocket|undefined,oid:string|undefined,total=0,ended=false,finishing=false,requestId:string|undefined,revision=command.revision,checkpointEnabled=false;
  let checkpointQueue=Promise.resolve();
+ const checkpointed=new Set<string>();
  let timer:ReturnType<typeof setTimeout>|undefined,accessTimer:ReturnType<typeof setInterval>|undefined,drain:ReturnType<typeof setTimeout>|undefined;
  const send=(v:unknown)=>{if(socket.readyState===WebSocket.OPEN)socket.send(JSON.stringify(v));};
  const clear=()=>{if(timer)clearTimeout(timer);if(accessTimer)clearInterval(accessTimer);if(drain)clearTimeout(drain);};
@@ -68,7 +69,7 @@ export async function relaySpeech(socket:WebSocket,client:SupabaseClient,admin:S
       if(staged.error||staged.data!==true)throw Error('FINAL_STAGE_FAILED');
       const saved=await client.rpc('speech_stream_checkpoint',{oid,span_ms:span});
       if(saved.error||!Number.isInteger(saved.data?.revision))throw Error('CHECKPOINT_NOT_SAVED');
-      revision=saved.data.revision;send({type:'checkpoint',...saved.data});extraction.notify();
+      revision=saved.data.revision;send({type:'checkpoint',...saved.data});if(!checkpointed.has(saved.data.id)){checkpointed.add(saved.data.id);extraction.notify(Date.now(),transcript.length);}
      }).catch(()=>fail('CHECKPOINT_NOT_SAVED'));
     }
    }catch{void fail('INVALID_PROVIDER_STREAM');}
