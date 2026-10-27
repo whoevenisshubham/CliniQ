@@ -1,6 +1,12 @@
 "use client";
 import {useEffect,useRef,useState} from 'react';
 import {readJsonResponse,accessDenied} from '@/lib/client/http-response';
+export function extractionFailure(reason:unknown){
+ if(reason==='INCOMPLETE_OUTPUT')return 'The model did not finish within its response limit.';
+ if(['CLINICAL_SCHEMA','INVALID_OPERATION','OUTPUT_SCHEMA','MALFORMED_OUTPUT'].includes(String(reason)))return 'Generated fields did not match the required EMR format.';
+ if(reason==='MEDICATION_CONTEXT_REVIEW_REQUIRED')return 'The output treated existing medication as a new prescription.';
+ return 'Generated facts did not pass the source and clinical checks.';
+}
 export function ClinicalExtraction({cid,revision,disabled,onSaved,onAccessLost}:{cid:string;revision:number;disabled:boolean;onSaved:()=>void;onAccessLost:(e:unknown)=>void}){
  const [available,setAvailable]=useState(false);
  const [busy,setBusy]=useState(false),[state,setState]=useState('EMR suggestions use saved final speech. Clinician review is required.');
@@ -12,7 +18,7 @@ export function ClinicalExtraction({cid,revision,disabled,onSaved,onAccessLost}:
    const r=await fetch('/api/clinical/'+cid+'/extract',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({expectedRevision:revision,threadKey:crypto.randomUUID(),requestKey:crypto.randomUUID()}),signal:AbortSignal.any([c.signal,AbortSignal.timeout(110000)])});
    const b=await readJsonResponse(r,v=>{const d=(v as {data?:{status?:unknown;jobId?:unknown}})?.data;return !!d&&typeof d.status==='string'&&typeof d.jobId==='string';});if(!live.current)return;
    if(['succeeded','recovered'].includes(b.data.status)){setState('Reviewable EMR proposal persisted in '+Math.round(performance.now()-start)+' ms. Review its source before using it.');onSaved();}
-   else setState('EMR request state: '+b.data.status+'. Saved speech is retained. No automatic retry.');
+   else setState((b.data.status==='rejected'?extractionFailure(b.data.reason):'EMR request state: '+b.data.status+'.')+' Nothing was applied. Saved speech is retained. No automatic retry.');
   }catch(e){if(!live.current)return;if(accessDenied(e))onAccessLost(e);setState(e instanceof Error?e.message:'EMR outcome is unconfirmed. Do not send it again.');}
   finally{if(live.current)setBusy(false);}
  };

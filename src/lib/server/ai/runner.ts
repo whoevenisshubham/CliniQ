@@ -95,5 +95,5 @@ export async function runAIJob(admin: SupabaseClient, jobId?: string, offline?: 
         return { jobId: job.id, status: 'stale' };
     const published = await admin.rpc('ai_publish', { jid: job.id, f: job.fence });
     check(published.error);
-    return { jobId: job.id, status: published.data ? state : 'stale' };
+    return { jobId: job.id, status: published.data ? state : 'stale', ...(published.data&&state==='rejected'?{reason:(result as {reason:string}).reason}:{}) };
 }

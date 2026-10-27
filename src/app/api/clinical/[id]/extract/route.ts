@@ -23,6 +23,6 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   const tid=await createThread(client,id(b.threadKey),cid);
   const jid=await admitAI(client,id(b.requestKey),tid,{kind:'extract_emr',question:'Prepare source-bound EMR changes from the saved final transcript, preserving spoken corrections, explicit negatives and unknowns.',documentIds:[]});
   const outcome=await runAIJob(getSupabaseAdminClient(),jid);
-  return privateJson({data:{jobId:jid,status:outcome.status}});
+  return privateJson({data:{jobId:jid,status:outcome.status,...('reason'in outcome&&typeof outcome.reason==='string'&&/^[A-Z_]{1,80}$/.test(outcome.reason)?{reason:outcome.reason}:{})}});
  }catch(e){return errorResponse(e);}
 }

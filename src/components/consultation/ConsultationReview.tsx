@@ -256,12 +256,13 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
     const openReview=(button:HTMLButtonElement)=>{reviewButtonRef.current=button;if(!snapshot.chief_complaint?.trim()){setError('A chief complaint is required for approval. Your saved transcript and draft are retained. Enter the chief complaint, click Save findings, then review the saved draft.');chiefComplaintRef.current?.focus();return;}setError('');setConfirmed(false);setReview(true);};
     return <RecordLayout provider={provider} fixture={!!fixture} section="consultations">
   <div className="clinical-topline"><p className="eyebrow">{provider ? "Consultation & review" : "Approved care history"}</p><span role="status" className="record-state">{busy ? "Saving…" : status}</span></div>
-  <h1 className="clinical-title">{detail ? detail.patient.name : provider ? "The conversation, kept in context." : "Your approved visit records."}</h1>
-  {!detail && <p className="section-intro">{provider ? "Keep the conversation beside your findings. Save a draft, review it, and approve a lasting record." : "Only clinician-approved versions appear here. Earlier versions remain visible when a correction is issued."}</p>}
+  <h1 className="clinical-title">{detail ? detail.patient.name : provider&&selected ? "Your saved consultation" : provider ? "The conversation, kept in context." : "Your approved visit records."}</h1>
+  {!detail && !(provider&&selected) && <p className="section-intro">{provider ? "Keep the conversation beside your findings. Save a draft, review it, and approve a lasting record." : "Only clinician-approved versions appear here. Earlier versions remain visible when a correction is issued."}</p>}
   {error && <div className="clinical-error" role="alert"><p>{error}</p>{pending.current && <button className="quiet-button" disabled={busy} onClick={() => void commit(pending.current!.command, true)}>Retry / reconcile the same operation</button>}{status === "session expired" && <Link href="/login">Sign in again</Link>}</div>}
   {notice&&<p role="status">{notice}</p>}
   {!detail && !provider && <div className="clinical-history">{listing?.approved?.length ? listing.approved.map(a => <ApprovedRecord key={a.id} record={a}/>) : <p>{status === "loading" ? "Loading approved history…" : "No approved visit records yet."}</p>}</div>}
-  {!detail && provider && <>
+  {!detail && provider && selected && <section aria-label="Saved consultation" aria-busy={status==='loading'}><p>{status==='loading'?'Opening saved transcript and findings…':'The saved consultation could not be opened.'}</p>{status!=='loading'&&<button className="quiet-button" onClick={()=>void loadRef.current(selected)}>Load saved consultation</button>}</section>}
+  {!detail && provider && !selected && <>
    <form className="clinical-start" onSubmit={e => {
                 e.preventDefault();
                 const care = listing?.care?.find(c => `${c.patient_id}:${c.workspace_id}` === patientChoice);
