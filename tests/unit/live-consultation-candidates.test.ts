@@ -16,6 +16,7 @@ it('retains initial and later candidates, preserves raw speech, and never offers
  await emit({type:'emr_proposal',proposal:{id:'initial',base_revision:1,operations:[{op:'set_fact',path:'chief_complaint',value:'Initial complaint'}]},elapsedMs:100});
  await emit({type:'emr_proposal',proposal:{id:'later',base_revision:2,operations:[{op:'update_fact',path:'chief_complaint',value:'Corrected complaint'}]},elapsedMs:200});
  expect(proposal).toHaveBeenCalledTimes(2);expect(proposal.mock.calls[0][0].operations[0].value).toBe('Initial complaint');expect(proposal.mock.calls[1][0].operations[0].value).toBe('Corrected complaint');expect(host.textContent).toContain('Original statement. Actually, a later correction.');
+ await emit({type:'stop_capture'});await emit({type:'checkpoint',id:'saved-final',revision:2,sequence:0,startMs:0,text:'Original statement. Actually, a later correction.'});expect(host.textContent).toContain('Final speech saved · finishing EMR');expect(host.textContent).not.toContain('Listening ·');
  await emit({type:'saved'});expect(saved).toHaveBeenCalledOnce();expect(start.disabled).toBe(true);
  }finally{await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals();}
 });
