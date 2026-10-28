@@ -2,10 +2,9 @@
 
 import React, { useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, Square, RotateCcw, Clock, Hash, Globe } from "lucide-react";
-import { cn, formatTime } from "@/lib/utils";
+import { Mic, Square, RotateCcw, Clock, Hash, Globe } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { TranscriptSegment } from "@/lib/types";
 
@@ -80,6 +79,8 @@ interface LiveTranscriptPanelProps {
   onStop: () => void;
   onReset: () => void;
   className?: string;
+  /** V2 supplies scoped capture controls; the historical reset never mutates saved sources. */
+  controls?: React.ReactNode;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -97,12 +98,16 @@ export function LiveTranscriptPanel({
   onStop,
   onReset,
   className,
+  controls,
 }: LiveTranscriptPanelProps) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null), scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new segments
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const viewport = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    // Follow only inside the transcript, and only while the reader is at its end.
+    if (viewport && viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 100)
+      viewport.scrollTop = viewport.scrollHeight;
   }, [segments.length, interimText]);
 
   return (
@@ -126,7 +131,7 @@ export function LiveTranscriptPanel({
               Ambient Scribe
             </h3>
             <p className="text-[10px] text-[var(--foreground-subtle)]">
-              Multilingual · Medical-Optimized
+              English · Hindi · Hinglish
             </p>
           </div>
         </div>
@@ -157,7 +162,7 @@ export function LiveTranscriptPanel({
       </div>
 
       {/* ─── Transcript area ────────────────────────────────────── */}
-      <ScrollArea className="flex-1 px-4 py-3">
+      <ScrollArea ref={scrollRef} className="flex-1 px-4 py-3">
         <div className="space-y-1 min-h-full">
           {/* Empty state */}
           {segments.length === 0 && !interimText && !isConnecting && (
@@ -166,7 +171,7 @@ export function LiveTranscriptPanel({
                 <Mic className="w-5 h-5 text-[var(--foreground-subtle)]" />
               </div>
               <p className="text-xs text-[var(--foreground-subtle)] text-center max-w-[200px] leading-relaxed">
-                Press <strong className="text-[var(--foreground-muted)]">Start Recording</strong> to begin ambient scribing
+                Your conversation appears here. Finalized speech is saved; interim text remains provisional.
               </p>
               <p className="text-[10px] text-[var(--foreground-subtle)]/60 text-center">
                 Supports English, Hindi, and Hinglish
@@ -230,7 +235,7 @@ export function LiveTranscriptPanel({
       )}
 
       {/* ─── Controls ───────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-4 py-3 border-t border-[var(--border)] bg-[var(--background-secondary)]">
+      {controls !== undefined ? <div className="scribe-controls">{controls}</div> : <div className="flex items-center gap-2 px-4 py-3 border-t border-[var(--border)] bg-[var(--background-secondary)]">
         {!isRecording && !isConnecting ? (
           <Button
             onClick={onStart}
@@ -262,7 +267,7 @@ export function LiveTranscriptPanel({
         >
           <RotateCcw className="w-3.5 h-3.5" />
         </Button>
-      </div>
+      </div>}
     </div>
   );
 }

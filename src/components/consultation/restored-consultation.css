@@ -1,0 +1,57 @@
+/* CliniQ d2fadb62 ActiveConsultationClient: compact patient toolbar, ambient
+   scribe left, sectioned EMR right. Scoped to consultations, not document UI. */
+.restored-consultation .record-app {--primary:#2563eb;--primary-hover:#1d4ed8;--primary-foreground:#fff;background:var(--background)}
+.restored-consultation .record-header {height:64px;padding:12px 24px}
+.restored-consultation .record-grid {grid-template-columns:180px minmax(0,1fr)}
+.restored-consultation .record-nav {padding:24px 16px;font-size:13px}
+.restored-consultation .record-nav>a {padding:11px 12px;margin:4px 0;border-radius:8px}
+.restored-consultation .record-nav>p:not(.eyebrow),.restored-consultation .record-nav>small {display:none}
+.restored-consultation .record-main {width:100%;max-width:1600px;padding:20px 28px}
+.restored-consultation .clinical-topline {margin:0;justify-content:space-between;font-size:11px}
+.restored-consultation .clinical-title {font-size:26px;margin:8px 0 12px;letter-spacing:-.025em}
+.restored-consultation .clinical-primary-strip {gap:16px;border-bottom:1px solid var(--border);padding-bottom:14px}
+.restored-consultation .clinical-primary-strip p {font-size:12px;line-height:1.8;margin:0;flex:1}
+.restored-consultation .clinical-primary-strip>div {display:flex;gap:10px;flex-wrap:wrap}
+.restored-consultation .clinical-toolbar {margin:0 0 14px;padding:8px 0;border-top:0;font-size:12px;gap:16px}
+.restored-consultation .clinical-toolbar button {font-size:12px;padding:6px}
+.restored-consultation .consultation-columns {display:flex;flex-direction:column;gap:14px}
+.restored-consultation .consultation-context {padding:0;border:0;font-size:13px}
+.restored-consultation summary {cursor:pointer;font-size:12px;color:var(--foreground-muted);padding:8px 0}
+.restored-consultation .clinical-workbench {display:grid;grid-template-columns:minmax(280px,.8fr) minmax(0,1.4fr);gap:24px;align-items:start;margin:0}
+.restored-consultation .transcript-column {min-width:0;display:flex;flex-direction:column;gap:12px}
+.restored-consultation .transcript-column>.source-disclosure {order:2}
+.restored-consultation .transcript-column>.typed-source {order:3}
+.restored-consultation .findings-column {min-width:0;padding:0;border:0}
+.restored-consultation .clinical-section-heading {margin:0 0 16px;padding:14px 18px;border:1px solid var(--border);border-radius:10px;background:var(--surface);gap:12px}
+.restored-consultation .clinical-section-heading h2 {font-size:17px;margin:0 0 4px}
+.restored-consultation .clinical-section-heading p {font-size:12px;margin:0}
+.restored-consultation .section-number {font-size:12px}
+.restored-consultation .clinical-field {font-size:13px;margin:14px 0}
+.restored-consultation .clinical-field textarea {padding:10px 12px;min-height:74px;font-size:14px;border-radius:8px}
+.restored-consultation .clinical-proposals {border-radius:10px;margin:14px 0;padding:14px;background:var(--surface)}
+.restored-consultation .clinical-proposals h3 {font-size:14px;margin:0 0 10px}
+.restored-consultation .clinical-proposals h4 {font-size:12px;font-weight:600;color:var(--foreground-muted);margin:14px 0 6px}
+.restored-consultation .compact-context article {border:0;padding:0;margin:8px 0}
+.restored-consultation .compact-context article p {font-size:13px;margin:3px 0;line-height:1.5}
+.restored-consultation .compact-context article p:first-child {font-size:11px;color:var(--foreground-muted)}
+.restored-consultation .compact-context details {font-size:11px}
+.restored-consultation .emr-suggestion {padding:10px 0;border-bottom:1px solid var(--border)}
+.restored-consultation .emr-suggestion strong {font-size:12px;text-transform:capitalize}
+.restored-consultation .emr-suggestion p {margin:4px 0;font-size:14px}
+.restored-consultation .emr-waiting {font-size:12px;line-height:1.7;color:var(--foreground-muted);padding:12px 16px;background:var(--surface);border-radius:8px}
+.restored-consultation .clinical-inline {margin:10px 0;gap:8px}
+.restored-consultation .primary-button,.restored-consultation .quiet-button {font-size:12px;min-height:38px;padding:9px 14px;border-radius:7px}
+.restored-consultation .primary-button {background:#2563eb;color:white}
+.restored-consultation button:disabled {cursor:not-allowed}
+.restored-consultation .restored-scribe {height:560px;min-height:400px}
+.restored-consultation .scribe-controls {padding:14px;border-top:1px solid var(--border);background:var(--background-secondary)}
+.restored-consultation .scribe-controls p,.restored-consultation .speech-capture>p {font-size:12px;line-height:1.6;margin:6px 0}
+.restored-consultation .scribe-controls small,.restored-consultation .speech-capture>small {font-size:11px;color:var(--foreground-muted);line-height:1.5}
+.restored-consultation #chief-complaint-guidance {font-size:11px;color:var(--foreground-muted);margin-top:-8px;line-height:1.6}
+.restored-consultation .clinical-savebar {position:sticky;bottom:0;background:var(--background);padding:12px 0;z-index:2}
+.restored-consultation .clinical-measurement {grid-template-columns:1.2fr .7fr .7fr;gap:8px;background:var(--surface);border:1px solid var(--border);padding:12px;border-radius:8px}
+.restored-consultation .clinical-medication {padding:14px;gap:12px}
+.restored-consultation .clinical-observation-time {grid-column:1/-1}
+@media(min-width:1100px){.restored-consultation .transcript-column {position:sticky;top:16px;max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain}}
+@media(max-width:1000px){.restored-consultation .record-grid {grid-template-columns:1fr}.restored-consultation .record-nav {display:none}.restored-consultation .record-main {padding:18px}.restored-consultation .clinical-workbench {grid-template-columns:minmax(240px,.8fr) minmax(0,1.2fr);gap:16px}}
+@media(max-width:620px){.restored-consultation .clinical-workbench {grid-template-columns:1fr}.restored-consultation .record-header {padding:10px 16px}.restored-consultation .record-header .header-context {display:none}.restored-consultation .restored-scribe {height:440px}.restored-consultation .clinical-title {font-size:24px}.restored-consultation .clinical-primary-strip {flex-wrap:wrap}.restored-consultation .clinical-primary-strip>p {flex-basis:100%}}
