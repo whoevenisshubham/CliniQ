@@ -1,6 +1,7 @@
 /* CliniQ d2fadb62 ActiveConsultationClient: compact patient toolbar, ambient
    scribe left, sectioned EMR right. Scoped to consultations, not document UI. */
 .restored-consultation .record-app {--primary:#2563eb;--primary-hover:#1d4ed8;--primary-foreground:#fff;background:var(--background)}
+.dark .restored-consultation .record-app {--background:#0a0f1e;--background-secondary:#0d1526;--surface:#111827;--surface-elevated:#1a2540;--border:#26344f;--foreground:#e2e8f0;--foreground-muted:#a0afc4;--foreground-subtle:#8495af;--primary:#8ab4ff;--primary-hover:#abcaff}
 .restored-consultation .record-header {height:64px;padding:12px 24px}
 .restored-consultation .record-grid {grid-template-columns:180px minmax(0,1fr)}
 .restored-consultation .record-nav {padding:24px 16px;font-size:13px}
