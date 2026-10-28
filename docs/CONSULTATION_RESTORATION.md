@@ -17,7 +17,7 @@ legacy public mutation endpoints remain contained.
 
 Live interim text is provisional; checkpoint acknowledgements represent durable
 finals. Suggestions appear beside the EMR and require an explicit review action.
-They do not overwrite clinician fields. A later source or clinician revision
+The earlier and latest candidates have a compact comparison; the latest is expanded, with earlier details retained in a disclosure. They do not overwrite clinician fields. A later source or clinician revision
 makes an earlier candidate stale. Both source statements remain available.
 
 Findings saves update the authoritative revision from the receipt instead of

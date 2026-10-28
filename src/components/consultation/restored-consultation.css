@@ -67,3 +67,9 @@
 .restored-consultation .scribe-controls:empty {display:none}
 .restored-consultation .capture-diagnostics {padding:12px 0;font-size:12px;color:var(--foreground-muted)}
 .restored-consultation .capture-diagnostics small {font-size:11px;line-height:1.5}
+
+.restored-consultation .candidate-comparison {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:10px 0;border-block:1px solid var(--border)}
+.restored-consultation .candidate-comparison small {font-size:10px;color:var(--foreground-muted);text-transform:uppercase;letter-spacing:.04em}
+.restored-consultation .candidate-comparison p {font-size:13px;line-height:1.5;margin:6px 0}
+
+.restored-consultation .candidate-comparison:has(>div:only-child) {grid-template-columns:1fr}
