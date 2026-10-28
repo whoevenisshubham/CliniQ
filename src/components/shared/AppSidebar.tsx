@@ -122,9 +122,9 @@ const NAV_CONFIG: Record<UserRole, NavItem[]> = {
 // ─── Role labels & colors ─────────────────────────────────────────────────────
 
 const ROLE_META: Record<UserRole, { label: string; color: string; dot: string }> = {
-  doctor: { label: "Physician", color: "text-blue-400", dot: "bg-blue-400" },
+  doctor: { label: "Physician", color: "text-blue-700 dark:text-blue-300", dot: "bg-blue-400" },
   nurse: { label: "Nurse", color: "text-teal-400", dot: "bg-teal-400" },
-  patient: { label: "Patient", color: "text-green-400", dot: "bg-green-400" },
+  patient: { label: "Patient", color: "text-green-700 dark:text-green-300", dot: "bg-green-400" },
   admin: { label: "Administrator", color: "text-purple-400", dot: "bg-purple-400" },
   research: { label: "Researcher", color: "text-amber-400", dot: "bg-amber-400" },
   receptionist: { label: "Receptionist", color: "text-pink-400", dot: "bg-pink-400" },
@@ -178,7 +178,7 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
               className="overflow-hidden"
             >
               <span className="text-sm font-bold text-[var(--foreground)] tracking-tight">
-                CLINIQ<span className="text-blue-400">+</span>
+                CLINIQ<span className="text-blue-700 dark:text-blue-300">+</span>
               </span>
               <p className="text-[10px] text-[var(--foreground-subtle)] -mt-0.5 font-mono">
                 Clinical workspace
@@ -234,7 +234,7 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
                 className={cn(
                   "flex items-center gap-3 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer group",
                   isActive
-                    ? "bg-blue-600/15 text-blue-400 border border-blue-600/25"
+                    ? "bg-blue-600/15 text-blue-700 dark:text-blue-300 border border-blue-600/25"
                     : "text-[var(--foreground-muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
                 )}
                 title={collapsed ? item.label : undefined}
@@ -242,7 +242,7 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
                 <Icon
                   className={cn(
                     "w-4 h-4 shrink-0",
-                    isActive ? "text-blue-400" : "text-[var(--foreground-subtle)] group-hover:text-[var(--foreground-muted)]"
+                    isActive ? "text-blue-700 dark:text-blue-300" : "text-[var(--foreground-subtle)] group-hover:text-[var(--foreground-muted)]"
                   )}
                 />
                 <AnimatePresence>
@@ -307,7 +307,7 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
 
         <button
           onClick={onSignOut}
-          className="flex w-full items-center gap-3 px-2.5 py-2 rounded-lg text-xs text-red-400/70 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+          className="flex w-full items-center gap-3 px-2.5 py-2 rounded-lg text-xs text-red-700 dark:text-red-300 hover:bg-red-500/10 hover:text-red-400 transition-colors"
           title={collapsed ? "Sign Out" : undefined}
         >
           <LogOut className="w-4 h-4 shrink-0" />

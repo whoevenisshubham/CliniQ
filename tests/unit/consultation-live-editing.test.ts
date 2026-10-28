@@ -15,6 +15,15 @@ const original={id:'source-one',sequence:0,text:'Raw synthetic speech.',speaker:
 const base={visit:{id:'encounter-one',patient_id:'patient-one',workspace_id:'workspace-one',revision:0,status:'active',started_at:'2026-10-27T01:00:00Z'},draft:{revision:0,snapshot:emptySnapshot()},patient:{id:'patient-one',name:'Synthetic',allergies:[]},segments:[original],approved:[],history:[],documents:[],prescriptions:[],proposals:[]};
 const click=async(text:string)=>{const b=[...host.querySelectorAll('button')].find(b=>b.textContent===text);if(!b)throw Error('Missing '+text);await act(async()=>b.click());};
 const change=async(t:HTMLTextAreaElement,text:string)=>act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value')!.set!.call(t,text);t.dispatchEvent(new Event('input',{bubbles:true}));});
+
+it('a patient deep link reads only approved versions and never asks for a clinician draft',async()=>{
+ const approved=(id:string,consultation_id:string,chief:string)=>({id,consultation_id,source_revision:1,snapshot:{...emptySnapshot(),chief_complaint:chief},reviewed_at:'2026-10-28T00:00:00Z',amended_from_id:null});
+ const read=vi.fn<typeof fetch>(async()=>Response.json({data:{role:'patient',approved:[approved('version-one','encounter-one','Selected approved complaint'),approved('version-two','encounter-two','Other approved complaint')],prescriptions:[]}}));vi.stubGlobal('fetch',read);
+ await act(async()=>root.render(createElement(ConsultationReview,{actorId:'patient-one',provider:false,initialId:'encounter-one'})));
+ expect(read).toHaveBeenCalledTimes(1);expect(read.mock.calls[0][0]).toBe('/api/clinical');
+ expect(host.textContent).toContain('Selected approved complaint');expect(host.textContent).not.toContain('Other approved complaint');
+ expect(host.querySelector('a[href="/api/clinical/approved/version-one"]')).not.toBeNull();
+});
 it('local clinical editing stays responsive during capture and is retained over transcript-only saves',async()=>{
  let rev=0;vi.stubGlobal('fetch',vi.fn(async(url:string)=>Response.json({data:url.endsWith('/extract')?{available:false}:{...base,visit:{...base.visit,revision:rev},draft:{...base.draft,revision:rev}}})));
  await act(async()=>root.render(createElement(ConsultationReview,{actorId:'doctor-one',provider:true,initialId:'encounter-one'})));await click('Simulate capture');const t=host.querySelector<HTMLTextAreaElement>('[aria-describedby="chief-complaint-guidance"]')!;expect(t.disabled).toBe(false);await change(t,'My unsaved clinician finding');rev=1;await click('Finish simulated capture');expect(t.value).toBe('My unsaved clinician finding');expect(host.textContent).toContain('Your unsaved findings are retained');

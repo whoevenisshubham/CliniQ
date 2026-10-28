@@ -112,7 +112,7 @@ export function ConsultationReview({ actorId, provider, initialId = null, initia
     initialPatient?:string;
     fixture?: ClinicalDetail;
 }) {
-    const [listing, setListing] = useState<Listing | null>(null), [selected, setSelected] = useState<string | null>(initialId), [detail, setDetail] = useState<ClinicalDetail | null>(fixture ?? null);
+    const [listing, setListing] = useState<Listing | null>(null), [selected, setSelected] = useState<string | null>(provider?initialId:null), [detail, setDetail] = useState<ClinicalDetail | null>(fixture ?? null);
     const [snapshot, setSnapshot] = useState<ClinicalSnapshot>(fixture?.draft.snapshot ?? emptySnapshot()), [transcript, setTranscript] = useState("");
     const [speaker, setSpeaker] = useState<SavedSegment["speaker"]>("unknown"), [language, setLanguage] = useState<SavedSegment["language"]>("unknown");
     const [status, setStatus] = useState(fixture ? "visual fixture" : "loading"), [error, setError] = useState(""), [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false), [review, setReview] = useState(false), [confirmed, setConfirmed] = useState(false), [reasons, setReasons] = useState<Record<string, string>>({});
@@ -288,7 +288,7 @@ export function ConsultationReview({ actorId, provider, initialId = null, initia
   {!detail && !(provider&&selected) && <p className="section-intro">{provider ? "Keep the conversation beside your findings. Save a draft, review it, and approve a lasting record." : "Only clinician-approved versions appear here. Earlier versions remain visible when a correction is issued."}</p>}
   {error && <div className="clinical-error" role="alert"><p>{error}</p>{pending.current && <button className="quiet-button" disabled={busy} onClick={() => void commit(pending.current!.command, true)}>Retry / reconcile the same operation</button>}{status === "session expired" && <Link href="/login">Sign in again</Link>}</div>}
   {notice&&<p role="status">{notice}</p>}
-  {!detail && !provider && <div className="clinical-history">{listing?.approved?.length ? listing.approved.map(a => <ApprovedRecord key={a.id} record={a}/>) : <p>{status === "loading" ? "Loading approved history…" : "No approved visit records yet."}</p>}</div>}
+  {!detail && !provider && <div className="clinical-history">{initialId&&<Link href="/consultations">All approved visits</Link>}{listing?.approved?.some(a=>!initialId||a.consultation_id===initialId) ? listing.approved.filter(a=>!initialId||a.consultation_id===initialId).map(a => <ApprovedRecord key={a.id} record={a}/>) : <p>{status === "loading" ? "Loading approved history…" : "No approved visit records available for this selection."}</p>}</div>}
   {!detail && provider && selected && <section aria-label="Saved consultation" aria-busy={status==='loading'}><p>{status==='loading'?'Opening saved transcript and findings…':'The saved consultation could not be opened.'}</p>{status!=='loading'&&<button className="quiet-button" onClick={()=>void loadRef.current(selected)}>Load saved consultation</button>}</section>}
   {!detail && provider && !selected && <>
    <form className="clinical-start" onSubmit={e => {
