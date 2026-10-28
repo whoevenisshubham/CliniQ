@@ -78,7 +78,15 @@ export function normalizeClinicalFacts(raw:unknown,input:{sources:Evidence[];bas
  if(present.length||corrected.length){const preserved=snapshot.symptoms.filter(t=>!corrected.some(a=>sameAssertionSubject({kind:'symptom',text:t,medication:null},a)&&input.sources.some(s=>a.corrects_source_ids.includes(s.segmentId!)&&supports(t,s.text))));operations.push({op:'set_fact',path:'symptoms',value:[...new Set([...preserved,...present.map(f=>f.text)])],evidence_segment_ids:[...new Set(context.symptoms.flatMap(f=>[...f.source_ids,...f.corrects_source_ids]))],note:'Explicit source assertions; earlier correction history retained'});}
  const prescriptions=operations.filter(o=>o.path==='medications');if(prescriptions.length){
   const merged=new Map(snapshot.medications.map(m=>[normalizeClinicalWording(m.name),m]));
-  for(const op of prescriptions)for(const m of op.value as Medication[])merged.set(normalizeClinicalWording(m.name),{...m,id:merged.get(normalizeClinicalWording(m.name))?.id??m.id});
+  // MediFlow partial-slot merge adapted to the strict wire contract: null
+  // means unstated in this delta, not an instruction to erase a reviewed field.
+  // Explicit replacement values still win; retraction/uncertainty stays review-only.
+  for(const op of prescriptions)for(const m of op.value as Medication[]){
+   const key=normalizeClinicalWording(m.name),old=merged.get(key),next={...m,id:old?.id??m.id};
+   for(const field of ['dose','frequency','duration','route','instructions']as const)if(next[field]===null&&old)next[field]=old[field];
+   next.unknownFields=(['dose','frequency','duration','route']as const).filter(field=>next[field]===null);
+   validateClinicalSnapshot({...emptySnapshot(),medications:[next]});merged.set(key,next);
+  }
   for(let i=operations.length-1;i>=0;i--)if(operations[i].path==='medications')operations.splice(i,1);
   operations.push({op:'set_fact',path:'medications',value:[...merged.values()],evidence_segment_ids:[...new Set(prescriptions.flatMap(o=>o.evidence_segment_ids))],note:'Explicit new clinician prescriptions; unrelated reviewed prescriptions retained'});
  }

@@ -58,3 +58,17 @@ it('late proposal cannot overwrite a newer clinician-edited draft',()=>{
  const edited={...emptySnapshot(),chief_complaint:'Clinician-reviewed wording'};
  const candidate=proposalCandidate(edited,2,{baseRevision:1,throughSegmentId:sid,operations:p.operations});expect(candidate.state).toBe('stale');expect(candidate.snapshot).toEqual(edited);
 });
+
+it('merges strict nullable prescription fragments without erasing dose, duration or stable ID',()=>{
+ const q1='Prescribe ExampleMedicine 2.5 mg for two days.',q2='Take ExampleMedicine twice daily.';
+ const first=fact('prescription','ExampleMedicine 2.5 mg',q1,'present',{m:{n:'ExampleMedicine',d:'2.5 mg',f:null,du:'two days',r:null,i:null}});
+ const second=fact('prescription','ExampleMedicine twice daily',q2,'present',{m:{n:'ExampleMedicine',d:null,f:'twice daily',du:null,r:null,i:null}});
+ const a=normalizeClinicalFacts({facts:[first]},input([source(q1)]));const prior=(a.operations.find(o=>o.path==='medications')!.value as ReturnType<typeof emptySnapshot>['medications'])[0];
+ const b=normalizeClinicalFacts({facts:[second]},{...input([source(q2,later,1)]),draft:{...emptySnapshot(),medications:[prior]}});
+ const row=(b.operations.find(o=>o.path==='medications')!.value as ReturnType<typeof emptySnapshot>['medications'])[0];
+ expect(row).toMatchObject({id:prior.id,dose:'2.5 mg',frequency:'twice daily',duration:'two days',route:null,unknownFields:['route']});
+ const together=normalizeClinicalFacts({facts:[first,{...second,s:[1]}]},input([source(q1),source(q2,later,1)]));expect(together.operations.find(o=>o.path==='medications')!.value).toEqual([row]);
+ const q3='Actually, prescribe ExampleMedicine 5 mg.';
+ const c=normalizeClinicalFacts({facts:[fact('prescription','ExampleMedicine 5 mg',q3,'present',{s:[1],c:[0],m:{n:'ExampleMedicine',d:'5 mg',f:null,du:null,r:null,i:null}})]},{...input([source(q1),source(q3,later,1)]),draft:{...emptySnapshot(),medications:[row]}});
+ expect((c.operations.find(o=>o.path==='medications')!.value as typeof row[])[0]).toMatchObject({id:prior.id,dose:'5 mg',frequency:'twice daily',duration:'two days'});expect(prior.dose).toBe('2.5 mg');
+});
