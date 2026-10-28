@@ -41,3 +41,10 @@ it('does not call a Web Audio start failure microphone permission denial; closes
  await captureClip({signal:new AbortController().signal,onError,onClip,windowMs:60000});
  expect(onError).toHaveBeenCalledWith('AUDIO_START_NOT_ALLOWED');expect(onClip).not.toHaveBeenCalled();expect(stop).toHaveBeenCalledOnce();expect(close).toHaveBeenCalledOnce();
 });
+
+it('retains earlier medication fields when a later delta supplies only a frequency for the same stable ID',()=>{
+ const medicine={id:'retained-medicine',name:'SyntheticMedicine',dose:'2.5 mg',frequency:null,duration:'two days',route:'oral',instructions:'after food',unknownFields:['frequency'] as ('frequency')[]};
+ const before={...emptySnapshot(),medications:[medicine]};
+ const p=validateProposal({baseRevision:2,throughSegmentId:source.id,operations:[{op:'update_fact',path:'medications',value:[{id:medicine.id,frequency:'twice daily',unknownFields:[]}],evidence_segment_ids:[source.id]}]},[source]);
+ const after=proposalCandidate(before,2,p);expect(after.snapshot.medications).toEqual([{...medicine,frequency:'twice daily',unknownFields:[]}]);expect(before.medications[0].frequency).toBeNull();
+});

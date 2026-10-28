@@ -60,7 +60,9 @@ export function proposalCandidate(snapshot: ClinicalSnapshot, currentRevision: n
         if(op.path==='medications'&&Array.isArray(op.value)){
             const incoming=structuredClone(op.value) as Medication[];
             if(incoming.some(m=>!m||typeof m!=='object')||new Set(incoming.map(m=>m.id)).size!==incoming.length)throw new Error('CLINICAL_SCHEMA');
-            next.medications=[...next.medications.map(m=>incoming.find(n=>n.id===m.id)??m),...incoming.filter(m=>!next.medications.some(old=>old.id===m.id))];
+            // MediFlow 45fbfb85 merge.ts: merge partial medication fields, retain the
+            // rest of the row. V2 matches stable IDs instead of mutable indices.
+            next.medications=[...next.medications.map(m=>{const delta=incoming.find(n=>n.id===m.id);return delta?{...m,...Object.fromEntries(Object.entries(delta).filter(([,v])=>v!==undefined))}:m;}),...incoming.filter(m=>!next.medications.some(old=>old.id===m.id))];
         }else Object.assign(next, { [op.path]: structuredClone(op.value) });
     }
     return { state: 'review_required' as const, snapshot: next, requiresReview: true, uncertain };

@@ -138,6 +138,8 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
     const transcriptRef = useRef(transcript);
     transcriptRef.current = transcript;
     const hideAccess=useCallback((e:unknown)=>{if(!accessDenied(e))return;denied.current=true;++epoch.current;reads.current?.abort();pending.current=null;dirtyRef.current=false;setListing(null);setDetail(null);setSnapshot(emptySnapshot());setTranscript('');setCorrectionSource(null);setPatientChoice('');setReview(false);setReasons({});setConfirmed(false);setDirty(false);setNotice('');setSpeechTiming(null);setAccessLost(true);},[]);
+    const detailRef=useRef(detail);
+    useEffect(()=>{detailRef.current=detail;},[detail]);
     const load = useCallback(async (id: string | null, replace = false) => {
         if(denied.current)return;
         const token = ++epoch.current;
@@ -152,17 +154,19 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
             if (!mounted.current || token !== epoch.current)
                 return;
             if (id) {
+                const previous=detailRef.current;
+                if(previous&&data.visit.revision<previous.visit.revision)return;
                 if (dirtyRef.current && !replace) {
-                    if(detail&&JSON.stringify(data.draft.snapshot)===JSON.stringify(detail.draft.snapshot)){
+                    if(previous&&JSON.stringify(data.draft.snapshot)===JSON.stringify(previous.draft.snapshot)){
                         setDetail(data);setStatus('unsaved');setNotice('New speech or suggestions saved. Your unsaved findings are retained.');return;
                     }
-                    if (data.visit.revision !== detail?.visit.revision) {
+                    if (data.visit.revision !== previous?.visit.revision) {
                         setStatus("conflicted");
                         setError("This encounter changed in another session. Your unsaved input is retained; review it before reloading.");
                     }
                     return;
                 }
-                if (data.visit.revision !== detail?.visit.revision) {
+                if (data.visit.revision !== previous?.visit.revision) {
                     setConfirmed(false);
                     setReasons({});
                 }
@@ -182,7 +186,7 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
             setError(e instanceof Error ? e.message : "Unable to load consultation.");
             hideAccess(e);setStatus("view unavailable");
         }
-    }, [fixture, detail?.visit.revision,hideAccess]);
+    }, [fixture,hideAccess]);
     const loadRef = useRef(load);
     loadRef.current = load;
     const invalidate=useCallback(()=>{++epoch.current;reads.current?.abort();},[]);
@@ -265,7 +269,7 @@ export function ConsultationReview({ actorId, provider, initialId = null, fixtur
         }
     }
     const locked = busy || captureBusy || status === "session expired" || !!pending.current;
-    const inputLocked=status==='session expired'||(!!pending.current&&!busy);
+    const inputLocked=status==='session expired'||(!!pending.current&&(!busy||(pending.current.command as {action?:string}).action!=='save'));
     const checkpoint=(v:LiveCheckpoint)=>setDetail(old=>!old||v.revision<old.visit.revision?old:({...old,visit:{...old.visit,revision:v.revision},draft:{...old.draft,revision:v.revision},segments:old.segments.some(s=>s.id===v.id)?old.segments:[...old.segments,{id:v.id,sequence:v.sequence,text:v.text,speaker:'unknown',language:'unknown',startMs:null,endMs:null,source_type:'speech'}]}));
     const receiveProposal=(p:LiveCandidate)=>setDetail(old=>!old||!p.id?old:({...old,proposals:[...(old.proposals??[]).filter(x=>x.id!==p.id),{...p,id:p.id,source_snapshot:[],state:'review_required',result_kind:'live',created_at:new Date().toISOString()}]}));
     if(accessLost)return <RecordLayout provider={provider} section="consultations"><h1>Access changed</h1><p>Private clinical content and local drafts have been hidden.</p><Link href="/login">Sign in again</Link></RecordLayout>;

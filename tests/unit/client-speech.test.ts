@@ -26,7 +26,7 @@ it('unknown clip inspection never unlocks another send; retained recovery sends 
 it('availability denial propagates access loss and cannot enable capture',async()=>{
  const denied=vi.fn();vi.stubGlobal('fetch',vi.fn(()=>Promise.resolve(Response.json(null,{status:403}))));
  await act(async()=>root.render(createElement(SpeechCapture,{consultationId:'encounter-one',revision:0,sequence:0,disabled:false,fixture:false,onBusy:vi.fn(),onSaved:vi.fn(),onAccessLost:denied})));
- expect(denied).toHaveBeenCalledOnce();expect(button('Capture 15-second clip').disabled).toBe(true);
+ expect(denied).toHaveBeenCalledOnce();expect(button('Start live transcription').disabled).toBe(true);
 });
 it('only retained results permit save-only recovery; unknown and active states retain the operation',()=>{
  expect(speechPhase('responded')).toBe('retained');for(const state of ['outcome_unknown','unexpected'])expect(speechPhase(state)).toBe('unknown');for(const state of ['admitted','transmitting'])expect(speechPhase(state)).toBe('pending');expect(speechPhase('saved')).toBe('saved');
@@ -37,7 +37,7 @@ it('remaining audio admission bounds actual capture instead of implying a full 1
 });
 it('malformed successful preflight cannot enable capture beyond the supported bound',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>result({available:true,mode:'live',maxClipMs:900000})));
- await act(async()=>root.render(createElement(SpeechCapture,{consultationId:'encounter-one',revision:0,sequence:0,disabled:false,fixture:false,onBusy:vi.fn(),onSaved:vi.fn(),onAccessLost:vi.fn()})));expect(button('Capture 15-second clip').disabled).toBe(true);expect(captureClip).not.toHaveBeenCalled();
+ await act(async()=>root.render(createElement(SpeechCapture,{consultationId:'encounter-one',revision:0,sequence:0,disabled:false,fixture:false,onBusy:vi.fn(),onSaved:vi.fn(),onAccessLost:vi.fn()})));expect(button('Start live transcription').disabled).toBe(true);expect(captureClip).not.toHaveBeenCalled();
 });
 
 it('uses a sixty-second durable allowance without creating a second audio send',async()=>{

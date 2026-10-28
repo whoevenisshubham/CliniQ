@@ -104,7 +104,7 @@ it('clinical save recovers an unreadable commit through operation lookup without
 
 it('an unreadable approval remains recoverable inside its dialog and cannot replace the retained review',async()=>{
  let posts=0;vi.stubGlobal('fetch',vi.fn((url:string,init?:RequestInit)=>{if(url.endsWith('/speech'))return Promise.resolve(result({available:false,mode:'disabled'}));if(url.includes('/operations/'))return Promise.resolve(result({consultationId:'encounter-one',revision:0,status:'completed'}));if(init?.method){posts++;return Promise.resolve(new Response('',{status:200}));}return Promise.resolve(result({...clinical,draft:{...clinical.draft,snapshot:{...clinical.draft.snapshot,chief_complaint:'Saved synthetic complaint'}}}));}));
- await render(createElement(ConsultationReview,{actorId:'actor-one',provider:true,initialId:'encounter-one'}));await click('Review saved draft');
+ await render(createElement(ConsultationReview,{actorId:'actor-one',provider:true,initialId:'encounter-one'}));await click('Finish & review');
  const dialog=document.querySelector('[role="dialog"]')!;await act(async()=>dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());await click('Approve record');
  expect(dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')!.disabled).toBe(true);expect(button('Reconcile this approval').disabled).toBe(false);await click('Reconcile this approval');expect(posts).toBe(1);expect(document.querySelector('[role="dialog"]')).toBeNull();expect(host.textContent).toContain('Saved to the clinical record.');
 });
@@ -128,7 +128,7 @@ for(const c of [
 
 it('missing chief complaint directs focus to findings before approval without submitting or discarding the saved draft',async()=>{
  const posts:RequestInit[]=[];vi.stubGlobal('fetch',vi.fn((url:string,init?:RequestInit)=>{if(init?.method)posts.push(init);return Promise.resolve(result(url.endsWith('/speech')?{available:false,mode:'disabled'}:clinical));}));
- await render(createElement(ConsultationReview,{actorId:'actor-one',provider:true,initialId:'encounter-one'}));await click('Review saved draft');expect(document.querySelector('[role="dialog"]')).toBeNull();expect(host.textContent).toContain('Your saved transcript and draft are retained');expect(document.activeElement).toBe(host.querySelector('textarea[aria-describedby="chief-complaint-guidance"]'));expect(posts).toHaveLength(0);
+ await render(createElement(ConsultationReview,{actorId:'actor-one',provider:true,initialId:'encounter-one'}));await click('Finish & review');expect(document.querySelector('[role="dialog"]')).toBeNull();expect(host.textContent).toContain('Your saved transcript and draft are retained');expect(document.activeElement).toBe(host.querySelector('textarea[aria-describedby="chief-complaint-guidance"]'));expect(posts).toHaveLength(0);
 });
 
 it('confirmed findings save updates from its receipt instead of refetching private context',async()=>{

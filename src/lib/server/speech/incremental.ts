@@ -8,6 +8,7 @@ import {providerConfiguration} from '../ai/provider';
 // Reuses MediFlow's finalized-segment cursor and single-flight delta drain.
 // No retry of rejected/unknown work and no automatic allowance expansion.
 export function incrementalExtraction(client:SupabaseClient,admin:SupabaseClient,cid:string,emit:(event:unknown)=>void){
+ let debounce:ReturnType<typeof setTimeout>|undefined;
  let pending=false,running:Promise<void>|undefined,halted=false,passes=0,thread:Promise<string>|undefined,latestFinalAt=0,characters=0;
  const abort=new AbortController(),deadline=Date.now()+170000;
  const cancelQueued=async(jid:string)=>{const r=await admin.from('document_jobs').update({status:'cancelled',error_code:'LIVE_DRAIN_STOPPED'}).eq('id',jid).eq('status','queued').is('provider_attempt_id',null);if(r.error)throw Error('CANCELLATION_UNCONFIRMED');};
@@ -16,6 +17,7 @@ export function incrementalExtraction(client:SupabaseClient,admin:SupabaseClient
   while(pending&&!halted){
    pending=false;
    if(process.env.LIVE_EMR_INCREMENTAL_ENABLED!=='true')return;
+   if(Date.now()>=deadline){halted=true;emit({type:'emr_status',state:'session_deadline'});return;}
    const config=providerConfiguration();
    if(!config.enabled||++passes>8){halted=true;emit({type:'emr_status',state:'disabled_or_bounded'});return;}
    try{
@@ -29,8 +31,9 @@ export function incrementalExtraction(client:SupabaseClient,admin:SupabaseClient
     emit({type:'emr_status',state:'preparing'});const started=Date.now(),r=await runAIJob(admin,jid,undefined,abort.signal);
     if(halted)return;
     if(!['succeeded','recovered'].includes(r.status)){
-     // A paced/refused admission must not become an unattended later send.
-     if(r.status==='not_admitted')await cancelQueued(jid);
+     // Only a pre-transmission quota refusal may coalesce within this active,
+     // bounded session. Provider failures/unknown outcomes never retry.
+     if(r.status==='not_admitted'){await cancelQueued(jid);if(['MINUTE_PACING','TOKEN_WINDOW'].includes(r.reason??'')&&Date.parse(r.availableAt??'')>Date.now()){pending=true;emit({type:'emr_status',state:'waiting_for_allowed_time',waitMs:Date.parse(r.availableAt)-Date.now(),reason:r.reason});await wait(Math.min(61000,Date.parse(r.availableAt)-Date.now()));continue;}}
      halted=true;emit({type:'emr_status',state:r.status,reason:'reason'in r&&typeof r.reason==='string'&&/^[A-Z_]+$/.test(r.reason)?r.reason:undefined});return;
     }
     const job=await client.from('document_jobs').select('result').eq('id',jid).single();
@@ -42,6 +45,6 @@ export function incrementalExtraction(client:SupabaseClient,admin:SupabaseClient
    }catch{if(!halted)emit({type:'emr_status',state:'unconfirmed_no_retry'});halted=true;}
   }
  };
- const start=()=>{if(!running&&!halted)running=drain().finally(()=>{running=undefined;});};
- return {notify(finalAt=Date.now(),length=120){if(halted)return;latestFinalAt=finalAt;characters+=length;pending=true;if(characters>=120)start();},async finish(){if(pending&&!running)start();await running;},stop(){halted=true;pending=false;abort.abort();}};
+ const start=()=>{if(!running&&!halted)running=drain().finally(()=>{running=undefined;if(pending&&!halted)start();});};
+ return {notify(finalAt=Date.now(),length=120){if(halted)return;latestFinalAt=finalAt;characters+=length;pending=true;if(debounce)clearTimeout(debounce);if(characters>=120)debounce=setTimeout(start,1200);},async finish(){if(debounce)clearTimeout(debounce);if(pending&&!running)start();while(running)await running;},stop(){halted=true;pending=false;if(debounce)clearTimeout(debounce);abort.abort();}};
 }

@@ -100,10 +100,12 @@ export function LiveTranscriptPanel({
   className,
   controls,
 }: LiveTranscriptPanelProps) {
-  const bottomRef = useRef<HTMLDivElement>(null), scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null), scrollRef = useRef<HTMLDivElement>(null), previousCount=useRef(segments.length);
 
   // Auto-scroll to bottom on new segments
   useEffect(() => {
+    if(previousCount.current===segments.length&&!interimText)return;
+    previousCount.current=segments.length;
     const viewport = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]');
     // Follow only inside the transcript, and only while the reader is at its end.
     if (viewport && viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 100)
