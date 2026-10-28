@@ -37,3 +37,10 @@ it('typing while a findings save is in flight survives the authoritative receipt
  const t=host.querySelector<HTMLTextAreaElement>('[aria-describedby="chief-complaint-guidance"]')!;await change(t,'First saved wording');await click('Save findings');expect(t.disabled).toBe(false);await change(t,'Later unsaved wording');
  await act(async()=>finish(Response.json({data:{consultationId:'encounter-one',revision:1}})));expect(t.value).toBe('Later unsaved wording');expect(host.textContent).toContain('Unsaved findings');expect([...host.querySelectorAll('button')].find(b=>b.textContent==='Save findings')?.disabled).toBe(false);
 });
+
+it('shows the newest candidate pair chronologically even when a returning read is newest-first',async()=>{
+ const proposals=[4,3,2,1].map(n=>({id:'p'+n,base_revision:0,state:'review_required',result_kind:'offline_fixture',created_at:'2026-10-27T01:00:0'+n+'Z',source_snapshot:[],operations:[{op:'set_fact',path:'chief_complaint',value:'Candidate '+n,evidence_segment_ids:[original.id]}]}));
+ vi.stubGlobal('fetch',vi.fn(async(url:string)=>Response.json({data:url.endsWith('/extract')?{available:false}:{...base,proposals}})));
+ await act(async()=>root.render(createElement(ConsultationReview,{actorId:'doctor-one',provider:true,initialId:'encounter-one'})));
+ const text=host.textContent!;expect(text).not.toContain('Candidate 1');expect(text).not.toContain('Candidate 2');expect(text.indexOf('Candidate 3')).toBeLessThan(text.indexOf('Candidate 4'));
+});
