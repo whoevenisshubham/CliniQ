@@ -10,6 +10,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { ThemeToggle } from "../shared/ThemeProvider";
+import {useWorkspaceIdentity} from '../shared/WorkspaceIdentity';
+import {DashboardShell} from '../shared/DashboardShell';
 
 export type DocumentRow = {
   id: string;
@@ -79,6 +81,8 @@ export function RecordLayout({
   section?: "documents" | "consultations" | "evidence" | "care" | "continuity" | "account";
   reception?: boolean;
 }) {
+  const user=useWorkspaceIdentity();
+  if(user&&!fixture)return <div className="record-app"><DashboardShell user={user}><header className="record-header"><span className="header-context">{reception?'Reception workspace':provider?'Clinician workspace':'Personal health records'}</span><ThemeToggle/></header><div id="records-main" className="record-main">{children}</div></DashboardShell></div>;
   return (
     <div className="record-app">
       <a className="skip-link" href="#records-main">

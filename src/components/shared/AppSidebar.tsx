@@ -177,7 +177,7 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
               transition={{ duration: 0.15 }}
               className="overflow-hidden"
             >
-              <span className="text-sm font-bold text-white tracking-tight">
+              <span className="text-sm font-bold text-[var(--foreground)] tracking-tight">
                 CLINIQ<span className="text-blue-400">+</span>
               </span>
               <p className="text-[10px] text-[var(--foreground-subtle)] -mt-0.5 font-mono">
