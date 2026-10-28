@@ -2,7 +2,7 @@
    scribe left, sectioned EMR right. Scoped to consultations, not document UI. */
 .restored-consultation .record-app {--primary:#2563eb;--primary-hover:#1d4ed8;--primary-foreground:#fff;background:var(--background)}
 .dark .restored-consultation .record-app {--background:#0a0f1e;--background-secondary:#0d1526;--surface:#111827;--surface-elevated:#1a2540;--border:#26344f;--foreground:#e2e8f0;--foreground-muted:#a0afc4;--foreground-subtle:#8495af;--primary:#8ab4ff;--primary-hover:#abcaff}
-.restored-consultation .record-header {height:64px;padding:12px 24px}
+.restored-consultation .record-header {height:64px;min-height:64px;padding:12px 24px}
 .restored-consultation .record-grid {grid-template-columns:180px minmax(0,1fr)}
 .restored-consultation .record-nav {padding:24px 16px;font-size:13px}
 .restored-consultation .record-nav>a {padding:11px 12px;margin:4px 0;border-radius:8px}
@@ -10,14 +10,14 @@
 .restored-consultation .record-main {width:100%;max-width:1600px;padding:20px 28px}
 .restored-consultation .clinical-topline {margin:0;justify-content:space-between;font-size:11px}
 .restored-consultation .clinical-title {font-size:26px;margin:8px 0 12px;letter-spacing:-.025em}
-.restored-consultation .clinical-primary-strip {gap:16px;border-bottom:1px solid var(--border);padding-bottom:14px}
+.restored-consultation .clinical-primary-strip {gap:16px;padding-top:4px;border-bottom:1px solid var(--border);padding-bottom:14px}
 .restored-consultation .clinical-primary-strip p {font-size:12px;line-height:1.8;margin:0;flex:1}
 .restored-consultation .clinical-primary-strip>div {display:flex;gap:10px;flex-wrap:wrap}
-.restored-consultation .clinical-toolbar {margin:0 0 14px;padding:8px 0;border-top:0;font-size:12px;gap:16px}
-.restored-consultation .clinical-toolbar button {font-size:12px;padding:6px}
+.restored-consultation .clinical-toolbar {margin:0 0 8px;padding:4px 0;border-top:0;font-size:12px;gap:16px}
+.restored-consultation .clinical-toolbar button {font-size:12px;padding:4px;min-height:28px}
 .restored-consultation .consultation-columns {display:flex;flex-direction:column;gap:14px}
-.restored-consultation .consultation-context {padding:0;border:0;font-size:13px}
-.restored-consultation summary {cursor:pointer;font-size:12px;color:var(--foreground-muted);padding:8px 0}
+.restored-consultation .consultation-context {padding:0;border:0;margin:0;font-size:13px}
+.restored-consultation summary {cursor:pointer;font-size:12px;line-height:18px;color:var(--foreground-muted);padding:8px 0}
 .restored-consultation .clinical-workbench {display:grid;grid-template-columns:minmax(280px,.8fr) minmax(0,1.4fr);gap:24px;align-items:start;margin:0}
 .restored-consultation .transcript-column {min-width:0;display:flex;flex-direction:column;gap:12px}
 .restored-consultation .transcript-column>.source-disclosure {order:2}
@@ -56,3 +56,9 @@
 @media(min-width:1100px){.restored-consultation .transcript-column {position:sticky;top:16px;max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain}}
 @media(max-width:1000px){.restored-consultation .record-grid {grid-template-columns:1fr}.restored-consultation .record-nav {display:none}.restored-consultation .record-main {padding:18px}.restored-consultation .clinical-workbench {grid-template-columns:minmax(240px,.8fr) minmax(0,1.2fr);gap:16px}}
 @media(max-width:620px){.restored-consultation .clinical-workbench {grid-template-columns:1fr}.restored-consultation .record-header {padding:10px 16px}.restored-consultation .record-header .header-context {display:none}.restored-consultation .restored-scribe {height:440px}.restored-consultation .clinical-title {font-size:24px}.restored-consultation .clinical-primary-strip {flex-wrap:wrap}.restored-consultation .clinical-primary-strip>p {flex-basis:100%}}
+
+.restored-consultation .clinical-topline .eyebrow {margin:0;line-height:18px;font-size:10px}
+.restored-consultation .clinical-topline .record-state {padding:4px 8px;line-height:18px;font-size:11px}
+.restored-consultation .scribe-primary-controls {padding:10px 14px;border-bottom:1px solid var(--border);background:var(--background-secondary)}
+.restored-consultation .scribe-primary-controls p {font-size:12px;line-height:1.5;margin:0 0 8px}
+.restored-consultation .scribe-primary-controls .clinical-inline {margin:0}

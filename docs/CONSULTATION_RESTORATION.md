@@ -25,6 +25,10 @@ refetching patient history, prescriptions, documents and all source text. A late
 local edit survives that receipt. Background checkpoint events preserve the
 editor's node, focus and caret. Capture is keyed to the encounter, never to each
 new revision. Ordinary statuses stay local to the responsible action.
+Microphone and start/stop controls precede the transcript, so the initial screen
+does not require scrolling through source text to begin. The branch deployment
+selects the single Mumbai function region beside its isolated database through
+`vercel.json`; project-wide settings and production are not changed.
 
 Finalized speech coalesces for 1.2 seconds, with one extraction in flight.
 The 120-character opening threshold avoids spending a request on a fragment;
