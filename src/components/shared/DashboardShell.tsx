@@ -37,8 +37,9 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--background)]">
+      <a className="skip-link" href="#workspace-main">Skip to workspace</a>
       <AppSidebar user={user} onSignOut={handleSignOut} />
-      <main className="flex-1 overflow-y-auto">
+      <main id="workspace-main" className="min-w-0 flex-1 overflow-y-auto">
         {signOutError && <p role="alert" className="p-3 text-sm text-red-400">{signOutError}</p>}
         <motion.div
           initial={{ opacity: 0, y: 6 }}

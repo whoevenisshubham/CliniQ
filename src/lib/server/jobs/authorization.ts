@@ -1,2 +1,6 @@
 import {timingSafeEqual} from 'node:crypto';
-export function workerAuthorized(request:Request){const expected=process.env.DOCUMENT_DISPATCH_SECRET??'',supplied=request.headers.get('x-document-dispatch')??'';return expected.length>=32&&supplied.length<=512&&Buffer.byteLength(expected)===Buffer.byteLength(supplied)&&timingSafeEqual(Buffer.from(expected),Buffer.from(supplied));}
+function matches(expected:string,supplied:string){return expected.length>=32&&supplied.length<=512&&Buffer.byteLength(expected)===Buffer.byteLength(supplied)&&timingSafeEqual(Buffer.from(expected),Buffer.from(supplied));}
+export function workerAuthorized(request:Request){
+ return matches(process.env.DOCUMENT_DISPATCH_SECRET??'',request.headers.get('x-document-dispatch')??'')||
+  matches(process.env.RECOVERY_RUNNER_SECRET??'',request.headers.get('x-recovery-secret')??'');
+}

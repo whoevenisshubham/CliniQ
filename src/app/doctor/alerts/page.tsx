@@ -1,10 +1,3 @@
-import { redirect } from "next/navigation";
-import { requirePrincipal } from "@/lib/server/auth/context";
-
-export default async function SafetyAlertsPage() {
-  const user = await requirePrincipal().catch(()=>null);
-  if (!user) redirect("/login");
-  if(user.role==='nurse')redirect('/staff');
-  if(user.role!=='doctor')redirect('/login');
-  redirect('/consultations');
-}
+import {RoleHomePage} from '@/components/shared/RoleHomePage';
+export const dynamic='force-dynamic';
+export default function Page(){return <RoleHomePage role="doctor" view="safety"/>;}

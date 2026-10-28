@@ -1,2 +1,3 @@
-import {redirect} from 'next/navigation';
-export default function Page(){redirect('/records');}
+import {RoleHomePage} from '@/components/shared/RoleHomePage';
+export const dynamic='force-dynamic';
+export default function Page(){return <RoleHomePage role="doctor"/>;}

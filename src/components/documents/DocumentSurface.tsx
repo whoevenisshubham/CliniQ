@@ -97,6 +97,7 @@ export function RecordLayout({
             {reception ? "Clinic operations" : provider ? "Clinical workspace" : "Your workspace"}
           </p>
           {!reception && <><Link
+            href={provider?'/doctor':'/patient'}><ArrowLeft size={18}/>Workspace home</Link><Link
             aria-current={section === "documents" ? "page" : undefined}
             href={
               fixture

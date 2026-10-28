@@ -1,5 +1,11 @@
 # Durable work and recovery
 
+## Reviewable release-time runner (not enabled)
+
+`docs/release-recovery.workflow.yml.example` is deliberately outside the active workflow directory and contains no schedule. It proposes a manually dispatched, branch-restricted isolated-preview environment, dedicated `RECOVERY_RUNNER_SECRET`, read-only repository permissions, one concurrency group and a nine-minute job bound. It requires a reviewed exact deployed SHA and HTTPS preview origin. `scripts/release-recovery.mjs` checks source, parser assets and all provider execution flags before claiming at most three jobs sequentially. It awaits the actual worker response, rejects unknown/degraded/failure states and does not retry HTTP failures or transmit clinical text. Worker SQL leases/fences remain authoritative.
+
+The existing worker endpoint accepts the separate recovery header only when a dedicated secret is configured. No credential was created/configured and this workflow was not activated. Deployment Protection remains enabled; a runner would need an approved scoped access mechanism before use. No dispatch or service credential is embedded in source. Receipts expose only source, origin, bounded status categories and timestamps; previous successful receipt time is explicitly `unknown` if absent and `stale` after one hour. That input is a previously verified receipt, not an invented health signal. It is not an automated persistent monitoring dashboard. Manual recovery, future unattended execution and successful scheduled acceptance remain separate.
+
 SQL owns document/AI jobs, speech operations and continuing-care intentions. No browser timer is the durable queue. Local explicit maintenance, the background function and the scheduled function use shared recovery code.
 
 ## Partial failures
