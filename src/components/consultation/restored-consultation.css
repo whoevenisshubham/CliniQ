@@ -62,3 +62,8 @@
 .restored-consultation .scribe-primary-controls {padding:10px 14px;border-bottom:1px solid var(--border);background:var(--background-secondary)}
 .restored-consultation .scribe-primary-controls p {font-size:12px;line-height:1.5;margin:0 0 8px}
 .restored-consultation .scribe-primary-controls .clinical-inline {margin:0}
+
+.restored-consultation .speech-capture {margin:0;padding:0;border:0}
+.restored-consultation .scribe-controls:empty {display:none}
+.restored-consultation .capture-diagnostics {padding:12px 0;font-size:12px;color:var(--foreground-muted)}
+.restored-consultation .capture-diagnostics small {font-size:11px;line-height:1.5}
