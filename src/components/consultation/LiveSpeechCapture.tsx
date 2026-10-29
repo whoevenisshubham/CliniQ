@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useRef,useState} from 'react';
 import {captureClip} from '@/lib/clinical/capture';
+import {MAX_STREAM_SPEECH_MS} from '@/lib/clinical/audio';
 import {LiveSpeechTiming} from '@/lib/clinical/live-timing';
 import {LiveTranscriptPanel} from '../doctor/LiveTranscriptPanel';
 import type {SavedSegment} from '@/lib/contracts/clinical';
@@ -31,14 +32,14 @@ export function LiveSpeechCapture({cid,revision,sequence,disabled,onBusy,onSaved
    if(!mounted.current||typeof event.data!=='string'||event.data.length>30000)return;
    let r;try{r=JSON.parse(event.data);}catch{end('Invalid live response; no automatic reconnect.');ws.close();return;}
    if(r.type==='ready'){
-    if(!Number.isInteger(r.capMs)||r.capMs<1000||r.capMs>60000){end('Invalid audio allowance');ws.close();return;}
+    if(!Number.isInteger(r.capMs)||r.capMs<1000||r.capMs>MAX_STREAM_SPEECH_MS){end('Invalid audio allowance');ws.close();return;}
     const c=new AbortController();capture.current=c;startedAt.current=performance.now();setState('Listening · automatic stop at '+Math.ceil(r.capMs/1000)+' seconds · interim text is provisional');
-    void captureClip({signal:c.signal,windowMs:r.capMs,onFrame:pcm=>{if(stopped.current)return;energyTiming.current.observe(pcm,performance.now());if(ws.readyState!==WebSocket.OPEN||ws.bufferedAmount>262144){end('Audio connection interrupted; no automatic resend.');ws.close();return;}ws.send(new Uint8Array(pcm).buffer);},onClip:()=>stop(),onError:code=>{end('Live capture: '+code);ws.close();}}).then(handle=>{finish.current=handle?.finish;});
+    void captureClip({signal:c.signal,windowMs:r.capMs,streamOnly:true,onStreamEnd:()=>stop(),onFrame:pcm=>{if(stopped.current)return;energyTiming.current.observe(pcm,performance.now());if(ws.readyState!==WebSocket.OPEN||ws.bufferedAmount>262144){end('Audio connection interrupted; no automatic resend.');ws.close();return;}ws.send(new Uint8Array(pcm).buffer);},onClip:()=>stop(),onError:code=>{end('Live capture: '+code);ws.close();}}).then(handle=>{finish.current=handle?.finish;});
    }else if(r.type==='interim'&&typeof r.text==='string'&&r.text.length<=8000){energyTiming.current.interim(performance.now());setInterim(r.text);if(!firstInterim.current){firstInterim.current=true;interimElapsed.current=Math.round(performance.now()-startedAt.current);setLatency(v=>({...v,interimMs:interimElapsed.current}));}}
    else if(r.type==='final'&&typeof r.text==='string'&&r.text.length<=8000){energyTiming.current.final(performance.now());setFinal(r.text);setInterim('');}
    else if(r.type==='stop_capture')stop();
    else if(r.type==='checkpoint'&&Number.isInteger(r.revision)&&typeof r.id==='string'&&typeof r.text==='string'&&Number.isInteger(r.sequence)){setCheckpoints(old=>old.some(s=>s.id===r.id)?old:[...old,r]);onCheckpoint?.(r);setState((stopped.current?'Final speech saved · finishing EMR through revision ':'Listening · final speech saved through revision ')+r.revision);}
-   else if(r.type==='emr_status'&&typeof r.state==='string')setEmrState(r.state==='preparing'?'Preparing reviewable EMR from saved speech…':r.state==='waiting_for_allowed_time'?'Free-quota pacing: next EMR admission in '+Math.ceil((r.waitMs??0)/1000)+' seconds. Final speech is already saved.':'EMR: '+r.state+(typeof r.reason==='string'&&/^[A-Z_]+$/.test(r.reason)?' · '+r.reason:'')+'. No automatic retry.');
+   else if(r.type==='emr_status'&&typeof r.state==='string')setEmrState(r.state==='waiting_for_finish'?'Initial EMR proposal saved. Final EMR will include later speech after you stop.':r.state==='preparing'?'Preparing reviewable EMR from saved speech…':r.state==='waiting_for_allowed_time'?'Free-quota pacing: next EMR admission in '+Math.ceil((r.waitMs??0)/1000)+' seconds. Final speech is already saved.':'EMR: '+r.state+(typeof r.reason==='string'&&/^[A-Z_]+$/.test(r.reason)?' · '+r.reason:'')+'. No automatic retry.');
    else if(r.type==='emr_proposal'&&Number.isInteger(r.proposal?.base_revision)&&Array.isArray(r.proposal.operations)&&r.proposal.operations.length<=30){finalToEmr.current=r.finalSegmentToEmrMs;onProposal?.(r.proposal);setEmrState('EMR proposal persisted in '+r.elapsedMs+' ms · clinician review required');}
    else if(r.type==='demo_closed')setDemoState(r.confirmed?'Finite demonstration allowances disabled. Saved candidates remain reviewable.':'Allowance cleanup unconfirmed; do not start another session.');
    else if(r.type==='transcript_saved'){savedAt.current=performance.now();setLatency(v=>({...v,stopToSavedMs:stoppedAt.current?Math.round(savedAt.current-stoppedAt.current):undefined}));setState('Transcript saved · finishing EMR work');}

@@ -1,4 +1,8 @@
 export const MAX_SPEECH_MS = 60000;
+// Batch WAV admission stays at one minute. Streaming sends bounded PCM frames
+// and reserves separate connection time for finalization on the Free host.
+export const MAX_STREAM_SPEECH_MS = 180000;
+export const STREAM_FINISH_BUDGET_MS = 110000;
 export const MAX_SPEECH_PCM_BYTES = 1920000;
 // Only the canonical 44-byte PCM container emitted below is admitted.
 export const SPEECH_WAV_OVERHEAD = 44;

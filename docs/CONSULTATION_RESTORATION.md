@@ -70,3 +70,25 @@ incremental EMR quality and latency remain owner-demonstration gates.
 Print HTML can be visually inspected. Browser print-dialog pagination, actual
 200% zoom and the previously blocked scheduling behavioral check remain separate
 gates until a permitted verification path is available.
+# Bounded multi-minute streaming
+
+The streaming adapter supports an explicitly authorized three-minute PCM session;
+the batch WAV path keeps its independent one-minute limit. Stream-only capture
+does not accumulate the recording or construct a large WAV at stop. The database
+reserves the full audio cap once and gives that stream a cap-derived receipt
+lease. Excess frames, stale access, invalid receipts and unknown outcomes remain
+terminal, with no automatic reconnect or fallback.
+
+For a multi-minute finite packet limited to two EMR requests, the first proposal
+can appear during speech. The second is held until stop to include later finals
+and corrections. It is not sent again when no new evidence arrived. Both still
+use the durable account token window and unchanged per-call/aggregate budgets;
+the UI distinguishes waiting for stop from quota pacing and provider failure.
+
+The live function has a 300-second runtime envelope, with at most 180 seconds of
+audio and a bounded 110-second finishing budget. This is a finite Preview test
+envelope, not a claim that ordinary consultations must end at three minutes.
+Current provider quality and actual multi-minute hosted duration still require
+the owner-triggered acceptance session. Implementation/isolated tests do not
+establish those results.
+

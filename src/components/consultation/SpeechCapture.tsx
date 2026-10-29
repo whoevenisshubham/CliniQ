@@ -1,6 +1,6 @@
 "use client";
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {MAX_SPEECH_MS,validateWav} from '@/lib/clinical/audio';
+import {MAX_SPEECH_MS,MAX_STREAM_SPEECH_MS,validateWav} from '@/lib/clinical/audio';
 import {LiveSpeechCapture,type LiveCheckpoint,type LiveCandidate} from './LiveSpeechCapture';
 import type {SavedSegment} from '@/lib/contracts/clinical';
 import {captureClip} from '@/lib/clinical/capture';
@@ -29,7 +29,7 @@ export function SpeechCapture({consultationId,revision,sequence,disabled,fixture
  useEffect(()=>{
   live.current=true;const n=generation.current,abort=new AbortController();
   if(!fixture)void fetch(path,{cache:'no-store',signal:AbortSignal.any([abort.signal,AbortSignal.timeout(30000)])})
-   .then(r=>readJsonResponse(r,b=>speechResponse(b,'availability'))).then(b=>{if(live.current&&generation.current===n){setAvailable(b.data.available===true);setStreaming(b.data.streaming===true);if(Number.isInteger(b.data.maxClipMs)&&b.data.maxClipMs>=1000&&b.data.maxClipMs<=MAX_SPEECH_MS)setMaxClipMs(b.data.maxClipMs);setState(b.data.available?(b.data.mode==='live'?'Speech transport configured · allowance checked before send':'Synthetic offline transport · no live speech'):'Speech unavailable · continue with typed transcript');}})
+   .then(r=>readJsonResponse(r,b=>speechResponse(b,'availability'))).then(b=>{if(live.current&&generation.current===n){setAvailable(b.data.available===true);setStreaming(b.data.streaming===true);if(Number.isInteger(b.data.maxClipMs)&&b.data.maxClipMs>=1000&&b.data.maxClipMs<=(b.data.streaming===true?MAX_STREAM_SPEECH_MS:MAX_SPEECH_MS))setMaxClipMs(b.data.maxClipMs);setState(b.data.available?(b.data.mode==='live'?'Speech transport configured · allowance checked before send':'Synthetic offline transport · no live speech'):'Speech unavailable · continue with typed transcript');}})
    .catch(e=>{if(live.current&&generation.current===n){if(accessDenied(e))callbacks.current.onAccessLost(e);else setState('Speech status unavailable · typed transcript remains available');}});
   return()=>{live.current=false;abort.abort();invalidate();};
  },[path,fixture,invalidate]);

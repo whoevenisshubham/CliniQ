@@ -4,17 +4,21 @@ import type {SupabaseClient} from '@supabase/supabase-js';
 import {createThread,admitAI} from '../ai/service';
 import {runAIJob} from '../ai/runner';
 import {providerConfiguration} from '../ai/provider';
+import {MAX_STREAM_SPEECH_MS,STREAM_FINISH_BUDGET_MS} from '@/lib/clinical/audio';
 
 // Reuses MediFlow's finalized-segment cursor and single-flight delta drain.
 // No retry of rejected/unknown work and no automatic allowance expansion.
-export function incrementalExtraction(client:SupabaseClient,admin:SupabaseClient,cid:string,emit:(event:unknown)=>void){
+export function incrementalExtraction(client:SupabaseClient,admin:SupabaseClient,cid:string,emit:(event:unknown)=>void,options:{audioWindowMs?:number;finalAfterStop?:boolean}={}){
  let debounce:ReturnType<typeof setTimeout>|undefined;
  let pending=false,running:Promise<void>|undefined,halted=false,passes=0,thread:Promise<string>|undefined,latestFinalAt=0,characters=0;
- const abort=new AbortController(),deadline=Date.now()+170000;
+ let finishing=false,deferredUntilFinish=false,successful=0;
+ const abort=new AbortController(),deadline=Date.now()+Math.min(MAX_STREAM_SPEECH_MS,options.audioWindowMs??60000)+STREAM_FINISH_BUDGET_MS;
  const cancelQueued=async(jid:string)=>{const r=await admin.from('document_jobs').update({status:'cancelled',error_code:'LIVE_DRAIN_STOPPED'}).eq('id',jid).eq('status','queued').is('provider_attempt_id',null);if(r.error)throw Error('CANCELLATION_UNCONFIRMED');};
  const wait=(ms:number)=>new Promise<void>((resolve,reject)=>{if(abort.signal.aborted){reject(Error('STOPPED'));return;}const stop=()=>{clearTimeout(timer);reject(Error('STOPPED'));};const timer=setTimeout(()=>{abort.signal.removeEventListener('abort',stop);resolve();},ms);abort.signal.addEventListener('abort',stop,{once:true});});
  const drain=async()=>{
   while(pending&&!halted){
+   if(options.finalAfterStop&&successful>=2){pending=false;return;}
+   if(options.finalAfterStop&&successful===1&&!finishing){deferredUntilFinish=true;emit({type:'emr_status',state:'waiting_for_finish'});return;}
    pending=false;
    if(process.env.LIVE_EMR_INCREMENTAL_ENABLED!=='true')return;
    if(Date.now()>=deadline){halted=true;emit({type:'emr_status',state:'session_deadline'});return;}
@@ -41,10 +45,10 @@ export function incrementalExtraction(client:SupabaseClient,admin:SupabaseClient
     if(job.error||typeof id!=='string')throw Error('PROPOSAL_UNAVAILABLE');
     const p=await client.from('clinical_proposals').select('*').eq('id',id).single();
     if(p.error||!p.data)throw Error('PROPOSAL_UNAVAILABLE');
-    if(!halted)emit({type:'emr_proposal',proposal:p.data,elapsedMs:Date.now()-started,finalSegmentToEmrMs:Date.now()-cutoff});
+    if(!halted){successful++;emit({type:'emr_proposal',proposal:p.data,elapsedMs:Date.now()-started,finalSegmentToEmrMs:Date.now()-cutoff});}
    }catch{if(!halted)emit({type:'emr_status',state:'unconfirmed_no_retry'});halted=true;}
   }
  };
- const start=()=>{if(!running&&!halted)running=drain().finally(()=>{running=undefined;if(pending&&!halted)start();});};
- return {notify(finalAt=Date.now(),length=120){if(halted)return;latestFinalAt=finalAt;characters+=length;pending=true;if(debounce)clearTimeout(debounce);if(characters>=120)debounce=setTimeout(start,1200);},async finish(){if(debounce)clearTimeout(debounce);if(pending&&!running)start();while(running)await running;},stop(){halted=true;pending=false;if(debounce)clearTimeout(debounce);abort.abort();}};
+ const start=()=>{if(!running&&!halted&&!deferredUntilFinish)running=drain().finally(()=>{running=undefined;if(pending&&!halted&&!deferredUntilFinish)start();});};
+ return {notify(finalAt=Date.now(),length=120){if(halted)return;latestFinalAt=finalAt;characters+=length;pending=true;if(debounce)clearTimeout(debounce);if(characters>=120)debounce=setTimeout(start,1200);},async finish(){finishing=true;deferredUntilFinish=false;if(debounce)clearTimeout(debounce);if(pending&&!running)start();while(running)await running;},stop(){halted=true;pending=false;if(debounce)clearTimeout(debounce);abort.abort();}};
 }

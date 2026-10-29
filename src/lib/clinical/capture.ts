@@ -1,4 +1,4 @@
-import { encodeWav, MAX_SPEECH_MS, PcmStreamEncoder } from './audio';
+import { encodeWav, MAX_SPEECH_MS, MAX_STREAM_SPEECH_MS, PcmStreamEncoder } from './audio';
 // Capture lifecycle/PCM processing adapted from MediFlow useSTT 45fbfb85 and
 // CliniQ useMedicalScribe d2fadb62. This bounded local adapter has no transport,
 // keys or automatic provider/model selection. Start only after a user action.
@@ -9,9 +9,11 @@ export async function captureClip(options: {
     windowMs?: number;
     onCaptureEnd?: () => void;
     onFrame?: (pcm:Uint8Array) => void;
+    streamOnly?: boolean;
+    onStreamEnd?: () => void;
 }) {
     const windowMs = options.windowMs ?? 15000;
-    if (windowMs < 1000 || windowMs > MAX_SPEECH_MS)
+    if (!Number.isInteger(windowMs)||windowMs < 1000 || windowMs > (options.streamOnly?MAX_STREAM_SPEECH_MS:MAX_SPEECH_MS) || options.streamOnly&&(!options.onFrame||!options.onStreamEnd))
         throw new Error('INVALID_CAPTURE_WINDOW');
     let stage: 'microphone-access' | 'audio-start' | 'audio-processing' = 'microphone-access';
     let stream: MediaStream | null = null, context: AudioContext | null = null, source: MediaStreamAudioSourceNode | null = null, processor: ScriptProcessorNode | null = null, gain: GainNode | null = null;
@@ -53,6 +55,7 @@ export async function captureClip(options: {
             if (!length)
                 throw new Error('CAPTURE_EMPTY');
             options.onCaptureEnd?.();
+            if(options.streamOnly){stop();options.onStreamEnd!();return;}
             const samples = new Float32Array(length);
             let offset = 0;
             for (const frame of frames) {
@@ -70,7 +73,7 @@ export async function captureClip(options: {
         processor.onaudioprocess = event => { if (closed)
             return; const frame = event.inputBuffer.getChannelData(0).slice(0, maxSamples - length); if (frame.length) {
             options.onFrame?.(pcmEncoder.encode(frame));
-            frames.push(frame);
+            if(!options.streamOnly)frames.push(frame);
             length += frame.length;
         } if (length >= maxSamples)
             finish(); };

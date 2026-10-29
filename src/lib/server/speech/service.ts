@@ -5,7 +5,7 @@ import type {SupabaseClient} from '@supabase/supabase-js';
 import {resolvePrincipal} from '../auth/context';
 import {HttpError} from '../http';
 import {id} from '../documents/service';
-import {validateWav,MAX_SPEECH_MS,MAX_SPEECH_WAV_BYTES} from '@/lib/clinical/audio';
+import {validateWav,MAX_SPEECH_MS,MAX_STREAM_SPEECH_MS,MAX_SPEECH_WAV_BYTES} from '@/lib/clinical/audio';
 import {speechTransport,speechConfiguration,SpeechOutputError,SpeechUnavailableError} from './transport';
 async function modelSchema(client:SupabaseClient){try{const r=await client.rpc('optional_capabilities');return !r.error&&r.data?.speech_model_binding===1;}catch{return false;}}
 function check(error:{code:string;message:string}|null){if(!error)return;const codes:Record<string,number>={AUTH_REQUIRED:401,NOT_FOUND:404,SYNTHETIC_ONLY:403,IDEMPOTENCY_CONFLICT:409,REVISION_CONFLICT:409,OPERATION_LIMIT:429,INVALID_AUDIO:422,RESULT_UNAVAILABLE:409};throw new HttpError(codes[error.message]??(['23514','22P02','23505'].includes(error.code)?422:503),codes[error.message]?error.message:'SPEECH_UNAVAILABLE','Speech processing is unavailable or conflicts with the saved encounter. Your existing record is unchanged.');}
@@ -21,7 +21,8 @@ export async function speechAvailability(client:SupabaseClient,admin:()=>Supabas
  const a=allowance.data,configuration=mode==='live'?speechConfiguration():{model:'nova-2',language:'hi'};if(!a||!configuration||a.model!==configuration.model||a.requested_language!==configuration.language||a.used_requests>=a.max_requests||a.max_audio_ms-a.used_audio_ms<1000)return{available:false,mode,reason:'No matching audio allowance remains. Continue with typed transcript.'};
  if(mode==='live'&&Date.parse(a.next_send_at)>now)return{available:false,mode,reason:'Speech is waiting for its allowed send time. Typed transcript remains available.'};
  const stream=process.env.SPEECH_STREAMING_ENABLED==='true'?await client.rpc('speech_stream_capability'):null;
- return{available:true,mode,streaming:!!stream&&!stream.error&&stream.data===1,maxClipMs:Math.min(MAX_SPEECH_MS,a.max_audio_ms-a.used_audio_ms),reason:'Exact audio allowance is checked again before transmission.'};
+ const streaming=!!stream&&!stream.error&&stream.data===1;
+ return{available:true,mode,streaming,maxClipMs:Math.min(streaming?MAX_STREAM_SPEECH_MS:MAX_SPEECH_MS,a.max_audio_ms-a.used_audio_ms),reason:'Exact audio allowance is checked again before transmission.'};
 }
 export async function readAudio(request:Request){if(request.headers.get('content-type')?.split(';')[0].trim().toLowerCase()!=='audio/wav')throw new HttpError(415,'WAV_REQUIRED','Send a bounded PCM WAV clip.');const reader=request.body?.getReader();if(!reader)throw new HttpError(400,'AUDIO_REQUIRED','An audio clip is required.');let size=0;const parts:Uint8Array[]=[];const deadline=AbortSignal.any([request.signal,AbortSignal.timeout(30000)]);const aborted=new Promise<never>((_,reject)=>{const fail=()=>reject(new HttpError(408,'AUDIO_UPLOAD_TIMEOUT','Audio upload stopped before admission.'));if(deadline.aborted)fail();else deadline.addEventListener('abort',fail,{once:true});});try{while(true){const r=await Promise.race([reader.read(),aborted]);if(r.done)break;size+=r.value.byteLength;if(size>MAX_SPEECH_WAV_BYTES){await reader.cancel();throw new HttpError(413,'AUDIO_SIZE_LIMIT','Audio clip exceeds the bounded size.');}parts.push(r.value);}}finally{reader.releaseLock();}const bytes=new Uint8Array(size);let offset=0;for(const p of parts){bytes.set(p,offset);offset+=p.length;}return bytes;}
 export async function transcribeClip(client:SupabaseClient,admin:SupabaseClient,input:{cid:string;key:string;segmentId:string;sequence:number;expectedRevision:number;bytes:Uint8Array;signal:AbortSignal}){
