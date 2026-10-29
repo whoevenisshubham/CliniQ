@@ -36,7 +36,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--background)]">
+    <div className="role-shell flex h-screen overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
       <a className="skip-link" href="#workspace-main">Skip to workspace</a>
       <AppSidebar user={user} onSignOut={handleSignOut} />
       <main id="workspace-main" className="min-w-0 flex-1 overflow-y-auto">
