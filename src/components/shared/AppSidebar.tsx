@@ -3,7 +3,7 @@
 import React, { useState,useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname,useSearchParams } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   Activity,
   Users,
@@ -146,8 +146,8 @@ interface SidebarProps {
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
-const subscribeCompact=(notify:()=>void)=>{const query=window.matchMedia('(max-width: 639px)');query.addEventListener('change',notify);return()=>query.removeEventListener('change',notify);};
-const compactSnapshot=()=>window.matchMedia('(max-width: 639px)').matches;
+const subscribeCompact=(notify:()=>void)=>{const query=window.matchMedia('(max-width: 1023px)');query.addEventListener('change',notify);return()=>query.removeEventListener('change',notify);};
+const compactSnapshot=()=>window.matchMedia('(max-width: 1023px)').matches;
 export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
   const pathname = usePathname();
   const historyView=useSearchParams().get('view')==='history';
@@ -169,7 +169,7 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-600 shrink-0">
           <Activity className="w-4 h-4 text-white" />
         </div>
-        <AnimatePresence>
+        <>
           {!collapsed && (
             <motion.div
               initial={{ opacity: 0, x: -10 }}
@@ -186,7 +186,7 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
               </p>
             </motion.div>
           )}
-        </AnimatePresence>
+        </>
       </div>
 
       {/* ─── User card ─────────────────────────────────────────── */}
@@ -200,7 +200,7 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
             {/* Online dot */}
             <span className={cn("absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[var(--sidebar-bg)]", roleMeta.dot)} />
           </div>
-          <AnimatePresence>
+          <>
             {!collapsed && (
               <motion.div
                 initial={{ opacity: 0, x: -8 }}
@@ -217,7 +217,7 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
                 </p>
               </motion.div>
             )}
-          </AnimatePresence>
+          </>
         </div>
       </div>
 
@@ -246,7 +246,7 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
                     isActive ? "text-blue-700 dark:text-blue-300" : "text-[var(--foreground-subtle)] group-hover:text-[var(--foreground-muted)]"
                   )}
                 />
-                <AnimatePresence>
+                <>
                   {!collapsed && (
                     <motion.span
                       initial={{ opacity: 0 }}
@@ -258,7 +258,7 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
                       {item.label}
                     </motion.span>
                   )}
-                </AnimatePresence>
+                </>
                 {!collapsed && item.badge && (
                   <Badge
                     variant={item.badgeVariant === "destructive" ? "destructive" : "default"}
@@ -287,7 +287,7 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
           title={collapsed ? "Notifications" : undefined}
         >
           <Bell className="w-4 h-4 shrink-0" />
-          <AnimatePresence>
+          <>
             {!collapsed && (
               <motion.span
                 initial={{ opacity: 0 }}
@@ -298,7 +298,7 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
                 Notifications unavailable
               </motion.span>
             )}
-          </AnimatePresence>
+          </>
           {!collapsed && alertCount > 0 && (
             <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4">
               {alertCount}
@@ -312,7 +312,7 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
           title={collapsed ? "Sign Out" : undefined}
         >
           <LogOut className="w-4 h-4 shrink-0" />
-          <AnimatePresence>
+          <>
             {!collapsed && (
               <motion.span
                 initial={{ opacity: 0 }}
@@ -322,7 +322,7 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
                 Sign Out
               </motion.span>
             )}
-          </AnimatePresence>
+          </>
         </button>
       </div>
 
