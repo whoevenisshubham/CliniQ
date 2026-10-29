@@ -1,7 +1,8 @@
+import { containLegacyRoute } from "@/lib/server/containment";
 import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase-server";
 
-export async function GET(
+async function legacyGET(
     _request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
@@ -47,7 +48,7 @@ export async function GET(
     }
 }
 
-export async function POST(
+async function legacyPOST(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
@@ -93,3 +94,7 @@ export async function POST(
         return NextResponse.json({ error: "Failed to create appointment" }, { status: 500 });
     }
 }
+
+// Quarantined pending scoped service and database-policy verification.
+export const GET = containLegacyRoute(legacyGET);
+export const POST = containLegacyRoute(legacyPOST);

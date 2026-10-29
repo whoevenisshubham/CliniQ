@@ -1,12 +1,14 @@
 import { redirect } from "next/navigation";
-import { getServerUser } from "@/lib/auth";
-import { PatientAccountClient } from "@/components/patient/PatientAccountClient";
+import {requirePrincipal} from '@/lib/server/auth/context';
+import {AccountWorkspace} from '@/components/patient/AccountWorkspace';
+import {WorkspaceFrame} from '@/components/shared/WorkspaceFrame';
+export const dynamic='force-dynamic';
 
 export default async function PatientAccountPage() {
-    const user = await getServerUser();
+    const user = await requirePrincipal().catch(()=>null);
 
     if (!user) redirect("/login");
     if (user.role !== "patient") redirect("/login");
 
-    return <PatientAccountClient user={user} />;
+    return <WorkspaceFrame principal={user}><AccountWorkspace key={user.id} /></WorkspaceFrame>;
 }

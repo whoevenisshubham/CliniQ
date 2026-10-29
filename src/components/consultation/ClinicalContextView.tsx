@@ -1,0 +1,10 @@
+import {emptyContext,sameAssertionSubject,type ClinicalContext} from '@/lib/clinical/context';
+export function ClinicalContextView({value,compact=false}:{value?:ClinicalContext|Record<string,never>;compact?:boolean}){
+ const c=value&&Array.isArray(value.symptoms)?value as ClinicalContext:emptyContext(),all=[...c.symptoms,...c.medication_history,...c.statements];
+ if(!all.length)return null;
+ return <section aria-label="Source-bound clinical context" className={compact?"clinical-proposals compact-context":"clinical-proposals"}><h3>Reported facts & medication history</h3>{!compact&&<p>Denied and uncertain statements stay separate from positive symptoms. Existing medicines are history, not new prescriptions.</p>}{(['symptoms','medication_history','statements']as const).map(field=>c[field].length>0&&<div key={field}><h4>{field==='symptoms'?'Symptoms · positive / denied / uncertain':field==='medication_history'?'Existing medication history':'History, allergies & unresolved statements'}</h4>{c[field].map(a=>{
+ const corrected=all.some(b=>b.id!==a.id&&sameAssertionSubject(a,b)&&b.corrects_source_ids.some(id=>a.source_ids.includes(id)));
+ const conflict=all.some(b=>b.id!==a.id&&sameAssertionSubject(a,b)&&b.polarity!==a.polarity&&!b.corrects_source_ids.some(id=>a.source_ids.includes(id))&&!a.corrects_source_ids.some(id=>b.source_ids.includes(id)));
+ return <article key={a.id}><p><strong>{a.polarity==='absent'?'Explicitly denied':a.polarity==='uncertain'?'Uncertain · review required':'Reported present'}</strong>{corrected?' · earlier statement, corrected later':''}{conflict?' · conflicting source statements; review required':''}{a.corrects_source_ids.length?' · explicit correction of earlier source':''}</p><p>{a.text}</p>{a.medication&&<p>{a.medication.name} · {a.medication.dose??'dose unknown'} · {a.medication.frequency??'frequency unknown'}</p>}<details><summary>Source wording & correction history</summary><blockquote>{a.quote}</blockquote>{[...new Set([...a.source_ids,...a.corrects_source_ids])].map(id=><a className="text-link" href={'#segment-'+id} key={id}>Source {id.slice(0,8)} ↗ </a>)}</details></article>;
+ })}</div>)}</section>;
+}

@@ -1,3 +1,4 @@
+import { containLegacyRoute } from "@/lib/server/containment";
 import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase-server";
 import type { AuditEntry } from "@/lib/types";
@@ -7,7 +8,7 @@ import type { AuditEntry } from "@/lib/types";
  * Commits an audit entry (with SHA-256 chain hash) to Supabase audit_logs table.
  * Uses service-role client to bypass RLS — audit logs are write-only from server.
  */
-export async function POST(request: Request) {
+async function legacyPOST(request: Request) {
   try {
     const body = await request.json();
     const { entry }: { entry: AuditEntry } = body;
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
  * GET /api/audit?consultationId=xxx
  * Retrieves the audit chain for a consultation.
  */
-export async function GET(request: Request) {
+async function legacyGET(request: Request) {
   const { searchParams } = new URL(request.url);
   const consultationId = searchParams.get("consultationId");
 
@@ -106,3 +107,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ entries: [] });
   }
 }
+
+// Quarantined pending scoped service and database-policy verification.
+export const POST = containLegacyRoute(legacyPOST);
+export const GET = containLegacyRoute(legacyGET);

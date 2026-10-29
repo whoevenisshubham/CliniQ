@@ -1,0 +1,31 @@
+{
+  "version": "1",
+  "reviewed": "2026-10-23",
+  "purpose": "Small general explanation corpus; never patient-specific diagnosis or treatment. Wording is original short paraphrase, links credit the authoritative source. No third-party images/full article copied.",
+  "entries": [
+    {
+      "id": "ref-hba1c-meaning-v1",
+      "title": "What HbA1c measures",
+      "text": "HbA1c is a blood test reflecting average blood glucose over approximately the previous two to three months.",
+      "source": "https://medlineplus.gov/lab-tests/hemoglobin-a1c-hba1c-test/",
+      "publisher": "U.S. National Library of Medicine, MedlinePlus",
+      "scope": "general definition only; not diagnostic thresholds or patient interpretation"
+    },
+    {
+      "id": "ref-reference-range-v1",
+      "title": "Reading a report reference range",
+      "text": "A reference range is a comparison range printed by the laboratory. Ranges can differ by laboratory method and patient group. A result outside or within that range is not, by itself, a complete assessment of health.",
+      "source": "https://medlineplus.gov/lab-tests/how-to-understand-your-lab-results/",
+      "publisher": "U.S. National Library of Medicine, MedlinePlus",
+      "scope": "Use the range on the actual patient source; never substitute this corpus for it."
+    },
+    {
+      "id": "ref-results-context-v1",
+      "title": "Results need context",
+      "text": "Clinicians interpret laboratory findings alongside health history, examination and other relevant information. A laboratory result alone may not explain a person’s condition.",
+      "source": "https://medlineplus.gov/lab-tests/how-to-understand-your-lab-results/",
+      "publisher": "U.S. National Library of Medicine, MedlinePlus",
+      "scope": "general explanation only; no diagnosis, medicine or follow-up advice"
+    }
+  ]
+}

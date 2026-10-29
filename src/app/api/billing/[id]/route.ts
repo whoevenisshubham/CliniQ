@@ -1,0 +1,3 @@
+import {getSupabaseServerClient} from '@/lib/supabase-server';import {billingView,billingReview} from '@/lib/server/billing/service';import {errorResponse,privateJson,readJson,requireSameOrigin} from '@/lib/server/http';
+export async function GET(_request:Request,{params}:{params:Promise<{id:string}>}){try{return privateJson({data:await billingView(await getSupabaseServerClient(),(await params).id)});}catch(e){return errorResponse(e);}}
+export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){try{requireSameOrigin(request);return privateJson({data:await billingReview(await getSupabaseServerClient(),request.headers.get('idempotency-key')??'',(await params).id,await readJson(request,8192))});}catch(e){return errorResponse(e);}}

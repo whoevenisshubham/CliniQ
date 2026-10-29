@@ -1,3 +1,4 @@
+import { containLegacyRoute } from "@/lib/server/containment";
 import { NextResponse } from "next/server";
 import { Groq } from "groq-sdk";
 
@@ -25,7 +26,7 @@ JSON format:
   ]
 }`;
 
-export async function POST(request: Request) {
+async function legacyPOST(request: Request) {
     const groq = getGroq();
     try {
         const { transcriptChunk, patientAllergies, chronicConditions } = await request.json();
@@ -76,3 +77,6 @@ Transcript Snippet:
         );
     }
 }
+
+// Quarantined pending scoped service and database-policy verification.
+export const POST = containLegacyRoute(legacyPOST);

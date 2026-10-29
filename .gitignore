@@ -19,6 +19,7 @@
 
 # production
 /build
+/public/build-identity.json
 
 # misc
 .DS_Store
@@ -44,8 +45,14 @@ next-env.d.ts
 nul
 con
 prn
-<<<<<<< HEAD
 aux
-=======
-aux
->>>>>>> a5fa477498d95bd0fb2a14b21c9ecdf9a46aa7fe
+
+!.env.example
+/playwright-report/
+/test-results/
+# Private execution materials must stay outside this repository.
+/CLINIQ_PLUS_V2_EXECUTION_PACK*/
+/tests/infra/.runtime/
+/tests/infra/supabase/.temp/
+/tests/infra/supabase/.branches/
+/supabase/.temp/

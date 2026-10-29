@@ -1,8 +1,9 @@
+import { containLegacyRoute } from "@/lib/server/containment";
 import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase-server";
 
 // POST — Save prescriptions from a consultation
-export async function POST(
+async function legacyPOST(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
@@ -46,3 +47,6 @@ export async function POST(
         return NextResponse.json({ error: "Failed to save prescriptions" }, { status: 500 });
     }
 }
+
+// Quarantined pending scoped service and database-policy verification.
+export const POST = containLegacyRoute(legacyPOST);

@@ -1,8 +1,9 @@
+import { containLegacyRoute } from "@/lib/server/containment";
 import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase-server";
 
 // POST — Register a new patient
-export async function POST(request: Request) {
+async function legacyPOST(request: Request) {
     try {
         const body = await request.json();
         const { name, phone, dob, gender, blood_group, abha_id, allergies, chronic_conditions, emergency_contact, address } = body;
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
 }
 
 // GET — Search patients by phone, name, or ABHA ID
-export async function GET(request: Request) {
+async function legacyGET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const query = searchParams.get("q") ?? "";
@@ -86,3 +87,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ patients: [] });
     }
 }
+
+// Quarantined pending scoped service and database-policy verification.
+export const POST = containLegacyRoute(legacyPOST);
+export const GET = containLegacyRoute(legacyGET);

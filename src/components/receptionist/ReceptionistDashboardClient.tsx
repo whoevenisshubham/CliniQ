@@ -66,7 +66,21 @@ const DOCTORS = [
     { id: "demo-doctor-002", name: "Dr. Neha Patel", department: "General Medicine" },
 ];
 
+async function loadQueue(): Promise<QueueEntry[] | null> {
+    try {
+        const response = await fetch("/api/queue");
+        if (!response.ok) return null;
+        const data = await response.json();
+        return Array.isArray(data.queue) ? data.queue : null;
+    } catch { return null; }
+}
+
 export function ReceptionistDashboardClient({ user }: ReceptionistDashboardClientProps) {
+    const [clock, setClock] = useState(() => Date.now());
+    useEffect(() => {
+        const timer = setInterval(() => setClock(Date.now()), 30000);
+        return () => clearInterval(timer);
+    }, []);
     const [activeTab, setActiveTab] = useState<"queue" | "register" | "vitals">("queue");
     const [queue, setQueue] = useState<QueueEntry[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
@@ -94,14 +108,17 @@ export function ReceptionistDashboardClient({ user }: ReceptionistDashboardClien
 
     // Fetch queue
     const fetchQueue = useCallback(async () => {
-        try {
-            const res = await fetch("/api/queue");
-            const data = await res.json();
-            if (data.queue) setQueue(data.queue);
-        } catch { /* fallback */ }
+        const rows = await loadQueue();
+        if (rows) setQueue(rows);
     }, []);
 
-    useEffect(() => { fetchQueue(); const interval = setInterval(fetchQueue, 10000); return () => clearInterval(interval); }, [fetchQueue]);
+    useEffect(() => {
+        let active = true;
+        const refresh = () => loadQueue().then(rows => { if (active && rows) setQueue(rows); });
+        refresh();
+        const interval = setInterval(refresh, 10000);
+        return () => { active = false; clearInterval(interval); };
+    }, []);
 
     // Search patients
     const handleSearch = useCallback(async (q: string) => {
@@ -377,7 +394,7 @@ export function ReceptionistDashboardClient({ user }: ReceptionistDashboardClien
                             queue.map((entry, i) => {
                                 const priorityCfg = PRIORITY_CONFIG[entry.priority as keyof typeof PRIORITY_CONFIG] ?? PRIORITY_CONFIG.normal;
                                 const statusCfg = STATUS_CONFIG[entry.status] ?? STATUS_CONFIG.waiting;
-                                const waitMinutes = Math.round((Date.now() - new Date(entry.check_in_time).getTime()) / 60000);
+                                const waitMinutes = Math.round((clock - new Date(entry.check_in_time).getTime()) / 60000);
                                 const hasVitals = Object.keys(entry.vitals_recorded ?? {}).length > 0;
 
                                 return (

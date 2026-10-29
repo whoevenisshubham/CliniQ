@@ -1,10 +1,3 @@
-import { redirect } from "next/navigation";
-import { getServerUser } from "@/lib/auth";
-import { PatientsClient } from "@/components/doctor/PatientsClient";
-
-export default async function PatientsPage() {
-  const user = await getServerUser();
-  if (!user) redirect("/login");
-  if (!["doctor", "nurse"].includes(user.role)) redirect("/login");
-  return <PatientsClient user={user} />;
-}
+import {RoleHomePage} from '@/components/shared/RoleHomePage';
+export const dynamic='force-dynamic';
+export default function Page(){return <RoleHomePage role="doctor" view="patients"/>;}

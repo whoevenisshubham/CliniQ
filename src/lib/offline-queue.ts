@@ -12,6 +12,7 @@
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface OfflineQueueEntry {
+  actorId?: string;
   id: string;
   consultationId: string;
   patientName: string;
@@ -31,7 +32,14 @@ export interface QueueStats {
 
 // ─── Storage key ──────────────────────────────────────────────────────────────
 
-const QUEUE_KEY = "nexusmd_offline_queue";
+// Legacy global data is retained untouched and never automatically imported.
+// Recovery remains opt-in and actor scoped; M3 must wire committed draft saves.
+let activeActor: string | null = null;
+export function configureOfflineActor(actorId: string | null) { activeActor=actorId; }
+function queueKey():string|null {
+  if(typeof window==="undefined" || !activeActor) return null;
+  return localStorage.getItem(`cliniq:offline-opt-in:${activeActor}`)==="true" ? `cliniq:offline:${activeActor}` : null;
+}
 const MAX_QUEUE_SIZE = 50; // prevent unbounded localStorage growth
 
 // ─── Core helpers ─────────────────────────────────────────────────────────────
@@ -39,8 +47,9 @@ const MAX_QUEUE_SIZE = 50; // prevent unbounded localStorage growth
 function readQueue(): OfflineQueueEntry[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(QUEUE_KEY);
-    return raw ? (JSON.parse(raw) as OfflineQueueEntry[]) : [];
+    const key=queueKey();if(!key) return [];
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as OfflineQueueEntry[]).filter(entry=>entry.actorId===activeActor) : [];
   } catch {
     return [];
   }
@@ -48,13 +57,14 @@ function readQueue(): OfflineQueueEntry[] {
 
 function writeQueue(entries: OfflineQueueEntry[]): void {
   if (typeof window === "undefined") return;
+  const key=queueKey();if(!key) return;
   try {
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(entries));
+    localStorage.setItem(key, JSON.stringify(entries));
   } catch {
     // localStorage quota exceeded — drop oldest synced entries and retry
     const trimmed = entries.filter((e) => !e.synced).slice(-MAX_QUEUE_SIZE);
     try {
-      localStorage.setItem(QUEUE_KEY, JSON.stringify(trimmed));
+      localStorage.setItem(key, JSON.stringify(trimmed));
     } catch {
       // silently fail — rural mode best-effort
     }
@@ -73,8 +83,10 @@ export function enqueueOfflineEntry(params: {
   transcript: string;
   durationMs: number;
 }): string {
+  if(!queueKey() || !activeActor) return "";
   const id = `offline-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const entry: OfflineQueueEntry = {
+    actorId:activeActor,
     id,
     consultationId: params.consultationId,
     patientName: params.patientName,
@@ -141,6 +153,15 @@ export function getQueueStats(): QueueStats {
 // ─── Sync a single entry via /api/extract ────────────────────────────────────
 
 export async function syncEntry(entry: OfflineQueueEntry): Promise<boolean> {
+  // Extraction success is not persisted clinical state. Keep automatic replay
+  // closed until M3's authorized revision-aware draft service replaces it.
+  if(entry.actorId!==activeActor || !queueKey()) return false;
+  markSyncError(entry.id,"Draft synchronization is not available yet.");
+  return false;
+}
+
+// Preserved for M3 adaptation; deliberately unreachable from exported sync.
+async function legacySyncEntry(entry: OfflineQueueEntry): Promise<boolean> {
   try {
     const res = await fetch("/api/extract", {
       method: "POST",
@@ -158,6 +179,7 @@ export async function syncEntry(entry: OfflineQueueEntry): Promise<boolean> {
     return false;
   }
 }
+void legacySyncEntry;
 
 /** Sync all pending entries sequentially. Returns count of successfully synced. */
 export async function syncAllPending(onProgress?: (done: number, total: number) => void): Promise<number> {

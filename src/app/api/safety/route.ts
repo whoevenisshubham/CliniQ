@@ -1,7 +1,8 @@
+import { containLegacyRoute } from "@/lib/server/containment";
 import { NextResponse } from "next/server";
 import { checkSafetyConsistencies, DEMO_PATIENT_ALLERGIES } from "@/lib/safety-guard";
 
-export async function POST(request: Request) {
+async function legacyPOST(request: Request) {
   try {
     const { medications, patientAllergies, consultationId } = await request.json();
 
@@ -34,3 +35,6 @@ export async function POST(request: Request) {
     );
   }
 }
+
+// Quarantined pending scoped service and database-policy verification.
+export const POST = containLegacyRoute(legacyPOST);

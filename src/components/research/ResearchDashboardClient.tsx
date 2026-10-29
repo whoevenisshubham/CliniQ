@@ -1,126 +1,24 @@
 "use client";
-
-import React from "react";
-import { motion } from "framer-motion";
-import { FlaskConical, Globe, BarChart3, Database, TrendingUp, MapPin } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-
-interface ResearchDashboardClientProps {
-  user: { id: string; name: string; email: string; role: string };
-}
-
-export function ResearchDashboardClient({ user }: ResearchDashboardClientProps) {
-  return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto">
-      <div>
-        <h1 className="text-xl font-bold text-[var(--foreground)]">Research Insights</h1>
-        <p className="text-sm text-[var(--foreground-muted)] mt-0.5">
-          Anonymized population health data · Personal data hidden via ZK-Proofs
-        </p>
-      </div>
-
-      {/* ZK-Proof notice */}
-      <div className="flex items-center gap-3 p-3 rounded-lg bg-green-500/10 border border-green-500/25">
-        <div className="w-6 h-6 flex items-center justify-center rounded-full bg-green-500/20">
-          <Database className="w-3 h-3 text-green-400" />
-        </div>
-        <div>
-          <p className="text-xs font-medium text-green-300">Zero-Knowledge Privacy Active</p>
-          <p className="text-[10px] text-[var(--foreground-muted)]">
-            All patient identifiers (name, DOB, ABHA ID) are cryptographically hidden. You access de-identified insights only.
-          </p>
-        </div>
-        <Badge variant="success" className="ml-auto text-[9px] shrink-0">HIPAA Compliant</Badge>
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "Total Cases", value: "12,847", delta: "De-identified", icon: Database },
-          { label: "Disease Clusters", value: "23", delta: "Active tracking", icon: Globe },
-          { label: "ICD Codes Mapped", value: "4,219", delta: "Unique codes", icon: FlaskConical },
-          { label: "Epidemiology Models", value: "8", delta: "Active regions", icon: MapPin },
-        ].map((stat, i) => {
-          const Icon = stat.icon;
-          return (
-            <motion.div key={stat.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-xs text-[var(--foreground-subtle)]">{stat.label}</p>
-                      <p className="text-2xl font-bold text-[var(--foreground)] mt-0.5">{stat.value}</p>
-                      <p className="text-[10px] text-[var(--foreground-subtle)] mt-1">{stat.delta}</p>
-                    </div>
-                    <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-blue-500/10">
-                      <Icon className="w-4 h-4 text-blue-400" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          );
-        })}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top conditions */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-blue-400" />
-              Top Conditions (Feb 2026)
-              <Badge variant="secondary" className="ml-auto text-[9px]">Monsoon season</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {[
-              { condition: "Type 2 Diabetes (E11)", count: 1847, pct: 78 },
-              { condition: "Hypertension (I10)", count: 1623, pct: 68 },
-              { condition: "Dengue Fever (A90)", count: 812, pct: 34 },
-              { condition: "Upper Respiratory (J06)", count: 654, pct: 27 },
-              { condition: "Malaria (B54)", count: 431, pct: 18 },
-            ].map((item, i) => (
-              <div key={i} className="space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-xs text-[var(--foreground-muted)]">{item.condition}</span>
-                  <span className="text-[10px] text-[var(--foreground-subtle)]">{item.count.toLocaleString()} cases</span>
-                </div>
-                <Progress value={item.pct} className="h-1.5" indicatorClassName="bg-blue-500" />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Epid model */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-amber-400" />
-              Adaptive Epidemiology Model
-              <Badge variant="warning" className="ml-auto text-[9px]">High dengue risk</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-xs text-[var(--foreground-muted)]">Context-aware probability adjustments active:</p>
-            {[
-              { factor: "Season: Monsoon (July–Sept)", adjustment: "+34% vector disease", color: "text-amber-400" },
-              { factor: "Region: Urban Metro (Delhi)", adjustment: "+22% lifestyle diseases", color: "text-blue-400" },
-              { factor: "Cluster: Ages 45–65", adjustment: "+18% diabetes/hypertension", color: "text-purple-400" },
-              { factor: "Network: +12 dengue cases nearby", adjustment: "+41% dengue probability", color: "text-red-400" },
-            ].map((f, i) => (
-              <div key={i} className="flex items-start gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-[var(--foreground-subtle)] mt-1.5 shrink-0" />
-                <div className="flex-1">
-                  <p className="text-xs text-[var(--foreground-muted)]">{f.factor}</p>
-                  <p className={`text-[10px] font-medium ${f.color}`}>{f.adjustment}</p>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
+import {useCallback,useEffect,useRef,useState} from 'react';
+import Link from 'next/link';
+import {FlaskConical,Download} from 'lucide-react';
+import {Card,CardContent,CardHeader,CardTitle} from '@/components/ui/card';
+import {ThemeToggle} from '../shared/ThemeProvider';
+import {readJsonResponse} from '@/lib/client/http-response';
+type Release={id:string;quarter:string;createdAt:string;state:'released'|'withheld'|'withdrawn';visitsLowerBound?:number;participantsLowerBound?:number};
+type Data={workspaceId:string;canManage:boolean;coverage:string;members:{id:string;name:string;enabled:boolean;revision:number}[];releases:Release[]};
+export function ResearchDashboardClient({workspaces,view='overview'}:{workspaces:{id:string;name:string}[];view?:string}){
+ const [workspace,setWorkspace]=useState(workspaces[0]?.id??''),[data,setData]=useState<Data|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false),[quarter,setQuarter]=useState('');
+ const pending=useRef<{key:string;body:unknown}|null>(null),[uncertain,setUncertain]=useState(false),serial=useRef(0),reads=useRef<AbortController|null>(null);
+ const load=useCallback(async()=>{const token=++serial.current;reads.current?.abort();const controller=new AbortController();reads.current=controller;setLoading(true);setError('');try{const r=await fetch('/api/research?workspace='+workspace,{cache:'no-store',signal:AbortSignal.any([controller.signal,AbortSignal.timeout(30000)])});const b=await readJsonResponse(r,x=>{const d=(x as {data?:Data})?.data;return d?.workspaceId===workspace&&typeof d.canManage==='boolean'&&Array.isArray(d.releases)&&Array.isArray(d.members);});if(token===serial.current)setData(b.data);}catch{if(!controller.signal.aborted&&token===serial.current){setData(null);setError('No current aggregate-release access is available for this workspace. An active research membership and separate administrator authorization are required. Unavailable data is not a zero count.');}}finally{if(token===serial.current)setLoading(false);}},[workspace]);
+ const invalidate=useCallback(()=>{++serial.current;reads.current?.abort();},[]);
+ useEffect(()=>{if(workspace)void load();return invalidate;},[workspace,load,invalidate]);
+ async function send(body:unknown,recover=false){if(busy)return;const op=recover?pending.current:{key:crypto.randomUUID(),body};if(!op)return;pending.current=op;setBusy(true);setError('');try{const r=await fetch('/api/research',{method:'POST',headers:{'content-type':'application/json','idempotency-key':op.key},body:JSON.stringify(op.body),signal:AbortSignal.timeout(30000)});await readJsonResponse(r,x=>{const d=(x as {data?:{releaseId?:string;memberId?:string}})?.data;return typeof d?.releaseId==='string'||typeof d?.memberId==='string';});pending.current=null;setUncertain(false);await load();}catch(e){const status=(e as {status?:number}).status;if(status&&[400,401,403,404,409,422].includes(status)){pending.current=null;setUncertain(false);setData(null);setError('The action was rejected or saved state changed. Refresh before making another decision.');}else{setUncertain(true);setError('Outcome unconfirmed. Recover the same operation; do not create a duplicate release or authorization.');}}finally{setBusy(false);}}
+ return <div className="mx-auto max-w-6xl p-5 sm:p-8"><header className="mb-5 flex items-center justify-between gap-3"><div><h1 className="flex items-center gap-2 text-2xl font-semibold"><FlaskConical size={24}/>Research {view==='overview'?'insights':view}</h1><p className="mt-2 text-sm text-[var(--foreground-muted)]">Authorized aggregate care activity · no individual patient records</p></div><ThemeToggle/></header>
+ <div className="mb-5 flex flex-wrap items-center gap-3"><label>Workspace <select className="rounded border border-[var(--border)] bg-[var(--surface)] p-2" value={workspace} disabled={busy||uncertain} onChange={e=>{setData(null);setWorkspace(e.target.value);}}>{workspaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label><button className="quiet-button" disabled={loading||busy||!workspace} onClick={()=>void load()}>Refresh authorization</button></div>
+ {!workspace&&<p>No assigned research workspace. No clinical access is inferred from the role name.</p>}{loading&&<p role="status">Checking released data…</p>}{error&&<p role="alert" className="mb-4">{error}</p>}{uncertain&&<button className="quiet-button" disabled={busy} onClick={()=>void send(null,true)}>Recover same operation</button>}
+ {data&&<><Card><CardHeader><CardTitle>Released quarterly cohorts</CardTitle></CardHeader><CardContent><p className="mb-4 text-sm">Only completed UTC quarters with at least five explicitly consenting patients can be released. Counts are rounded down to multiples of five. No dynamic patient, disease, age or location filters are offered.</p>{!data.releases.length?<p>No aggregate release has been published. This does not mean there were no patients or visits.</p>:<div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr><th className="p-2">Quarter</th><th className="p-2">Status</th><th className="p-2">Participants</th><th className="p-2">Approved visits</th><th className="p-2">Export</th></tr></thead><tbody>{data.releases.map(r=><tr key={r.id} className="border-t border-[var(--border)]"><td className="p-2">{r.quarter.slice(0,7)}</td><td className="p-2">{r.state}</td><td className="p-2">{r.state==='released'?`${r.participantsLowerBound}+`:'Not disclosed'}</td><td className="p-2">{r.state==='released'?`${r.visitsLowerBound}+`:'Not disclosed'}</td><td className="p-2">{r.state==='released'?<a className="inline-flex items-center gap-1 underline" href={`/api/research?workspace=${workspace}&release=${r.id}&format=csv`}><Download size={14}/>CSV</a>:'Unavailable'}</td></tr>)}</tbody></table></div>}<p className="mt-4 text-sm text-[var(--foreground-muted)]">A release is withdrawn from future reads/downloads if a contributing authorization changes or an included record is amended. Already downloaded files cannot be recalled. Cohort thresholds are disclosure controls, not a claim of guaranteed anonymity or legal compliance.</p></CardContent></Card>
+ <section className="mt-6"><h2 className="text-lg font-semibold">Analysis coverage</h2><p className="mt-2 text-sm">This dataset measures approved-care activity. Disease prevalence, coded-condition clusters, risk-factor analysis and individual-case exports are not supported by this release contract. No diagnosis is inferred from free text.</p>{view==='cases'&&<p className="mt-2 text-sm">The original case-repository destination provides these released cohorts. Individual cases remain outside the authorized data scope.</p>}</section>
+ {data.canManage&&<section className="mt-6 border-t border-[var(--border)] pt-5"><h2 className="text-lg font-semibold">Workspace release administration</h2><p className="my-3 text-sm">This grants aggregate access to an existing active research member only. It cannot create an identity, membership or global role.</p>{!data.members.length?<p>No active research member is assigned. Provisioning one is a separate authorized account action.</p>:data.members.map(m=><div key={m.id} className="flex flex-wrap justify-between gap-3 py-3"><span>{m.name} · aggregate access {m.enabled?'enabled':'disabled'}</span><button className="quiet-button" disabled={busy||uncertain} onClick={()=>void send({action:'authorize',workspaceId:workspace,memberId:m.id,expectedRevision:m.revision,enabled:!m.enabled})}>{m.enabled?'Revoke aggregate access':'Authorize aggregate access'}</button></div>)}<label className="field-label">Completed UTC quarter starting on<input type="date" value={quarter} disabled={busy||uncertain} onChange={e=>setQuarter(e.target.value)}/></label><p className="my-3 text-sm">Use January 1, April 1, July 1 or October 1 of a completed quarter in the past five years. A quarter is sealed once, including a withheld release; it cannot be rerun with different filters.</p><button className="primary-button" disabled={!quarter||busy||uncertain} onClick={()=>void send({action:'release',workspaceId:workspace,quarter})}>Create bounded aggregate release</button><Link className="ml-4 underline" href="/admin/users">Existing membership status</Link></section>}</>}
+ </div>;
 }

@@ -1,12 +1,3 @@
-import { redirect } from "next/navigation";
-import { getServerUser } from "@/lib/auth";
-import { AdminDashboardClient } from "@/components/admin/AdminDashboardClient";
-
-export default async function AdminDashboardPage() {
-  const user = await getServerUser();
-
-  if (!user) redirect("/login");
-  if (user.role !== "admin") redirect("/login");
-
-  return <AdminDashboardClient user={user} />;
-}
+import {AdministrationPage} from '@/components/admin/AdministrationPage';
+export const dynamic='force-dynamic';
+export default function Page(){return <AdministrationPage section="overview"/>;}

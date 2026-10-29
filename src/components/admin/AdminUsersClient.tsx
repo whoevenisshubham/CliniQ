@@ -41,6 +41,29 @@ interface AdminUsersClientProps {
     user: { id: string; name: string; email: string; role: string };
 }
 
+async function loadUsers() {
+    try {
+        const res = await fetch('/api/admin/users');
+        const data = await res.json();
+        if (data.users?.length > 0) {
+            const mapped = data.users.map((u: Record<string, unknown>) => ({
+                id: u.id as string,
+                name: (u.name ?? 'User') as string,
+                email: (u.email ?? '') as string,
+                role: (u.role ?? 'patient') as 'doctor' | 'nurse' | 'patient' | 'admin' | 'research',
+                department: (u.department ?? '—') as string,
+                status: (u.is_active !== false ? 'active' : 'inactive') as 'active' | 'inactive',
+                last_active: u.updated_at ? new Date(u.updated_at as string).toLocaleDateString() : 'Unknown',
+                consultations: 0,
+                joined: new Date(u.created_at as string).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }),
+            }));
+            return mapped;
+        }
+    } catch { /* keep mock data */ }
+    return null;
+}
+
+
 export function AdminUsersClient({ user }: AdminUsersClientProps) {
     const [search, setSearch] = useState("");
     const [roleFilter, setRoleFilter] = useState<string>("all");
@@ -49,27 +72,15 @@ export function AdminUsersClient({ user }: AdminUsersClientProps) {
     const [users, setUsers] = useState(MOCK_USERS);
 
     const fetchUsers = useCallback(async () => {
-        try {
-            const res = await fetch('/api/admin/users');
-            const data = await res.json();
-            if (data.users?.length > 0) {
-                const mapped = data.users.map((u: Record<string, unknown>) => ({
-                    id: u.id as string,
-                    name: (u.name ?? 'User') as string,
-                    email: (u.email ?? '') as string,
-                    role: (u.role ?? 'patient') as 'doctor' | 'nurse' | 'patient' | 'admin' | 'research',
-                    department: (u.department ?? '—') as string,
-                    status: (u.is_active !== false ? 'active' : 'inactive') as 'active' | 'inactive',
-                    last_active: u.updated_at ? new Date(u.updated_at as string).toLocaleDateString() : 'Unknown',
-                    consultations: 0,
-                    joined: new Date(u.created_at as string).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }),
-                }));
-                setUsers(mapped);
-            }
-        } catch { /* keep mock data */ }
+        const rows = await loadUsers();
+        if (rows) setUsers(rows);
     }, []);
 
-    useEffect(() => { fetchUsers(); }, [fetchUsers]);
+    useEffect(() => {
+        let active = true;
+        loadUsers().then(rows => { if (active && rows) setUsers(rows); });
+        return () => { active = false; };
+    }, []);
 
     const handleCreateUser = async () => {
         try {

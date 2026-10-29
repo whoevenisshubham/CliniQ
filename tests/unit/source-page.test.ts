@@ -1,0 +1,16 @@
+import {afterEach,beforeEach,expect,it,vi} from 'vitest';
+const state=vi.hoisted(()=>({principal:vi.fn(),content:vi.fn(),render:vi.fn(),single:vi.fn()}));
+vi.mock('@/lib/supabase-server',()=>({getSupabaseServerClient:async()=>({from:()=>({select:()=>({eq:()=>({maybeSingle:state.single})})})}),getSupabaseAdminClient:vi.fn()}));
+vi.mock('@/lib/server/auth/context',()=>({resolvePrincipal:state.principal}));
+vi.mock('@/lib/server/documents/content',()=>({readPrivateContent:state.content}));
+vi.mock('@/lib/server/ocr/images',()=>({renderOCRImages:state.render}));
+import {GET} from '@/app/api/documents/[id]/ocr/page/route';
+import {HttpError} from '@/lib/server/http';
+const params={params:Promise.resolve({id:'owned-document'})};
+const request=()=>new Request('https://preview/api/documents/owned-document/ocr/page?version=current&page=1');
+beforeEach(()=>{state.principal.mockResolvedValue({role:'patient'});state.single.mockResolvedValue({data:{current_version_id:'current',status:'ready'},error:null});state.content.mockResolvedValue(new Response(new Uint8Array([1]),{headers:{'content-type':'image/png'}}));state.render.mockResolvedValue([{page:1,width:1,height:1,bytes:new Uint8Array([137,80,78,71])}]);});
+afterEach(()=>{vi.resetAllMocks();vi.unstubAllEnvs();});
+it('renders an authorized current source with live OCR disabled, without provider admission',async()=>{vi.stubEnv('OCR_ENABLED','false');const r=await GET(request(),params);expect(r.status).toBe(200);expect(r.headers.get('content-type')).toBe('image/png');expect(r.headers.get('cache-control')).toBe('private, no-store');expect(state.single).toHaveBeenCalledTimes(2);expect(state.render).toHaveBeenCalledOnce();});
+it('requires Auth and current authorized version before reading bytes or rasterizing',async()=>{state.principal.mockRejectedValueOnce(new HttpError(401,'AUTH_REQUIRED','Sign in.'));expect((await GET(request(),params)).status).toBe(401);state.single.mockResolvedValueOnce({data:null,error:null});expect((await GET(request(),params)).status).toBe(404);expect(state.content).not.toHaveBeenCalled();expect(state.render).not.toHaveBeenCalled();});
+it('does not publish raster bytes when access/version changes during rendering',async()=>{state.single.mockResolvedValueOnce({data:{current_version_id:'current',status:'ready'},error:null}).mockResolvedValueOnce({data:null,error:null});expect((await GET(request(),params)).status).toBe(404);});
+it('rejects out-of-bound pages before byte access',async()=>{expect((await GET(new Request('https://preview/api?version=current&page=21'),params)).status).toBe(422);expect(state.content).not.toHaveBeenCalled();expect(state.render).not.toHaveBeenCalled();});

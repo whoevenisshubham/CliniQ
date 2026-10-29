@@ -1,7 +1,8 @@
+import { containLegacyRoute } from "@/lib/server/containment";
 import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase-server";
 
-export async function GET(
+async function legacyGET(
     _request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
@@ -42,3 +43,6 @@ export async function GET(
         return NextResponse.json({ consultations: [], error: "Failed to fetch" });
     }
 }
+
+// Quarantined pending scoped service and database-policy verification.
+export const GET = containLegacyRoute(legacyGET);

@@ -489,7 +489,7 @@ export function PatientsClient({ user }: PatientsClientProps) {
   const [sortBy, setSortBy] = useState<"name" | "risk" | "lastVisit">("risk");
 
   const filteredPatients = useMemo(() => {
-    let list = MOCK_PATIENTS.filter((p) => {
+    const list = MOCK_PATIENTS.filter((p) => {
       const matchesSearch =
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.phone.includes(searchQuery) ||

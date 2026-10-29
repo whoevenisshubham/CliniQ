@@ -1,54 +1,43 @@
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { decodeSession, SESSION_COOKIE } from "@/lib/demo-auth";
+import { getRoleDashboardPath } from "@/lib/auth";
+import { resolvePrincipal } from "@/lib/server/auth/context";
+import { getSupabaseConfiguration } from "@/lib/supabase-server";
 
 const ROLE_ROUTES: Record<string, string[]> = {
-  "/doctor": ["doctor", "nurse"],
-  "/patient": ["patient"],
-  "/admin": ["admin"],
-  "/research": ["research", "admin"],
+  "/doctor": ["doctor", "nurse"], "/patient": ["patient"],
+  "/admin": ["admin"], "/research": ["research"], "/receptionist": ["receptionist"],
 };
 
-export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  if (
-    pathname === "/" ||
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/register") ||
-    pathname.startsWith("/api/")
-  ) {
-    return NextResponse.next();
-  }
-
-  const raw = request.cookies.get(SESSION_COOKIE)?.value;
-  const user = raw ? decodeSession(raw) : null;
-
-  if (!user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(url);
-  }
-
-  for (const [route, allowed] of Object.entries(ROLE_ROUTES)) {
-    if (pathname.startsWith(route)) {
-      if (!allowed.includes(user.role)) {
-        const url = request.nextUrl.clone();
-        const rolePaths: Record<string, string> = {
-          doctor: "/doctor", nurse: "/doctor",
-          patient: "/patient", admin: "/admin", research: "/research",
-        };
-        url.pathname = rolePaths[user.role] ?? "/login";
-        return NextResponse.redirect(url);
-      }
+export async function proxy(request: NextRequest) {
+  let response = NextResponse.next({ request });
+  try {
+    const { url, key } = getSupabaseConfiguration();
+    const client = createServerClient(url, key, { cookieOptions:{httpOnly:true,sameSite:"lax",secure:process.env.APP_ORIGIN?.startsWith("https://")??false,path:"/"}, cookies: {
+      getAll: () => request.cookies.getAll(),
+      setAll(cookies) {
+        cookies.forEach(({ name, value }) => request.cookies.set(name, value));
+        response = NextResponse.next({ request });
+        cookies.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+      },
+    } });
+    const user = await resolvePrincipal(client);
+    const route = Object.keys(ROLE_ROUTES).find(path => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(path + "/"));
+    if (route && !ROLE_ROUTES[route].includes(user.role)) {
+      const redirect = NextResponse.redirect(new URL(getRoleDashboardPath(user.role), request.url));
+      response.cookies.getAll().forEach(cookie => redirect.cookies.set(cookie));
+      response = redirect;
     }
+  } catch {
+    const redirect = NextResponse.redirect(new URL("/login", request.url));
+    response.cookies.getAll().forEach(cookie => redirect.cookies.set(cookie));
+    response = redirect;
   }
-
-  return NextResponse.next();
+  response.headers.set("Cache-Control", "private, no-store");
+  response.headers.set("Vary", "Cookie");
+  return response;
 }
 
-export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
-};
+// Explicit protected prefixes include extension-bearing URLs and reception.
+// APIs enforce their own admission and never depend on this redirect layer.
+export const config = { matcher: ["/doctor/:path*", "/patient/:path*", "/admin/:path*", "/research/:path*", "/receptionist/:path*"] };

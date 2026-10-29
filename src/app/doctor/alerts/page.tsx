@@ -1,10 +1,3 @@
-import { redirect } from "next/navigation";
-import { getServerUser } from "@/lib/auth";
-import { SafetyAlertsClient } from "@/components/doctor/SafetyAlertsClient";
-
-export default async function SafetyAlertsPage() {
-  const user = await getServerUser();
-  if (!user) redirect("/login");
-  if (!["doctor", "nurse"].includes(user.role)) redirect("/login");
-  return <SafetyAlertsClient user={user} />;
-}
+import {redirect} from 'next/navigation';import {requirePrincipal} from '@/lib/server/auth/context';import {SafetyAlertsClient} from '@/components/doctor/SafetyAlertsClient';
+export const dynamic='force-dynamic';
+export default async function Page({searchParams}:{searchParams:Promise<{encounter?:string;version?:string}>}){const p=await requirePrincipal().catch(()=>null);if(!p||p.role!=='doctor')redirect('/login');const q=await searchParams;return <SafetyAlertsClient key={p.id+':'+(q.encounter??'select')+':'+(q.version??'draft')} initialId={q.encounter} initialVersion={q.version??null}/>;}

@@ -1,0 +1,2 @@
+# Canonical migration bytes are LF in Git and on every checkout.
+supabase/**/*.sql text eol=lf

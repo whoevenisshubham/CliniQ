@@ -1,7 +1,8 @@
+import { containLegacyRoute } from "@/lib/server/containment";
 import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase-server";
 
-export async function GET(request: Request) {
+async function legacyGET(request: Request) {
     const supabase = getSupabaseAdminClient();
     const { searchParams } = new URL(request.url);
     const role = searchParams.get("role");
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
     }
 }
 
-export async function POST(request: Request) {
+async function legacyPOST(request: Request) {
     const supabase = getSupabaseAdminClient();
 
     try {
@@ -55,3 +56,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
     }
 }
+
+// Quarantined pending scoped service and database-policy verification.
+export const GET = containLegacyRoute(legacyGET);
+export const POST = containLegacyRoute(legacyPOST);

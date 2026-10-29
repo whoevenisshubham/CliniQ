@@ -1,0 +1,37 @@
+# Reviewable release-time proposal only. Not in .github/workflows; no schedule.
+name: Bounded preview recovery
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact reviewed deployed source SHA
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: isolated-preview-recovery
+  cancel-in-progress: false
+jobs:
+  recover:
+    if: github.ref == 'refs/heads/codex/v2-containment'
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    environment: isolated-preview-recovery
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Await bounded recovery (no provider execution)
+        env:
+          RECOVERY_ORIGIN: ${{ vars.RECOVERY_ORIGIN }}
+          RECOVERY_SOURCE_SHA: ${{ inputs.source_sha }}
+          RECOVERY_RUNNER_SECRET: ${{ secrets.RECOVERY_RUNNER_SECRET }}
+        run: node scripts/release-recovery.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: recovery-receipt
+          path: recovery-receipt.json

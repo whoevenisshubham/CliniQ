@@ -1,8 +1,9 @@
+import { containLegacyRoute } from "@/lib/server/containment";
 import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase-server";
 
 // POST — Start a new consultation
-export async function POST(request: Request) {
+async function legacyPOST(request: Request) {
     try {
         const body = await request.json();
         const { patient_id, doctor_id, consultation_type, chief_complaint } = body;
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
 }
 
 // GET — List consultations (optionally filter by doctor_id, patient_id, status)
-export async function GET(request: Request) {
+async function legacyGET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const doctor_id = searchParams.get("doctor_id");
@@ -65,7 +66,7 @@ export async function GET(request: Request) {
 }
 
 // PATCH — Update consultation (status change, finalize)
-export async function PATCH(request: Request) {
+async function legacyPATCH(request: Request) {
     try {
         const body = await request.json();
         const { id, status, ended_at, chief_complaint, consent_recorded, consent_timestamp } = body;
@@ -99,3 +100,8 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: "Failed to update consultation" }, { status: 500 });
     }
 }
+
+// Quarantined pending scoped service and database-policy verification.
+export const POST = containLegacyRoute(legacyPOST);
+export const GET = containLegacyRoute(legacyGET);
+export const PATCH = containLegacyRoute(legacyPATCH);

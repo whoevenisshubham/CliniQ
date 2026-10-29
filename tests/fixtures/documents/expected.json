@@ -1,0 +1,51 @@
+{
+  "synthetic-hindi-english.pdf": {
+    "pages": [
+      [
+        "SYNTHETIC BILINGUAL SOURCE - PAGE 1",
+        "केवल परीक्षण - कोई वास्तविक रोगी नहीं।",
+        "बुखार नहीं है। No fever reported.",
+        "तापमान 37.1 °C | मात्रा 2.5 mg"
+      ],
+      [
+        "SYNTHETIC BILINGUAL SOURCE - PAGE 2",
+        "पृष्ठ 2 - समीक्षा आवश्यक।",
+        "हिंदी और English - source page 2.",
+        "BP 120/80 mmHg | SpO2 98%"
+      ]
+    ],
+    "limitations": "Synthetic embedded-font shaping only; not universal Hindi PDF support.",
+    "sha256": "87a9ac3b5d57479673c4ca6003045800e025032c39bf340371b87824cc58c46b",
+    "bytes": 34469,
+    "embedded_font_streams": 4
+  },
+  "synthetic-columns-table.pdf": {
+    "pages": [
+      [
+        "L1",
+        "37.1",
+        "°C",
+        "L2",
+        "2.5",
+        "mg",
+        "R1",
+        "72",
+        "bpm",
+        "R2",
+        "98%"
+      ],
+      [
+        "Glucose",
+        "5.4",
+        "mmol/L",
+        "Mass",
+        "62.5",
+        "kg"
+      ]
+    ],
+    "limitations": "Preserve page and literal values. Do not infer column/table relationships or claim semantic reading-order confidence.",
+    "sha256": "5a7c9c2cfde46808404882302d40c85c111f81a670ec667dde6ce3cff0eb49ab",
+    "bytes": 22749,
+    "embedded_font_streams": 2
+  }
+}

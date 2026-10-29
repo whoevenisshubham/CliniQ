@@ -1,13 +1,15 @@
 import { redirect } from "next/navigation";
-import { getServerUser } from "@/lib/auth";
-import { DashboardShell } from "@/components/shared/DashboardShell";
+import { requireRole } from "@/lib/auth";
+
+export const dynamic = "force-dynamic";
 
 export default async function PatientLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const user = await getServerUser();
+  const user = await requireRole(["patient"]);
   if (!user) redirect("/login");
-  return <DashboardShell user={user}>{children}</DashboardShell>;
+  // Repaired patient pages own their RecordLayout; retained paths redirect there.
+  return <>{children}</>;
 }

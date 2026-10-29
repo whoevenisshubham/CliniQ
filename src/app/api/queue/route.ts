@@ -1,8 +1,9 @@
+import { containLegacyRoute } from "@/lib/server/containment";
 import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase-server";
 
 // GET — Today's queue (optionally filter by doctor)
-export async function GET(request: Request) {
+async function legacyGET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const doctor_id = searchParams.get("doctor_id");
@@ -36,7 +37,7 @@ export async function GET(request: Request) {
 }
 
 // POST — Add patient to queue
-export async function POST(request: Request) {
+async function legacyPOST(request: Request) {
     try {
         const body = await request.json();
         const { patient_id, patient_name, doctor_id, doctor_name, priority, reason, visit_type, registered_by } = body;
@@ -85,7 +86,7 @@ export async function POST(request: Request) {
 }
 
 // PATCH — Update queue status
-export async function PATCH(request: Request) {
+async function legacyPATCH(request: Request) {
     try {
         const body = await request.json();
         const { id, consultation_id, status, vitals_recorded } = body;
@@ -124,3 +125,8 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: "Failed to update queue" }, { status: 500 });
     }
 }
+
+// Quarantined pending scoped service and database-policy verification.
+export const GET = containLegacyRoute(legacyGET);
+export const POST = containLegacyRoute(legacyPOST);
+export const PATCH = containLegacyRoute(legacyPATCH);

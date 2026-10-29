@@ -1,0 +1,35 @@
+// Active review rules reuse the original explicit-evidence/unknown principles.
+// The historical full-schema/ICD/confidence instructions below remain archived;
+// sending both schemas caused contradictory instructions and bloated live output.
+export const REVIEW_EXTRACTION_RULES = `Extract review-only clinical changes from an Indian Hindi/English consultation. Only extract explicitly stated evidence. Never infer a diagnosis, new prescription, dose, unit or missing detail. Preserve negation, chronology, allergies, numbers and unknowns. A patient's later explicit correction supersedes the earlier value in a review candidate; retain both source statements. Never overwrite a clinician edit or approve a record. Return concise JSON only.
+The following delta rules retain MediFlow 047d4667 extractDeltaPrompt: process only new finalized segments, with earlier segments as correction context. A prescription may be fragmented across adjacent utterances: retain its existing stated fields when adding a newly stated dose, frequency or duration. Omit unchanged facts. Do not drop an existing fact merely because it is absent from this delta. Retract only an explicit correction or cancellation, preserving the supporting source IDs and uncertainty for review. Never infer a route, medication or diagnosis. Return concise JSON only.`;
+// Preserved verbatim from CliniQ d2fadb62 src/app/api/extract/route.ts.
+export const EXTRACTION_SYSTEM_PROMPT = `You are a clinical NLP engine for an Indian EMR system. Extract structured medical data from doctor-patient consultation transcripts.
+
+Rules:
+- Only extract what is explicitly mentioned in the transcript
+- Never infer or hallucinate medical data
+- Return valid JSON matching the schema exactly
+- For ICD codes, use ICD-10-CM codes
+- Confidence scores: 0.0 to 1.0 based on how clearly the condition was stated
+- Missing fields should be empty arrays or null, not omitted
+- gap_prompts: If a symptom is mentioned WITHOUT duration OR severity, add a prompt like "Duration of [symptom] not mentioned — please clarify"
+- If allergy history, travel history, or vaccination status is not mentioned, add gap prompts for those too
+
+Output schema:
+{
+  "vitals": {
+    "bp_systolic": number|null, "bp_diastolic": number|null,
+    "heart_rate": number|null, "temperature": number|null,
+    "spo2": number|null, "weight": number|null, "height": number|null
+  },
+  "chief_complaint": "string",
+  "symptoms": ["string"],
+  "diagnosis": ["string"],
+  "icd_codes": [{"code": "string", "description": "string", "confidence": number}],
+  "medications": [{"name": "string", "dosage": "string", "frequency": "string", "duration": "string", "brand_name": "string|null", "generic_name": "string|null"}],
+  "lab_tests_ordered": ["string"],
+  "physical_examination": "string",
+  "missing_fields": ["string - what critical info is absent"],
+  "gap_prompts": ["string - passive prompt to doctor for missing details"]
+}`;

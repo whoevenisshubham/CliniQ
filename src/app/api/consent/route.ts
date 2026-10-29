@@ -1,3 +1,4 @@
+import { containLegacyRoute } from "@/lib/server/containment";
 import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase-server";
 
@@ -6,7 +7,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase-server";
  * Receives base64-encoded audio blob and stores it in Supabase Storage.
  * Returns the public URL linked to the consultation.
  */
-export async function POST(request: Request) {
+async function legacyPOST(request: Request) {
   try {
     const formData = await request.formData();
     const audioBlob = formData.get("audio") as Blob | null;
@@ -73,3 +74,6 @@ export async function POST(request: Request) {
     );
   }
 }
+
+// Quarantined pending scoped service and database-policy verification.
+export const POST = containLegacyRoute(legacyPOST);

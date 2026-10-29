@@ -1,0 +1,3 @@
+import {it,expect} from 'vitest';import {researchCSV} from '@/lib/server/research/service';
+const id='51b9a50a-bb8a-4274-82ed-cd88c6109c6a';
+it('exports only the fixed numeric aggregate contract and rejects suppressed/withdrawn/malformed releases',()=>{const r={id,quarter:'2026-04-01',state:'released',visitsLowerBound:10,participantsLowerBound:5,patientName:'PRIVATE',patientId:'never-export',diagnosis:'never-export'};const csv=researchCSV({releases:[r]},id);expect(csv).toBe('quarter,approved_visits_lower_bound,participants_lower_bound\r\n2026-04-01,10,5\r\n');for(const state of ['withheld','withdrawn'])expect(()=>researchCSV({releases:[{...r,state}]},id)).toThrow();expect(()=>researchCSV({releases:[{...r,quarter:'=HYPERLINK("x")'}]},id)).toThrow();});

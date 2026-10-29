@@ -1,12 +1,10 @@
-import { cookies } from "next/headers";
-import { decodeSession, SESSION_COOKIE } from "./demo-auth";
+import "server-only";
+import { requirePrincipal } from "./server/auth/context";
 import type { UserRole } from "./types";
 
 export async function getServerUser() {
-  const store = await cookies();
-  const raw = store.get(SESSION_COOKIE)?.value;
-  if (!raw) return null;
-  return decodeSession(raw);
+  try { return await requirePrincipal(); }
+  catch { return null; }
 }
 
 export async function requireRole(allowedRoles: UserRole[]) {
@@ -20,7 +18,7 @@ export function getRoleDashboardPath(role: UserRole): string {
   const paths: Record<UserRole, string> = {
     doctor: "/doctor",
     patient: "/patient",
-    nurse: "/doctor",
+    nurse: "/staff",
     admin: "/admin",
     research: "/research",
     receptionist: "/receptionist",

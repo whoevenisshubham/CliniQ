@@ -1,0 +1,3 @@
+import {getSupabaseServerClient} from '@/lib/supabase-server';import {researchOwner,researchConsent} from '@/lib/server/research/service';import {privateJson,errorResponse,readJson,requireSameOrigin} from '@/lib/server/http';
+export async function GET(){try{return privateJson({data:await researchOwner(await getSupabaseServerClient())});}catch(e){return errorResponse(e);}}
+export async function POST(request:Request){try{requireSameOrigin(request);return privateJson({data:await researchConsent(await getSupabaseServerClient(),request.headers.get('idempotency-key')??'',await readJson(request,1024))});}catch(e){return errorResponse(e);}}

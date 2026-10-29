@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState,useSyncExternalStore } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { usePathname,useSearchParams } from "next/navigation";
+import { motion } from "framer-motion";
 import {
   Activity,
   Users,
@@ -59,13 +59,13 @@ const NAV_CONFIG: Record<UserRole, NavItem[]> = {
     },
     {
       label: "Active Consult",
-      href: "/doctor/consultation",
+      href: "/consultations",
       icon: Stethoscope,
       description: "Live scribing engine",
     },
     {
       label: "EMR Records",
-      href: "/doctor/emr",
+      href: "/consultations?view=history",
       icon: ClipboardList,
       description: "All medical records",
     },
@@ -73,28 +73,31 @@ const NAV_CONFIG: Record<UserRole, NavItem[]> = {
       label: "Safety Alerts",
       href: "/doctor/alerts",
       icon: Shield,
-      badge: "3",
-      badgeVariant: "destructive",
-      description: "Drug & allergy alerts",
+      description: "Recorded allergies; clinician review required",
     },
     {
       label: "Billing",
-      href: "/doctor/billing",
+      href: "/billing",
       icon: CreditCard,
-      description: "Live billing drafts",
+      description: "Reviewed illustrative billing",
     },
+    {label:"Shared Documents",href:"/records",icon:FileText},
+    {label:"Clinic Queue",href:"/care",icon:ClipboardList},
+    {label:"Follow-up Intentions",href:"/continuity",icon:HeartPulse},
   ],
   nurse: [
     { label: "Dashboard", href: "/doctor", icon: Activity },
     { label: "Patients", href: "/doctor/patients", icon: Users },
     { label: "Vitals Entry", href: "/doctor/vitals", icon: HeartPulse },
-    { label: "Safety Alerts", href: "/doctor/alerts", icon: Shield, badge: "3", badgeVariant: "destructive" },
+    { label: "Safety review unavailable", href: "/staff", icon: Shield },
   ],
   patient: [
     { label: "My Health", href: "/patient", icon: HeartPulse },
-    { label: "My Reports", href: "/patient/reports", icon: FileText },
-    { label: "Prescriptions", href: "/patient/prescriptions", icon: BriefcaseMedical },
-    { label: "Ask Questions", href: "/patient/chat", icon: Activity },
+    { label: "My Reports", href: "/records", icon: FileText },
+    { label: "Approved Visits", href: "/consultations", icon: ClipboardList },
+    { label: "Appointments", href: "/care", icon: ClipboardList },
+    { label: "Prescriptions & Tasks", href: "/continuity", icon: BriefcaseMedical },
+    { label: "Ask Questions", href: "/evidence", icon: Activity },
     { label: "My Account", href: "/patient/account", icon: User },
   ],
   admin: [
@@ -104,6 +107,7 @@ const NAV_CONFIG: Record<UserRole, NavItem[]> = {
     { label: "Audit Trail", href: "/admin/audit", icon: Shield },
     { label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
     { label: "Settings", href: "/admin/settings", icon: Settings },
+    { label: "Research Releases", href: "/admin/research", icon: FlaskConical },
   ],
   research: [
     { label: "Insights", href: "/research", icon: FlaskConical },
@@ -119,9 +123,9 @@ const NAV_CONFIG: Record<UserRole, NavItem[]> = {
 // ─── Role labels & colors ─────────────────────────────────────────────────────
 
 const ROLE_META: Record<UserRole, { label: string; color: string; dot: string }> = {
-  doctor: { label: "Physician", color: "text-blue-400", dot: "bg-blue-400" },
+  doctor: { label: "Physician", color: "text-blue-700 dark:text-blue-300", dot: "bg-blue-400" },
   nurse: { label: "Nurse", color: "text-teal-400", dot: "bg-teal-400" },
-  patient: { label: "Patient", color: "text-green-400", dot: "bg-green-400" },
+  patient: { label: "Patient", color: "text-green-700 dark:text-green-300", dot: "bg-green-400" },
   admin: { label: "Administrator", color: "text-purple-400", dot: "bg-purple-400" },
   research: { label: "Researcher", color: "text-amber-400", dot: "bg-amber-400" },
   receptionist: { label: "Receptionist", color: "text-pink-400", dot: "bg-pink-400" },
@@ -143,9 +147,14 @@ interface SidebarProps {
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
+const subscribeCompact=(notify:()=>void)=>{const query=window.matchMedia('(max-width: 1023px)');query.addEventListener('change',notify);return()=>query.removeEventListener('change',notify);};
+const compactSnapshot=()=>window.matchMedia('(max-width: 1023px)').matches;
 export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
+  const historyView=useSearchParams().get('view')==='history';
+  const compact=useSyncExternalStore(subscribeCompact,compactSnapshot,()=>false);
+  const [collapseChoice, setCollapsed] = useState<boolean|null>(null);
+  const collapsed=collapseChoice??compact;
   const navItems = NAV_CONFIG[user.role] ?? NAV_CONFIG.patient;
   const roleMeta = ROLE_META[user.role];
 
@@ -161,7 +170,7 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-600 shrink-0">
           <Activity className="w-4 h-4 text-white" />
         </div>
-        <AnimatePresence>
+        <>
           {!collapsed && (
             <motion.div
               initial={{ opacity: 0, x: -10 }}
@@ -170,15 +179,15 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
               transition={{ duration: 0.15 }}
               className="overflow-hidden"
             >
-              <span className="text-sm font-bold text-white tracking-tight">
-                Nexus<span className="text-blue-400">MD</span>
+              <span className="text-sm font-bold text-[var(--foreground)] tracking-tight">
+                CLINIQ<span className="text-blue-700 dark:text-blue-300">+</span>
               </span>
               <p className="text-[10px] text-[var(--foreground-subtle)] -mt-0.5 font-mono">
-                Smart EMR v1.0
+                Clinical workspace
               </p>
             </motion.div>
           )}
-        </AnimatePresence>
+        </>
       </div>
 
       {/* ─── User card ─────────────────────────────────────────── */}
@@ -192,7 +201,7 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
             {/* Online dot */}
             <span className={cn("absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[var(--sidebar-bg)]", roleMeta.dot)} />
           </div>
-          <AnimatePresence>
+          <>
             {!collapsed && (
               <motion.div
                 initial={{ opacity: 0, x: -8 }}
@@ -209,7 +218,7 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
                 </p>
               </motion.div>
             )}
-          </AnimatePresence>
+          </>
         </div>
       </div>
 
@@ -217,19 +226,17 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive =
-            pathname === item.href ||
-            (item.href !== "/" && pathname.startsWith(item.href + "/"));
+          const isActive = item.href==='/consultations?view=history'?pathname==='/consultations'&&historyView:item.href==='/consultations'?pathname==='/consultations'&&!historyView:pathname===item.href;
 
           return (
-            <Link key={item.href} href={item.href}>
+            <Link key={item.href} href={item.href} aria-label={item.label} aria-current={isActive?'page':undefined}>
               <motion.div
                 whileHover={{ x: collapsed ? 0 : 2 }}
                 whileTap={{ scale: 0.97 }}
                 className={cn(
                   "flex items-center gap-3 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer group",
                   isActive
-                    ? "bg-blue-600/15 text-blue-400 border border-blue-600/25"
+                    ? "bg-blue-600/15 text-blue-700 dark:text-blue-300 border border-blue-600/25"
                     : "text-[var(--foreground-muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
                 )}
                 title={collapsed ? item.label : undefined}
@@ -237,10 +244,10 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
                 <Icon
                   className={cn(
                     "w-4 h-4 shrink-0",
-                    isActive ? "text-blue-400" : "text-[var(--foreground-subtle)] group-hover:text-[var(--foreground-muted)]"
+                    isActive ? "text-blue-700 dark:text-blue-300" : "text-[var(--foreground-subtle)] group-hover:text-[var(--foreground-muted)]"
                   )}
                 />
-                <AnimatePresence>
+                <>
                   {!collapsed && (
                     <motion.span
                       initial={{ opacity: 0 }}
@@ -252,7 +259,7 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
                       {item.label}
                     </motion.span>
                   )}
-                </AnimatePresence>
+                </>
                 {!collapsed && item.badge && (
                   <Badge
                     variant={item.badgeVariant === "destructive" ? "destructive" : "default"}
@@ -274,14 +281,14 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
 
       {/* ─── Footer actions ─────────────────────────────────────── */}
       <div className="px-2 py-3 space-y-0.5">
-        <button
+        <button disabled aria-label="Notifications unavailable"
           className={cn(
             "flex w-full items-center gap-3 px-2.5 py-2 rounded-lg text-xs text-[var(--foreground-muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)] transition-colors"
           )}
           title={collapsed ? "Notifications" : undefined}
         >
           <Bell className="w-4 h-4 shrink-0" />
-          <AnimatePresence>
+          <>
             {!collapsed && (
               <motion.span
                 initial={{ opacity: 0 }}
@@ -289,10 +296,10 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
                 exit={{ opacity: 0 }}
                 className="flex-1 text-left"
               >
-                Notifications
+                Notifications unavailable
               </motion.span>
             )}
-          </AnimatePresence>
+          </>
           {!collapsed && alertCount > 0 && (
             <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4">
               {alertCount}
@@ -302,11 +309,11 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
 
         <button
           onClick={onSignOut}
-          className="flex w-full items-center gap-3 px-2.5 py-2 rounded-lg text-xs text-red-400/70 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+          className="flex w-full items-center gap-3 px-2.5 py-2 rounded-lg text-xs text-red-700 dark:text-red-300 hover:bg-red-500/10 hover:text-red-400 transition-colors"
           title={collapsed ? "Sign Out" : undefined}
         >
           <LogOut className="w-4 h-4 shrink-0" />
-          <AnimatePresence>
+          <>
             {!collapsed && (
               <motion.span
                 initial={{ opacity: 0 }}
@@ -316,14 +323,16 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
                 Sign Out
               </motion.span>
             )}
-          </AnimatePresence>
+          </>
         </button>
       </div>
 
       {/* ─── Collapse toggle ────────────────────────────────────── */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-[72px] flex items-center justify-center w-6 h-6 rounded-full bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors z-10 shadow-md"
+        aria-label={collapsed?'Expand navigation':'Collapse navigation'}
+        aria-expanded={!collapsed}
+        className="absolute right-1 top-[64px] flex items-center justify-center w-6 h-6 rounded-full bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors z-10 shadow-md"
       >
         {collapsed ? (
           <ChevronRight className="w-3 h-3" />
