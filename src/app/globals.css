@@ -7,7 +7,7 @@ a.role-home-primary:hover {background:#1d4ed8}
 
 /* Original d2fadb62 clinical shell palette; light mode retains readable contrast. */
 .role-shell {--background:#f8fafc;--background-secondary:#f1f5f9;--surface:#fff;--surface-elevated:#edf2fa;--border:#cbd5e1;--border-subtle:#e2e8f0;--foreground:#0f172a;--foreground-muted:#475569;--foreground-subtle:#526176;--primary:#2563eb;--primary-hover:#1d4ed8;--primary-foreground:#fff;--sidebar-bg:#f1f5f9;--sidebar-border:#cbd5e1}
-.dark .role-shell {--background:#0a0f1e;--background-secondary:#0d1526;--surface:#111827;--surface-elevated:#1a2540;--border:#26344f;--border-subtle:#162035;--foreground:#e2e8f0;--foreground-muted:#a0afc4;--foreground-subtle:#8495af;--sidebar-bg:#070c18;--sidebar-border:#26344f}
+.dark .role-shell {--background:#0a0f1e;--background-secondary:#0d1526;--surface:#111827;--surface-elevated:#1a2540;--border:#26344f;--border-subtle:#162035;--foreground:#e2e8f0;--foreground-muted:#a0afc4;--foreground-subtle:#8495af;--sidebar-bg:#070c18;--sidebar-border:#26344f;--primary:#8ab4ff;--primary-hover:#abcaff;--primary-foreground:#0a0f1e}
 
 .ocr-page-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 1.5rem; margin-block: 1.5rem; }
 .ocr-page-pair img { display: block; max-width: 100%; max-height: 38rem; object-fit: contain; border: 1px solid var(--border); }
