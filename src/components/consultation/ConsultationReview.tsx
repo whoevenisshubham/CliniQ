@@ -15,6 +15,7 @@ import { emptySnapshot, type ClinicalSnapshot, type Medication, type SavedSegmen
 import {accessDenied,readJsonResponse} from '@/lib/client/http-response';
 import {clinicalResponse} from '@/lib/client/workspace-response';
 type Approved = {
+    metadata?:{patientName:string;encounterAt:string;reviewedBy:string};
     clinical_context?:ClinicalContext;
     id: string;
     consultation_id: string;
@@ -356,7 +357,22 @@ export function ConsultationReview({ actorId, provider, initialId = null, initia
 }
 export function ApprovedRecord({ record }: {
     record: Approved;
-}) { return <article className="approved-record"><p className="eyebrow">Approved · {displayDateTime(record.reviewed_at)}</p><h2>{record.snapshot.chief_complaint ?? 'Approved consultation'}</h2><p>{record.snapshot.clinical_summary ?? 'No clinician summary recorded. Generated explanations are unavailable.'}</p>{record.amended_from_id && <p>Correction of version {record.amended_from_id}. The original is retained.</p>}<p>Version {record.id} · source revision {record.source_revision}</p><ul>{record.snapshot.medications.map(m => <li key={m.id}>{m.name} · {m.dose ?? 'Dose unknown'} · {m.frequency ?? 'Frequency unknown'} · {m.duration ?? 'Duration unknown'} · {m.route ?? 'Route unknown'}</li>)}</ul><ClinicalContextView value={record.clinical_context}/><Link className="text-link" href={`/api/clinical/approved/${record.id}`} target="_blank">Open faithful print / save as PDF record ↗</Link><Link className="text-link" href={"/billing?encounter="+record.consultation_id}>View illustrative billing ↗</Link></article>; }
+}) {
+ const s=record.snapshot;
+ const terms=(values:string[])=>values.length?<ul>{values.map((v,i)=><li key={i}>{v}</li>)}</ul>:<p>Not recorded.</p>;
+ return <article className="approved-record">
+  <p className="eyebrow">Approved · {displayDateTime(record.reviewed_at)}</p>
+  {record.metadata&&<p>{record.metadata.patientName} · Encounter {displayDateTime(record.metadata.encounterAt)} · Reviewed by {record.metadata.reviewedBy}</p>}
+  <h2>{s.chief_complaint??'Approved consultation'}</h2>
+  <p>{s.clinical_summary??'No clinician summary recorded.'}</p>
+  <section className="source-panel"><h3>Reported symptoms</h3>{terms(s.symptoms)}<h3>Reviewed assessment</h3>{terms(s.diagnosis)}<h3>Physical examination</h3><p>{s.physical_examination??'Not recorded.'}</p><h3>Tests ordered</h3>{terms(s.lab_tests_ordered)}</section>
+  <section className="source-panel"><h3>Reviewed measurements</h3>{s.vitals.length?<dl>{s.vitals.map((v,i)=><div className="my-3" key={i}><dt className="font-semibold">{v.name}</dt><dd>{v.value??'Not recorded'} {v.unit} · {v.observedAt?displayDateTime(v.observedAt):'Observation time not recorded'}</dd></div>)}</dl>:<p>No reviewed measurements recorded.</p>}</section>
+  <ClinicalContextView value={record.clinical_context}/>
+  <section className="source-panel"><h3>Separately reviewed new prescriptions</h3>{s.medications.length?<ul>{s.medications.map(m=><li className="my-3" key={m.id}><strong>{m.name}</strong> · {m.dose??'Dose unknown'} · {m.frequency??'Frequency unknown'} · {m.duration??'Duration unknown'} · {m.route??'Route unknown'}{m.instructions&&<p>{m.instructions}</p>}{m.unknownFields.length>0&&<p>Explicitly unknown: {m.unknownFields.join(', ')}</p>}</li>)}</ul>:<p>No new prescription recorded in this reviewed version.</p>}</section>
+  <details className="my-4"><summary>Reviewed version and source details</summary><p>Version {record.id} · source revision {record.source_revision}</p>{record.amended_from_id&&<p>Correction of version {record.amended_from_id}. The original is retained.</p>}</details>
+  <div className="clinical-inline"><Link className="text-link" href={`/api/clinical/approved/${record.id}`} target="_blank">Open faithful print / save as PDF record ↗</Link><Link className="text-link" href={'/billing?encounter='+record.consultation_id}>View illustrative billing ↗</Link></div>
+ </article>;
+}
 
 
 function readableValue(value:unknown):string {

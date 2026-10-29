@@ -3,7 +3,7 @@
 import {it,expect,vi,beforeEach,afterEach} from 'vitest';
 import {act,createElement,type ReactNode} from 'react';
 import {createRoot,type Root} from 'react-dom/client';
-import {ConsultationReview} from '@/components/consultation/ConsultationReview';
+import {ConsultationReview,ApprovedRecord} from '@/components/consultation/ConsultationReview';
 import {emptySnapshot} from '@/lib/contracts/clinical';
 vi.mock('next/link',()=>({default:({children,href}:{children:ReactNode;href:string})=>createElement('a',{href},children)}));
 vi.mock('@/components/documents/DocumentSurface',()=>({RecordLayout:({children}:{children:ReactNode})=>createElement('main',null,children)}));
@@ -15,6 +15,13 @@ const original={id:'source-one',sequence:0,text:'Raw synthetic speech.',speaker:
 const base={visit:{id:'encounter-one',patient_id:'patient-one',workspace_id:'workspace-one',revision:0,status:'active',started_at:'2026-10-27T01:00:00Z'},draft:{revision:0,snapshot:emptySnapshot()},patient:{id:'patient-one',name:'Synthetic',allergies:[]},segments:[original],approved:[],history:[],documents:[],prescriptions:[],proposals:[]};
 const click=async(text:string)=>{const b=[...host.querySelectorAll('button')].find(b=>b.textContent===text);if(!b)throw Error('Missing '+text);await act(async()=>b.click());};
 const change=async(t:HTMLTextAreaElement,text:string)=>act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value')!.set!.call(t,text);t.dispatchEvent(new Event('input',{bubbles:true}));});
+
+it('the selected approved reader exposes all reviewed clinical fields and keeps its exact print version',async()=>{
+ const snapshot={...emptySnapshot(),chief_complaint:'Synthetic reviewed complaint',symptoms:['Synthetic reviewed symptom'],diagnosis:['Synthetic reviewed assessment'],physical_examination:'Synthetic reviewed examination',lab_tests_ordered:['Synthetic reviewed test'],vitals:[{name:'Synthetic reviewed measurement',value:7.2,unit:'%',observedAt:null}]};
+ await act(async()=>root.render(createElement(ApprovedRecord,{record:{id:'selected-reviewed-version',consultation_id:'selected-encounter',snapshot,source_revision:4,reviewed_at:'2026-10-29T01:00:00Z',amended_from_id:null,metadata:{patientName:'Synthetic patient',encounterAt:'2026-10-28T01:00:00Z',reviewedBy:'Synthetic clinician'}}})));
+ for(const value of ['Synthetic patient','Synthetic clinician','Synthetic reviewed symptom','Synthetic reviewed assessment','Synthetic reviewed examination','Synthetic reviewed test','Synthetic reviewed measurement','7.2','Observation time not recorded','No new prescription recorded'])expect(host.textContent).toContain(value);
+ expect(host.querySelector('a[href="/api/clinical/approved/selected-reviewed-version"]')).not.toBeNull();
+});
 
 it('a patient deep link reads only approved versions and never asks for a clinician draft',async()=>{
  const approved=(id:string,consultation_id:string,chief:string)=>({id,consultation_id,source_revision:1,snapshot:{...emptySnapshot(),chief_complaint:chief},reviewed_at:'2026-10-28T00:00:00Z',amended_from_id:null});
