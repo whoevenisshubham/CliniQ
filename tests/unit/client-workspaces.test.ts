@@ -71,11 +71,11 @@ it('actor remount aborts an old account read and ignores its late response',asyn
 });
 
 it('account refresh retains dirty profile input and requires explicit reopening after a saved revision changes',async()=>{
- let reads=0;const fetcher=vi.fn(()=>Promise.resolve(result(++reads===1?account:{...account,revision:1,profile:{...profile,name:'Synthetic newer saved name'}})));vi.stubGlobal('fetch',fetcher);
+ let reads=0;const fetcher=vi.fn((url:string)=>Promise.resolve(result(url==='/api/research/consent'?[]:++reads===1?account:{...account,revision:1,profile:{...profile,name:'Synthetic newer saved name'}})));vi.stubGlobal('fetch',fetcher);
  await render(createElement(AccountWorkspace));await click('Edit profile');
  const name=host.querySelector<HTMLInputElement>('input')!;await change(name,'Synthetic unsaved correction');await click('Refresh saved state');
  expect(host.querySelector('input')).toBe(name);expect(name.value).toBe('Synthetic unsaved correction');expect(host.textContent).toContain('Your input is retained');expect(button('Save profile').disabled).toBe(true);expect(button('Cancel edit').disabled).toBe(false);
- await click('Cancel edit');expect(host.textContent).toContain('Synthetic newer saved name');await click('Edit profile');expect(host.querySelector<HTMLInputElement>('input')!.value).toBe('Synthetic newer saved name');expect(button('Save profile').disabled).toBe(false);expect(fetcher.mock.calls).toHaveLength(2);
+ await click('Cancel edit');expect(host.textContent).toContain('Synthetic newer saved name');await click('Edit profile');expect(host.querySelector<HTMLInputElement>('input')!.value).toBe('Synthetic newer saved name');expect(button('Save profile').disabled).toBe(false);expect(fetcher.mock.calls.filter(([url])=>url==='/api/account')).toHaveLength(2);
 });
 
 it('billing keeps an ambiguous exact review, then reports the confirmed save despite a failed refresh',async()=>{
