@@ -1,4 +1,9 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Role home actions must override the retained unlayered anchor inheritance. */
+a.role-home-primary {color:#fff;background:#2563eb}
+a.role-home-primary:hover {background:#1d4ed8}
 
 .ocr-page-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 1.5rem; margin-block: 1.5rem; }
 .ocr-page-pair img { display: block; max-width: 100%; max-height: 38rem; object-fit: contain; border: 1px solid var(--border); }

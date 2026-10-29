@@ -27,7 +27,7 @@ export function RoleHome({user,view='overview'}:{user:User;view?:'overview'|'pat
  const content=<div className="mx-auto max-w-6xl p-5 sm:p-8">
   <header className="mb-8 flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs uppercase tracking-widest text-[var(--foreground-subtle)]">{provider?'Clinical workspace':'Personal health'}</p><h1 className="mt-2 text-3xl font-semibold">{view==='patients'?'Patients':view==='safety'?'Recorded allergies & review':`Welcome, ${user.name}`}</h1><p className="mt-2 text-sm text-[var(--foreground-muted)]">{provider?'Continue a saved encounter or select a patient to begin.':'Your private records, reviewed visits and continuing care.'}</p></div><ThemeToggle/></header>
   <nav aria-label="Quick actions" className="mb-8 flex flex-wrap gap-3">
-   <Link className="rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white" href={provider?'/consultations':'/records'}>{provider?'Open Ambient Scribe':'Open document library'}</Link>
+   <Link className="role-home-primary rounded-lg px-4 py-3 text-sm font-medium" href={provider?'/consultations':'/records'}>{provider?'Open Ambient Scribe':'Open document library'}</Link>
    <Link className="rounded-lg border border-[var(--border)] px-4 py-3 text-sm" href="/care">{provider?'Clinic queue':'Appointments'}</Link>
    <Link className="rounded-lg border border-[var(--border)] px-4 py-3 text-sm" href={provider?'/records':'/continuity'}>{provider?'Explicitly shared documents':'Medicines & follow-up'}</Link>
   </nav>
