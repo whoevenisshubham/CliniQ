@@ -23,6 +23,8 @@ export async function GET(request:Request,{params}:{params:Promise<{id:string}>}
   const capability=await client.rpc('speech_stream_capability');
   if(!availability.available||availability.mode!=='live'||capability.error||capability.data!==1)throw new HttpError(503,'LIVE_SPEECH_UNAVAILABLE','No scoped live speech allowance is available.');
   const q=new URL(request.url).searchParams,key=q.get('operation')??'',segmentId=q.get('segment')??'';
+  // An old tab must not consume a long allowance before rejecting its new cap.
+  if(availability.maxClipMs!>60000&&q.get('streamVersion')!=='2')throw new HttpError(409,'CLIENT_UPDATE_REQUIRED','Reload this consultation before starting the extended stream.');
   const uuid=/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
   const sequence=Number(q.get('sequence')),revision=Number(q.get('revision'));
   if(!uuid.test(key)||!uuid.test(segmentId)||!q.has('sequence')||!q.has('revision')||!Number.isSafeInteger(sequence)||sequence<0||sequence>999||!Number.isSafeInteger(revision)||revision<0)throw new HttpError(400,'INVALID_COMMAND','Saved transcript position is required.');

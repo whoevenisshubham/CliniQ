@@ -25,7 +25,7 @@ export function LiveSpeechCapture({cid,revision,sequence,disabled,onBusy,onSaved
  const start=()=>{
   if(disabled||locked.current||attempted)return;setAttempted(true);locked.current=true;finish.current=undefined;stoppedAt.current=0;savedAt.current=0;stopped.current=false;firstInterim.current=false;interimElapsed.current=undefined;setLatency({});setFinal('');setInterim('');setCheckpoints([]);setEmrState('');setDemoState('');setState('Connecting authenticated live speech…');setActive(true);onBusy(true);
   energyTiming.current=new LiveSpeechTiming();finalToEmr.current=undefined;
-  const q=new URLSearchParams({operation:crypto.randomUUID(),segment:crypto.randomUUID(),revision:String(revision),sequence:String(sequence)});
+  const q=new URLSearchParams({streamVersion:'2',operation:crypto.randomUUID(),segment:crypto.randomUUID(),revision:String(revision),sequence:String(sequence)});
   const ws=new WebSocket((location.protocol==='https:'?'wss:':'ws:')+'//'+location.host+'/api/clinical/'+cid+'/speech/live?'+q);socket.current=ws;
   const end=(message:string)=>{capture.current?.abort();if(mounted.current){setState(message);setActive(false);onBusy(false);}locked.current=false;};
   ws.onmessage=event=>{

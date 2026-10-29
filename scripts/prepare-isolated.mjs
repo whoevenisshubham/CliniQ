@@ -11,7 +11,7 @@ if (process.argv[2] !== '--apply-local-synthetic') throw new Error('Explicit --a
 localConfiguration();
 if (sql("select to_regclass('public.users') is not null") !== 'f') throw new Error('Existing application schema preserved: use existing fixture or a separately named isolated project; no reset permitted');
 const plan=loadMigrationPlan(root);
-const base=plan.baseline,forwardSQL=Object.keys(plan.manifest).filter(f=>f.startsWith('supabase/migrations/')&&!/20261025000[12]_|20261026000[123]_|20261027000[12]_/.test(f)).map(f=>transactionBody(readFileSync(path.join(root,f),'utf8'))).join('\n');
+const base=plan.baseline,forwardSQL=Object.keys(plan.manifest).filter(f=>f.startsWith('supabase/migrations/')&&!/20261025000[12]_|20261026000[123]_|20261027000[12]_|202610290005_/.test(f)).map(f=>transactionBody(readFileSync(path.join(root,f),'utf8'))).join('\n');
 const legacyPolicies = readFileSync(path.join(root,'tests/fixtures/legacy-policies.sql'),'utf8');
 const fresh = sql(`BEGIN;\n${base}\n${forwardSQL}\nSELECT json_build_object('users',(select count(*) from public.users),'patients',(select count(*) from public.patients),'memberships',(select count(*) from public.workspace_memberships));\nROLLBACK;`);
 assert.deepEqual(JSON.parse(fresh),{users:0,patients:0,memberships:0});
