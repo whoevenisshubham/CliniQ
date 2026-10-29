@@ -8,7 +8,7 @@ const admin=createClient(config.API_URL,config.SERVICE_ROLE_KEY,{auth:{persistSe
 const wA=randomUUID(),wB=randomUUID();
 const people:Record<string,{id:string;client:SupabaseClient}>={};
 beforeAll(async()=>{
- expect((await admin.from('workspaces').insert([{id:wA,name:'Synthetic administration A'},{id:wB,name:'Synthetic administration B'}])).error).toBeNull();
+ expect((await admin.from('workspaces').insert([{id:wA,name:'Synthetic administration A',is_demo:true},{id:wB,name:'Synthetic administration B',is_demo:true}])).error).toBeNull();
  for(const [name,role,w] of [['adminA','admin',wA],['adminB','admin',wB],['staff','doctor',wA]]){
   const id=randomUUID(),email=`${name}.${id}@synthetic.example.test`,password=randomUUID()+randomUUID();
   const auth=await admin.auth.admin.createUser({email,password,email_confirm:true});expect(auth.error).toBeNull();
