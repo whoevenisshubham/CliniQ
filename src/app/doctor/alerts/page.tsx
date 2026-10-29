@@ -1,3 +1,3 @@
-import {RoleHomePage} from '@/components/shared/RoleHomePage';
+import {redirect} from 'next/navigation';import {requirePrincipal} from '@/lib/server/auth/context';import {SafetyAlertsClient} from '@/components/doctor/SafetyAlertsClient';
 export const dynamic='force-dynamic';
-export default function Page(){return <RoleHomePage role="doctor" view="safety"/>;}
+export default async function Page({searchParams}:{searchParams:Promise<{encounter?:string;version?:string}>}){const p=await requirePrincipal().catch(()=>null);if(!p||p.role!=='doctor')redirect('/login');const q=await searchParams;return <SafetyAlertsClient key={p.id+':'+(q.encounter??'select')+':'+(q.version??'draft')} initialId={q.encounter} initialVersion={q.version??null}/>;}

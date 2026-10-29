@@ -1,6 +1,7 @@
 import {afterEach,expect,it,vi} from 'vitest';
 import {workerAuthorized} from '@/lib/server/jobs/authorization';
-const runtime=vi.hoisted(()=>({execute:vi.fn(),client:vi.fn(()=>({synthetic:true}))}));
+const runtime=vi.hoisted(()=>({execute:vi.fn(),client:vi.fn(()=>({synthetic:true})),observe:vi.fn(async()=> 'ok')}));
+vi.mock('@/lib/server/jobs/observation',()=>({observeWorker:runtime.observe,workerStatus:vi.fn(async()=>({state:'unknown',lastSuccess:null}))}));
 vi.mock('@/lib/server/jobs/execution',()=>({executeWork:runtime.execute}));
 vi.mock('@/lib/server/jobs/client',()=>({workerClient:runtime.client}));
 import {dispatchDocumentWork} from '@/lib/server/jobs/dispatch';
@@ -32,4 +33,8 @@ it('accepts the zero-byte stream supplied by hosted Next and bounds an unfinishe
  const empty=new Request('https://preview/api',{method:'POST',headers,body:new ReadableStream({start(controller){controller.close();}}),duplex:'half'} as RequestInit);
  expect((await POST(empty)).status).toBe(200);expect(runtime.execute).toHaveBeenCalledOnce();runtime.execute.mockClear();
  vi.useFakeTimers();try{const unfinished=new Request('https://preview/api',{method:'POST',headers,body:new ReadableStream(),duplex:'half'} as RequestInit);const pending=POST(unfinished);await vi.advanceTimersByTimeAsync(2001);expect((await pending).status).toBe(408);expect(runtime.execute).not.toHaveBeenCalled();}finally{vi.useRealTimers();}
+});
+it('does not report successful maintenance when its durable observation cannot be confirmed',async()=>{
+ vi.stubEnv('DOCUMENT_DISPATCH_SECRET','a'.repeat(40));runtime.execute.mockResolvedValueOnce({status:'idle',degraded:false});runtime.observe.mockRejectedValueOnce(Error('synthetic observation outage'));
+ expect((await POST(new Request('https://preview/api',{method:'POST',headers:{'x-document-dispatch':'a'.repeat(40)}}))).status).toBe(503);expect(runtime.execute).toHaveBeenCalledOnce();expect(runtime.observe).toHaveBeenCalledOnce();
 });

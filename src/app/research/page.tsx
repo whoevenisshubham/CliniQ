@@ -1,3 +1,3 @@
-import {DeferredWorkspace} from '@/components/shared/DeferredWorkspace';
+import {ResearchPage} from '@/components/research/ResearchPage';
 export const dynamic='force-dynamic';
-export default function Page(){return <DeferredWorkspace allowed={['research','admin']} title="Research workspace" reason="No de-identified research export or epidemiological analysis is connected."/>;}
+export default function Page(){return <ResearchPage view="overview"/>;}

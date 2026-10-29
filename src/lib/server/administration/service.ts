@@ -12,3 +12,5 @@ function check(error:PostgrestError|null){
 async function requireAdmin(client:SupabaseClient){const p=await resolvePrincipal(client);if(p.role!=='admin')throw new HttpError(403,'ADMIN_REQUIRED','An active workspace administrator is required.');return p;}
 export async function administrationView(client:SupabaseClient,workspace:string){await requireAdmin(client);id(workspace);const r=await client.rpc('workspace_admin_view',{w:workspace});check(r.error);return r.data;}
 export async function administrationMutate(client:SupabaseClient,key:string,command:unknown){await requireAdmin(client);id(key);const r=await client.rpc('workspace_admin_mutate',{k:key,command});check(r.error);return r.data;}
+export async function administrationOperation(client:SupabaseClient,workspace:string,key:string){await requireAdmin(client);id(workspace);id(key);const r=await client.rpc('workspace_admin_operation',{w:workspace,k:key});check(r.error);return r.data;}
+export async function administrationWorkerStatus(client:SupabaseClient,workspace:string){await requireAdmin(client);id(workspace);const r=await client.rpc('workspace_worker_status',{w:workspace});check(r.error);return r.data;}

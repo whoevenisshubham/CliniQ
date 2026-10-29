@@ -1,7 +1,8 @@
 /**
  * NexusMD Safety Guard
  * Checks prescribed medications against patient allergies and known drug interactions.
- * Hardcoded interaction/allergy data — covers most common Indian clinical scenarios.
+ * Historical rule inventory. V2 filters this detector to its identified,
+ * independently checked rule pack; unverified claims/alternatives are not surfaced.
  */
 
 import type { SafetyAlert, AlertSeverity } from "./types";

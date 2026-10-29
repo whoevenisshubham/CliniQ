@@ -107,6 +107,7 @@ const NAV_CONFIG: Record<UserRole, NavItem[]> = {
     { label: "Audit Trail", href: "/admin/audit", icon: Shield },
     { label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
     { label: "Settings", href: "/admin/settings", icon: Settings },
+    { label: "Research Releases", href: "/admin/research", icon: FlaskConical },
   ],
   research: [
     { label: "Insights", href: "/research", icon: FlaskConical },

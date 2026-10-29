@@ -2,7 +2,7 @@ import {beforeAll,it,expect} from 'vitest';
 import {createClient,type SupabaseClient} from '@supabase/supabase-js';
 import {randomUUID} from 'node:crypto';
 import {localConfiguration} from '../../scripts/local-supabase.mjs';
-import {administrationView,administrationMutate} from '@/lib/server/administration/service';
+import {administrationView,administrationMutate,administrationOperation,administrationWorkerStatus} from '@/lib/server/administration/service';
 const config=localConfiguration();
 const admin=createClient(config.API_URL,config.SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
 const wA=randomUUID(),wB=randomUUID();
@@ -30,6 +30,9 @@ it('status changes are atomic, revisioned and idempotent, with no global role ch
  const key=randomUUID(),command={action:'set_status',workspaceId:wA,memberId:people.staff.id,expectedRevision:0,status:'inactive'};
  const result=await administrationMutate(people.adminA.client,key,command);expect(result).toEqual({memberId:people.staff.id,revision:1,status:'inactive'});
  expect(await administrationMutate(people.adminA.client,key,command)).toEqual(result);
+ expect(await administrationOperation(people.adminA.client,wA,key)).toEqual(result);
+ await expect(administrationOperation(people.adminB.client,wA,key)).rejects.toMatchObject({status:403});
+ expect(await administrationWorkerStatus(people.adminA.client,wA)).toHaveProperty('state');
  await expect(administrationMutate(people.adminA.client,randomUUID(),{...command,status:'active'})).rejects.toMatchObject({status:409,code:'REVISION_CONFLICT'});
  await expect(administrationMutate(people.adminB.client,randomUUID(),command)).rejects.toMatchObject({status:403,code:'ADMIN_REQUIRED'});
  await expect(administrationMutate(people.adminA.client,randomUUID(),{...command,memberId:people.adminA.id})).rejects.toMatchObject({status:403,code:'SELF_CHANGE_FORBIDDEN'});

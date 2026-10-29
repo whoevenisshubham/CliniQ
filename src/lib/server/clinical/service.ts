@@ -47,7 +47,7 @@ export async function mutateClinical(client: SupabaseClient, key: string, comman
 export async function clinicalList(client: SupabaseClient) {
     const p = await resolvePrincipal(client);
     if (p.role === "patient") {
-        const [r, rx] = await Promise.all([client.from("emr_versions").select("*").order("reviewed_at", { ascending: false }).limit(50), client.from("prescriptions").select("id,approved_emr_version_id,medication_name,dosage,frequency,duration,route,instructions,unknown_fields").order("created_at", { ascending: false }).limit(200)]);
+        const [r, rx] = await Promise.all([client.rpc("clinical_approved_index"), client.from("prescriptions").select("id,approved_emr_version_id,medication_name,dosage,frequency,duration,route,instructions,unknown_fields").order("created_at", { ascending: false }).limit(200)]);
         check(r.error);
         check(rx.error);
         return { approved: r.data, prescriptions: rx.data, role: p.role };

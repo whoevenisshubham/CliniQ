@@ -1,0 +1,4 @@
+import {getSupabaseServerClient} from '@/lib/supabase-server';import {safetyView,safetyReview} from '@/lib/server/clinical/safety';import {privateJson,errorResponse,readJson,requireSameOrigin} from '@/lib/server/http';
+type Params={params:Promise<{id:string}>};
+export async function GET(request:Request,{params}:Params){try{return privateJson({data:await safetyView(await getSupabaseServerClient(),(await params).id,new URL(request.url).searchParams.get('version'))});}catch(e){return errorResponse(e);}}
+export async function POST(request:Request,{params}:Params){try{requireSameOrigin(request);return privateJson({data:await safetyReview(await getSupabaseServerClient(),(await params).id,request.headers.get('idempotency-key')??'',await readJson(request,2048))});}catch(e){return errorResponse(e);}}

@@ -1,4 +1,5 @@
 import "server-only";
+import {cache} from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { UserRole } from "@/lib/types";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
@@ -40,6 +41,7 @@ export async function resolvePrincipal(client: SupabaseClient): Promise<Principa
     name: account.name, role: account.role, avatar_url: account.avatar_url ?? undefined, memberships:active };
 }
 
-export async function requirePrincipal() {
+// Request-scoped React cache deduplicates layout/page Auth reads; never shared across requests.
+export const requirePrincipal = cache(async function requirePrincipal() {
   return resolvePrincipal(await getSupabaseServerClient());
-}
+});
