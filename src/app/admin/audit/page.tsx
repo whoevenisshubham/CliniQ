@@ -1,3 +1,3 @@
-import {DeferredWorkspace} from '@/components/shared/DeferredWorkspace';
+import {AdministrationPage} from '@/components/admin/AdministrationPage';
 export const dynamic='force-dynamic';
-export default function Page(){return <DeferredWorkspace allowed={['admin']} title="Audit review" reason="Privileged audit review requires a scoped reader and accepted access boundaries."/>;}
+export default function Page(){return <AdministrationPage section="audit"/>;}

@@ -11,7 +11,7 @@ Every authenticated page resolves verified Auth to its active application accoun
 | `/continuity?encounter=<id>` | Patient, doctor | Owner medicine tracking/reports/tasks; clinician follow-up intentions from a current approved source |
 | `/patient/account` | Patient | Owner profile, purpose preferences, patient-entered family history and authorized measurement sources |
 | `/billing?encounter=<id>` | Doctor, patient | Explicit treating-clinician illustrative review; owner reads retained reviewed selections |
-| `/admin` and its existing subroutes | Admin | Explicit unavailable states; no fabricated metrics, provider uptime or unimplemented privilege controls |
+| `/admin` and its existing subroutes | Admin | Workspace-scoped staff status management, operational encounter metadata, actual counts, transactional membership-change receipts and read-only configuration; no automatic clinical access or global-role editing |
 | `/research` | Research, admin | Explicit unavailable state; no aggregate data/export acceptance |
 | `/staff` | Nurse | Explicit unavailable state; nursing membership does not grant clinician approval |
 

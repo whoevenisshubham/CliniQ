@@ -1,3 +1,3 @@
-import {DeferredWorkspace} from '@/components/shared/DeferredWorkspace';
+import {AdministrationPage} from '@/components/admin/AdministrationPage';
 export const dynamic='force-dynamic';
-export default function Page(){return <DeferredWorkspace allowed={['admin']} title="Account administration" reason="Role and account changes require explicit privileged procedures."/>;}
+export default function Page(){return <AdministrationPage section="users"/>;}
