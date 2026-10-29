@@ -24,6 +24,14 @@ it('a patient deep link reads only approved versions and never asks for a clinic
  expect(host.textContent).toContain('Selected approved complaint');expect(host.textContent).not.toContain('Other approved complaint');
  expect(host.querySelector('a[href="/api/clinical/approved/version-one"]')).not.toBeNull();
 });
+
+it('completed history separates saved EMRs from active encounter creation',async()=>{
+ const read=vi.fn(async()=>Response.json({data:{role:'doctor',patients:[{id:'patient-one',name:'Synthetic patient'}],care:[{patient_id:'patient-one',workspace_id:'workspace-one'}],visits:[{...base.visit,id:'active-encounter',status:'active'},{...base.visit,id:'completed-encounter',status:'completed'}]}}));vi.stubGlobal('fetch',read);
+ await act(async()=>root.render(createElement(ConsultationReview,{actorId:'doctor-one',provider:true,historyOnly:true})));
+ expect(host.querySelector('a[href="/consultations?id=completed-encounter"]')).not.toBeNull();
+ expect(host.querySelector('a[href="/consultations?id=active-encounter"]')).toBeNull();
+ expect([...host.querySelectorAll('button')].some(b=>b.textContent==='Start consultation')).toBe(false);
+});
 it('local clinical editing stays responsive during capture and is retained over transcript-only saves',async()=>{
  let rev=0;vi.stubGlobal('fetch',vi.fn(async(url:string)=>Response.json({data:url.endsWith('/extract')?{available:false}:{...base,visit:{...base.visit,revision:rev},draft:{...base.draft,revision:rev}}})));
  await act(async()=>root.render(createElement(ConsultationReview,{actorId:'doctor-one',provider:true,initialId:'encounter-one'})));await click('Simulate capture');const t=host.querySelector<HTMLTextAreaElement>('[aria-describedby="chief-complaint-guidance"]')!;expect(t.disabled).toBe(false);await change(t,'My unsaved clinician finding');rev=1;await click('Finish simulated capture');expect(t.value).toBe('My unsaved clinician finding');expect(host.textContent).toContain('Your unsaved findings are retained');

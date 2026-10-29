@@ -105,11 +105,12 @@ async function api(path: string, init?: RequestInit) {
 // The manual findings/transcript/review vocabulary is retained from CliniQ's
 // ActiveConsultationClient/LiveTranscriptPanel. Authoritative orchestration is
 // separate from their legacy inference timers and multi-request finalization.
-export function ConsultationReview({ actorId, provider, initialId = null, initialPatient, fixture }: {
+export function ConsultationReview({ actorId, provider, initialId = null, initialPatient, historyOnly=false, fixture }: {
     actorId: string;
     provider: boolean;
     initialId?: string | null;
     initialPatient?:string;
+    historyOnly?:boolean;
     fixture?: ClinicalDetail;
 }) {
     const [listing, setListing] = useState<Listing | null>(null), [selected, setSelected] = useState<string | null>(provider?initialId:null), [detail, setDetail] = useState<ClinicalDetail | null>(fixture ?? null);
@@ -291,15 +292,15 @@ export function ConsultationReview({ actorId, provider, initialId = null, initia
   {!detail && !provider && <div className="clinical-history">{initialId&&<Link href="/consultations">All approved visits</Link>}{listing?.approved?.some(a=>!initialId||a.consultation_id===initialId) ? listing.approved.filter(a=>!initialId||a.consultation_id===initialId).map(a => <ApprovedRecord key={a.id} record={a}/>) : <p>{status === "loading" ? "Loading approved history…" : "No approved visit records available for this selection."}</p>}</div>}
   {!detail && provider && selected && <section aria-label="Saved consultation" aria-busy={status==='loading'}><p>{status==='loading'?'Opening saved transcript and findings…':'The saved consultation could not be opened.'}</p>{status!=='loading'&&<button className="quiet-button" onClick={()=>void loadRef.current(selected)}>Load saved consultation</button>}</section>}
   {!detail && provider && !selected && <>
-   <form className="clinical-start" onSubmit={e => {
+   {historyOnly?<><h2>Completed encounter history</h2><Link href="/consultations">Open active consultations</Link></>:<form className="clinical-start" onSubmit={e => {
                 e.preventDefault();
                 const care = listing?.care?.find(c => `${c.patient_id}:${c.workspace_id}` === patientChoice);
                 if (care)
                     void commit({ action: "create", patientId: care.patient_id, workspaceId: care.workspace_id });
             }}>
     <label>Assigned patient<select required value={patientChoice} disabled={locked} onChange={e => setPatientChoice(e.target.value)}><option value="">Choose a patient</option>{listing?.care?.filter(c=>!initialPatient||c.patient_id===initialPatient).map(c => <option key={`${c.patient_id}:${c.workspace_id}`} value={`${c.patient_id}:${c.workspace_id}`}>{listing.patients?.find(p => p.id === c.patient_id)?.name ?? "Assigned patient"} · {c.workspace_id.slice(0, 8)}</option>)}</select></label><button className="primary-button" disabled={locked || !patientChoice}>Start consultation</button>
-   </form>
-   <div className="clinical-history">{listing?.visits?.filter(v=>!initialPatient||v.patient_id===initialPatient).map(v => <Link className="clinical-visit" href={`/consultations?id=${v.id}`} key={v.id}><span>{listing.patients?.find(p => p.id === v.patient_id)?.name ?? "Assigned patient"}<small>{displayDateTime(v.started_at)} · {v.id.slice(0, 8)}</small></span><span>{v.status} · revision {v.revision}</span></Link>)}{listing && !listing.visits?.some(v=>!initialPatient||v.patient_id===initialPatient) && <p>No consultations yet.</p>}</div>
+   </form>}
+   <div className="clinical-history">{listing?.visits?.filter(v=>(!initialPatient||v.patient_id===initialPatient)&&(!historyOnly||v.status==='completed')).map(v => <Link className="clinical-visit" href={`/consultations?id=${v.id}`} key={v.id}><span>{listing.patients?.find(p => p.id === v.patient_id)?.name ?? "Assigned patient"}<small>{displayDateTime(v.started_at)} · {v.id.slice(0, 8)}</small></span><span>{v.status} · revision {v.revision}</span></Link>)}{listing && !listing.visits?.some(v=>(!initialPatient||v.patient_id===initialPatient)&&(!historyOnly||v.status==='completed')) && <p>No matching consultations.</p>}</div>
   </>}
   {detail && <>
    <div className="clinical-primary-strip"><p><strong>{detail.visit.status}</strong> · {dirty?'Unsaved findings':transcript.trim()?'Unsaved transcript':status} · revision {detail.visit.revision}<br/><span>Allergies: {detail.patient.allergies.length?detail.patient.allergies.join(', '):'none recorded; verify with patient'}</span></p>{detail.approved[0]&&<Link className="primary-button" href={`/api/clinical/approved/${detail.approved[0].id}`} target="_blank">Print reviewed EMR</Link>}{active&&<div><button className="quiet-button" disabled={locked||!dirty} onClick={saveFindings}>Save findings</button><button className="primary-button" disabled={locked||dirty||!!transcript.trim()} onClick={e=>openReview(e.currentTarget)}>Finish & review</button></div>}</div>

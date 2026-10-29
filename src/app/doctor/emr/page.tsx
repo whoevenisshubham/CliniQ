@@ -1,1 +1,1 @@
-import {redirect} from "next/navigation";export default function Page(){redirect("/consultations");}
+import {redirect} from "next/navigation";export default function Page(){redirect("/consultations?view=history");}

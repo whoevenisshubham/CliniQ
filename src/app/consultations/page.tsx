@@ -7,11 +7,12 @@ export default async function Page({ searchParams }: {
     searchParams: Promise<{
         id?: string;
         patient?:string;
+        view?:string;
     }>;
 }) {
     const p = await requirePrincipal().catch(() => null);
     if (!p || !["doctor", "patient"].includes(p.role))
         redirect("/login");
-    const {id,patient} = await searchParams;
-    return <WorkspaceFrame principal={p}><ConsultationReview key={`${p.id}:${id ?? 'list'}:${patient??''}`} actorId={p.id} provider={p.role === "doctor"} initialPatient={patient} initialId={id && id !== "new" ? id : null}/></WorkspaceFrame>;
+    const {id,patient,view} = await searchParams;
+    return <WorkspaceFrame principal={p}><ConsultationReview key={`${p.id}:${id ?? 'list'}:${patient??''}:${view??''}`} actorId={p.id} provider={p.role === "doctor"} historyOnly={view==='history'} initialPatient={patient} initialId={id && id !== "new" ? id : null}/></WorkspaceFrame>;
 }

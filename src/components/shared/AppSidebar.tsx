@@ -2,7 +2,7 @@
 
 import React, { useState,useSyncExternalStore } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname,useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Activity,
@@ -59,13 +59,13 @@ const NAV_CONFIG: Record<UserRole, NavItem[]> = {
     },
     {
       label: "Active Consult",
-      href: "/doctor/consultation",
+      href: "/consultations",
       icon: Stethoscope,
       description: "Live scribing engine",
     },
     {
       label: "EMR Records",
-      href: "/doctor/emr",
+      href: "/consultations?view=history",
       icon: ClipboardList,
       description: "All medical records",
     },
@@ -77,7 +77,7 @@ const NAV_CONFIG: Record<UserRole, NavItem[]> = {
     },
     {
       label: "Billing",
-      href: "/doctor/billing",
+      href: "/billing",
       icon: CreditCard,
       description: "Reviewed illustrative billing",
     },
@@ -93,11 +93,11 @@ const NAV_CONFIG: Record<UserRole, NavItem[]> = {
   ],
   patient: [
     { label: "My Health", href: "/patient", icon: HeartPulse },
-    { label: "My Reports", href: "/patient/reports", icon: FileText },
+    { label: "My Reports", href: "/records", icon: FileText },
     { label: "Approved Visits", href: "/consultations", icon: ClipboardList },
     { label: "Appointments", href: "/care", icon: ClipboardList },
-    { label: "Prescriptions", href: "/patient/prescriptions", icon: BriefcaseMedical },
-    { label: "Ask Questions", href: "/patient/chat", icon: Activity },
+    { label: "Prescriptions & Tasks", href: "/continuity", icon: BriefcaseMedical },
+    { label: "Ask Questions", href: "/evidence", icon: Activity },
     { label: "My Account", href: "/patient/account", icon: User },
   ],
   admin: [
@@ -150,6 +150,7 @@ const subscribeCompact=(notify:()=>void)=>{const query=window.matchMedia('(max-w
 const compactSnapshot=()=>window.matchMedia('(max-width: 639px)').matches;
 export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
   const pathname = usePathname();
+  const historyView=useSearchParams().get('view')==='history';
   const compact=useSyncExternalStore(subscribeCompact,compactSnapshot,()=>false);
   const [collapseChoice, setCollapsed] = useState<boolean|null>(null);
   const collapsed=collapseChoice??compact;
@@ -224,7 +225,7 @@ export function AppSidebar({ user, alertCount = 0, onSignOut }: SidebarProps) {
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href;
+          const isActive = item.href==='/consultations?view=history'?pathname==='/consultations'&&historyView:item.href==='/consultations'?pathname==='/consultations'&&!historyView:pathname===item.href;
 
           return (
             <Link key={item.href} href={item.href} aria-label={item.label} aria-current={isActive?'page':undefined}>
